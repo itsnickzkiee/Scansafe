@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 86">
+<defs>
+  <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff3030"/><stop offset="1" stop-color="#c40000"/></linearGradient>
+</defs>
+<path d="M43 4 78 15v26c0 21-14 35-35 45C22 76 8 62 8 41V15z" fill="url(#shield)" stroke="#fff" stroke-width="3.5"/>
+<circle cx="34" cy="34" r="8" fill="none" stroke="#fff" stroke-width="3.2"/><circle cx="53" cy="34" r="8" fill="none" stroke="#fff" stroke-width="3.2"/>
+<path d="M20 59c1-11 7-16 14-16 8 0 13 5 15 16M39 59c1-11 7-16 14-16 8 0 13 5 15 16" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+<text x="95" y="41" font-family="Arial,Helvetica,sans-serif" font-size="37" font-weight="800" fill="#ffffff">Scan<tspan fill="#ff2b2b">Safe</tspan></text>
+<text x="97" y="61" font-family="Arial,Helvetica,sans-serif" font-size="10.5" fill="#ffffff" opacity=".88">Safer Evacuations. Smarter Shelter Management.</text>
+</svg>

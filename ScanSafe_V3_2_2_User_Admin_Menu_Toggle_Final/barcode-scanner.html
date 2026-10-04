@@ -1,1 +1,239 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe</title><link rel="stylesheet" href="assets/style.css"></head><body><div class="admin-app"><header class="admin-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions"><div class="avatar">A</div><div class="identity"><strong>Admin</strong>Administrator</div><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon "><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon "><use href="assets/icons.svg#building"></use></svg><span>Shelter & Room</span></a><a class="nav-item active" href="barcode-scanner.html"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><span>Barcode Scanner</span></a><a class="nav-item " href="reports.html"><svg class="icon "><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a><a class="nav-item " href="messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a></aside><main class="admin-main"><section class="page"><div class="page-title"><div><h1>Barcode Scanner</h1><p>Scan evacuee barcode to retrieve information, verify status, and manage shelter records.</p></div><div class="date-line"><svg class="icon sm"><use href="assets/icons.svg#calendar"></use></svg><span data-now></span></div></div><div class="scanner-page-grid"><section class="card scan-panel"><div class="panel-head-red"><h2><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg> Scan Barcode</h2><p>Point the camera at the barcode or enter the code manually.</p></div><div class="scan-body"><div class="scan-frame" style="height:230px"><div><div class="barcode" style="width:140px;height:70px"></div><h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3><div class="muted" style="font-size:10px">Ensure the barcode is within the frame.</div></div></div><button class="btn red full" style="margin-top:10px" onclick="scanNow()">Start Scanning</button><div style="text-align:center;font-size:9px;color:#667085;margin:20px 0">OR ENTER CODE MANUALLY</div><div class="manual"><div class="searchbar"><svg class="icon sm"><use href="assets/icons.svg#barcode"></use></svg><input id="manualBarcode" placeholder="Enter evacuee barcode number..."></div><button class="btn red" onclick="manualScan()"><svg class="icon sm"><use href="assets/icons.svg#search"></use></svg> Search</button></div></div></section><section class="card card-pad"><div style="display:flex;justify-content:space-between"><h3 class="section-h">Last Scanned Evacuee</h3><span class="muted" style="font-size:10px">Just now</span></div><div style="display:flex;gap:16px;align-items:center"><div class="person-round"><svg class="icon xl"><use href="assets/icons.svg#user"></use></svg></div><div><h2 style="font-size:17px;margin:0">Juan Dela Cruz</h2><div class="muted" style="font-size:10px;line-height:1.7">Age: 25 &nbsp; | &nbsp; Male<br>Group: <b>4</b><br>Room: <b>B-12</b><br>Status: <span class="pill green">Verified</span></div></div></div><div class="detail-list" style="margin-top:20px"><div class="detail-line"><b>Shelter</b><span>Main School Building</span></div><div class="detail-line"><b>Room Assignment</b><span>Room B-12</span></div><div class="detail-line"><b>Group Size</b><span>4 members</span></div></div><button class="btn out full" onclick="go('evacuees.html')">View Full Evacuee Details →</button></section><section class="card scan-panel"><div class="verify-head"><h3 style="margin:0;font-size:14px"><svg class="icon "><use href="assets/icons.svg#check"></use></svg> Verification Result</h3><div style="font-size:10px">Barcode scanned successfully.</div></div><div class="scan-body"><div id="scanResult" class="verify-box"><div class="verified-mark"><svg class="icon xl"><use href="assets/icons.svg#check"></use></svg></div><h2 style="color:#0a9637;text-align:center;margin:10px 0 4px">VERIFIED</h2><p style="text-align:center;font-size:10px;color:#667085">Evacuee record found in system.</p><div class="detail-list"><div class="detail-line"><b>Barcode Number</b><span>EV-001234</span></div><div class="detail-line"><b>Name</b><span>Juan Dela Cruz</span></div><div class="detail-line"><b>Group</b><span>4</span></div><div class="detail-line"><b>Room</b><span>B-12</span></div><div class="detail-line"><b>Status</b><span><span class="pill green">Verified</span></span></div><div class="detail-line"><b>Date & Time</b><span>August 6, 2026 &nbsp;10:24 AM</span></div><div class="detail-line"><b>Scanned By</b><span>Admin</span></div></div></div></div></section></div><div class="scanner-bottom"><section class="card card-pad"><div style="display:flex;justify-content:space-between"><h3 class="section-h">Scan History</h3><a style="font-size:10px;color:#d00">View All</a></div><table class="table"><tr><th>#</th><th>Name</th><th>Barcode</th><th>Room</th><th>Time</th><th>Status</th></tr><tr><td>1</td><td>Juan Dela Cruz</td><td>EV-001234</td><td>B-12</td><td>10:24 AM</td><td><span class="pill green">Verified</span></td></tr><tr><td>2</td><td>Maria Santos</td><td>EV-001235</td><td>A-4</td><td>10:18 AM</td><td><span class="pill green">Verified</span></td></tr><tr><td>3</td><td>Pedro Reyes</td><td>EV-001236</td><td>B-7</td><td>10:12 AM</td><td><span class="pill green">Verified</span></td></tr><tr><td>4</td><td>Ana Cruz</td><td>EV-001237</td><td>C-3</td><td>10:07 AM</td><td><span class="pill yellow">Pending</span></td></tr></table></section><section class="card card-pad"><h3 class="section-h">Recent Scans</h3><div class="notice-row"><div class="person-round" style="width:34px;height:34px"><svg class="icon "><use href="assets/icons.svg#user"></use></svg></div><div><b style="font-size:10px">Juan Dela Cruz</b><div class="muted" style="font-size:9px">EV-001234 | Room B-12</div></div><span class="pill green">Verified</span></div><div class="notice-row"><div class="person-round" style="width:34px;height:34px"><svg class="icon "><use href="assets/icons.svg#user"></use></svg></div><div><b style="font-size:10px">Maria Santos</b><div class="muted" style="font-size:9px">EV-001235 | Room A-4</div></div><span class="pill green">Verified</span></div></section><section class="card card-pad"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#alert"></use></svg> Suspicious Scans</h3><table class="table"><tr><th>Time</th><th>Barcode</th><th>Reason</th><th>Action</th></tr><tr><td>10:07</td><td>EV-001237</td><td>Not in current location</td><td><button class="btn out">Review</button></td></tr><tr><td>09:45</td><td>EV-001240</td><td>Duplicate scan</td><td><button class="btn out">Review</button></td></tr><tr><td>09:32</td><td>EV-001241</td><td>Invalid barcode</td><td><button class="btn out">Review</button></td></tr></table></section></div></section></main></div><script src="assets/app.js"></script></body></html>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ScanSafe</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+
+<body>
+    <div class="admin-app">
+        <header class="admin-top"><img class="logo-img" src="assets/logo.svg">
+            <div class="top-actions">
+                <div class="avatar">A</div>
+                <div class="identity"><strong>Admin</strong>Administrator</div>
+                <div class="notif"><svg class="icon ">
+                        <use href="assets/icons.svg#bell"></use>
+                    </svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm">
+                        <use href="assets/icons.svg#logout"></use>
+                    </svg> Logout</button>
+            </div>
+        </header>
+        <aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon ">
+                    <use href="assets/icons.svg#home"></use>
+                </svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon ">
+                    <use href="assets/icons.svg#users"></use>
+                </svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon ">
+                    <use href="assets/icons.svg#building"></use>
+                </svg><span>Shelter & Room</span></a><a class="nav-item active" href="barcode-scanner.html"><svg
+                    class="icon ">
+                    <use href="assets/icons.svg#barcode"></use>
+                </svg><span>Barcode Scanner</span></a><a class="nav-item " href="reports.html"><svg class="icon ">
+                    <use href="assets/icons.svg#chart"></use>
+                </svg><span>Reports & Analytics</span></a><a class="nav-item " href="messages.html"><svg class="icon ">
+                    <use href="assets/icons.svg#message"></use>
+                </svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon ">
+                    <use href="assets/icons.svg#settings"></use>
+                </svg><span>Settings</span></a></aside>
+        <main class="admin-main">
+            <section class="page">
+                <div class="page-title">
+                    <div>
+                        <h1>Barcode Scanner</h1>
+                        <p>Scan evacuee barcode to retrieve information, verify status, and manage shelter records.</p>
+                    </div>
+                    <div class="date-line"><svg class="icon sm">
+                            <use href="assets/icons.svg#calendar"></use>
+                        </svg><span data-now></span></div>
+                </div>
+                <div class="scanner-page-grid">
+                    <section class="card scan-panel">
+                        <div class="panel-head-red">
+                            <h2><svg class="icon ">
+                                    <use href="assets/icons.svg#barcode"></use>
+                                </svg> Scan Barcode</h2>
+                            <p>Point the camera at the barcode or enter the code manually.</p>
+                        </div>
+                        <div class="scan-body">
+                            <div class="scan-frame" style="height:230px">
+                                <div>
+                                    <div class="barcode" style="width:140px;height:70px"></div>
+                                    <h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3>
+                                    <div class="muted" style="font-size:10px">Ensure the barcode is within the frame.
+                                    </div>
+                                </div>
+                            </div><button class="btn red full" style="margin-top:10px" onclick="scanNow()">Start
+                                Scanning</button>
+                            <div style="text-align:center;font-size:9px;color:#667085;margin:20px 0">OR ENTER CODE
+                                MANUALLY</div>
+                            <div class="manual">
+                                <div class="searchbar"><svg class="icon sm">
+                                        <use href="assets/icons.svg#barcode"></use>
+                                    </svg><input id="manualBarcode" placeholder="Enter evacuee barcode number..."></div>
+                                <button class="btn red" onclick="manualScan()"><svg class="icon sm">
+                                        <use href="assets/icons.svg#search"></use>
+                                    </svg> Search</button>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="card card-pad">
+                        <div style="display:flex;justify-content:space-between">
+                            <h3 class="section-h">Last Scanned Evacuee</h3><span class="muted"
+                                style="font-size:10px">Just now</span>
+                        </div>
+                        <div style="display:flex;gap:16px;align-items:center">
+                            <div class="person-round"><svg class="icon xl">
+                                    <use href="assets/icons.svg#user"></use>
+                                </svg></div>
+                            <div>
+                                <h2 style="font-size:17px;margin:0">Juan Dela Cruz</h2>
+                                <div class="muted" style="font-size:10px;line-height:1.7">Age: 25 &nbsp; | &nbsp;
+                                    Male<br>Group: <b>4</b><br>Space: <b>A1</b><br>Status: <span
+                                        class="pill green">Verified</span></div>
+                            </div>
+                        </div>
+                        <div class="detail-list" style="margin-top:20px">
+                            <div class="detail-line"><b>Shelter</b><span>Main School Building</span></div>
+                            <div class="detail-line"><b>Accommodation Assignment</b><span>Hallway A1</span></div>
+                            <div class="detail-line"><b>Group Size</b><span>4 members</span></div>
+                        </div><button class="btn out full" onclick="go('evacuees.html')">View Full Evacuee Details
+                            →</button>
+                    </section>
+                    <section class="card scan-panel">
+                        <div class="verify-head">
+                            <h3 style="margin:0;font-size:14px"><svg class="icon ">
+                                    <use href="assets/icons.svg#check"></use>
+                                </svg> Verification Result</h3>
+                            <div style="font-size:10px">Barcode scanned successfully.</div>
+                        </div>
+                        <div class="scan-body">
+                            <div id="scanResult" class="verify-box">
+                                <div class="verified-mark"><svg class="icon xl">
+                                        <use href="assets/icons.svg#check"></use>
+                                    </svg></div>
+                                <h2 style="color:#0a9637;text-align:center;margin:10px 0 4px">VERIFIED</h2>
+                                <p style="text-align:center;font-size:10px;color:#667085">Evacuee record found in
+                                    system.</p>
+                                <div class="detail-list">
+                                    <div class="detail-line"><b>Barcode Number</b><span>EV-001234</span></div>
+                                    <div class="detail-line"><b>Name</b><span>Juan Dela Cruz</span></div>
+                                    <div class="detail-line"><b>Group</b><span>4</span></div>
+                                    <div class="detail-line"><b>Space</b><span>Hallway A1</span></div>
+                                    <div class="detail-line"><b>Status</b><span><span
+                                                class="pill green">Verified</span></span></div>
+                                    <div class="detail-line"><b>Date & Time</b><span>August 6, 2026 &nbsp;10:24
+                                            AM</span></div>
+                                    <div class="detail-line"><b>Scanned By</b><span>Admin</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div class="scanner-bottom">
+                    <section class="card card-pad">
+                        <div style="display:flex;justify-content:space-between">
+                            <h3 class="section-h">Scan History</h3><a style="font-size:10px;color:#d00">View All</a>
+                        </div>
+                        <table class="table">
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Barcode</th>
+                                <th>Room</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                            <tr>
+                                <td>1</td>
+                                <td>Juan Dela Cruz</td>
+                                <td>EV-001234</td>
+                                <td>B-12</td>
+                                <td>10:24 AM</td>
+                                <td><span class="pill green">Verified</span></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Maria Santos</td>
+                                <td>EV-001235</td>
+                                <td>A-4</td>
+                                <td>10:18 AM</td>
+                                <td><span class="pill green">Verified</span></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>Pedro Reyes</td>
+                                <td>EV-001236</td>
+                                <td>B-7</td>
+                                <td>10:12 AM</td>
+                                <td><span class="pill green">Verified</span></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>Ana Cruz</td>
+                                <td>EV-001237</td>
+                                <td>C-3</td>
+                                <td>10:07 AM</td>
+                                <td><span class="pill yellow">Pending</span></td>
+                            </tr>
+                        </table>
+                    </section>
+                    <section class="card card-pad">
+                        <h3 class="section-h">Recent Scans</h3>
+                        <div class="notice-row">
+                            <div class="person-round" style="width:34px;height:34px"><svg class="icon ">
+                                    <use href="assets/icons.svg#user"></use>
+                                </svg></div>
+                            <div><b style="font-size:10px">Juan Dela Cruz</b>
+                                <div class="muted" style="font-size:9px">EV-001234 | Hallway A1</div>
+                            </div><span class="pill green">Verified</span>
+                        </div>
+                        <div class="notice-row">
+                            <div class="person-round" style="width:34px;height:34px"><svg class="icon ">
+                                    <use href="assets/icons.svg#user"></use>
+                                </svg></div>
+                            <div><b style="font-size:10px">Maria Santos</b>
+                                <div class="muted" style="font-size:9px">EV-001235 | Hallway A1</div>
+                            </div><span class="pill green">Verified</span>
+                        </div>
+                    </section>
+                    <section class="card card-pad">
+                        <h3 class="section-h"><svg class="icon ">
+                                <use href="assets/icons.svg#alert"></use>
+                            </svg> Suspicious Scans</h3>
+                        <table class="table">
+                            <tr>
+                                <th>Time</th>
+                                <th>Barcode</th>
+                                <th>Reason</th>
+                                <th>Action</th>
+                            </tr>
+                            <tr>
+                                <td>10:07</td>
+                                <td>EV-001237</td>
+                                <td>Not in current location</td>
+                                <td><button class="btn out">Review</button></td>
+                            </tr>
+                            <tr>
+                                <td>09:45</td>
+                                <td>EV-001240</td>
+                                <td>Duplicate scan</td>
+                                <td><button class="btn out">Review</button></td>
+                            </tr>
+                            <tr>
+                                <td>09:32</td>
+                                <td>EV-001241</td>
+                                <td>Invalid barcode</td>
+                                <td><button class="btn out">Review</button></td>
+                            </tr>
+                        </table>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>

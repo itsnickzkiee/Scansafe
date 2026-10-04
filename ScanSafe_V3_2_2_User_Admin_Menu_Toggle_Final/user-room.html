@@ -1,1 +1,141 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe User</title><link rel="stylesheet" href="assets/style.css"></head><body class="user-shell"><header class="user-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions" style="color:#0f2744"><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><div class="avatar">J</div><div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Home</span></a><a class="nav-item " href="my-information.html"><svg class="icon "><use href="assets/icons.svg#user"></use></svg><span>My Information</span></a><a class="nav-item active" href="user-room.html"><svg class="icon "><use href="assets/icons.svg#bed"></use></svg><span>Room Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="profile.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Profile</span></a></aside><main class="user-main"><section class="user-hero"><h1>Room Assignment</h1><p>View your assigned room and location inside the evacuation shelter.</p><div class="date-card"><svg class="icon lg"><use href="assets/icons.svg#calendar"></use></svg><div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div></div></section><section class="assignment-summary"><div class="assignment-cell" style="display:flex;gap:15px;align-items:center"><span style="color:#d00"><svg class="icon xl"><use href="assets/icons.svg#home"></use></svg></span><div><span style="font-size:9px">Your Assigned Room</span><h2 style="font-size:19px;margin:4px 0">Main School Building</h2><b>Room A-4</b><div style="font-size:9px;color:#d00;margin-top:4px">Ground Floor &nbsp;|&nbsp; View on Floor Plan →</div></div></div><div class="assignment-cell"><span class="muted" style="font-size:9px">Room Capacity</span><div style="font-size:26px;font-weight:800">10</div><span class="muted" style="font-size:9px">Persons</span></div><div class="assignment-cell"><span class="muted" style="font-size:9px">Occupied</span><div style="font-size:26px;font-weight:800">8</div><span class="muted" style="font-size:9px">Persons</span></div><div class="assignment-cell"><span class="muted" style="font-size:9px">Available</span><div style="font-size:26px;font-weight:800">2</div><span class="muted" style="font-size:9px">Slots</span></div><div class="assignment-cell"><b style="color:#21a34b">✓ Active</b><div class="muted" style="font-size:9px;margin-top:6px">Assigned Date<br>Aug 6, 2026 10:24 AM</div></div></section><div class="user-room-grid"><section class="card floor-card"><div class="floor-title">Ground Floor – Floor Plan</div><div class="floor-sub">Main School Building (During Evacuation)</div><div class="floor-wrap exact-floor-wrap" style="margin-top:8px"><div class="floor-image-stage user-floor-stage"><img src="assets/floor-plan-light.png" class="floor-plan-image" alt="Ground Floor Room Layout"><button class="map-hotspot" data-room="116" onclick="selectRoom('116')" style="left:1.8%;top:8.2%;width:21.1%;height:6.7%" aria-label="Room 116"></button><button class="map-hotspot" data-room="114" onclick="selectRoom('114')" style="left:1.8%;top:14.9%;width:21.1%;height:6.3%" aria-label="Room 114"></button><button class="map-hotspot" data-room="112" onclick="selectRoom('112')" style="left:1.8%;top:21.2%;width:21.1%;height:6.5%" aria-label="Room 112"></button><button class="map-hotspot" data-room="110" onclick="selectRoom('110')" style="left:1.8%;top:27.7%;width:21.1%;height:6.0%" aria-label="Room 110"></button><button class="map-hotspot" data-room="108" onclick="selectRoom('108')" style="left:1.8%;top:39.9%;width:21.1%;height:6.8%" aria-label="Room 108"></button><button class="map-hotspot" data-room="106" onclick="selectRoom('106')" style="left:1.8%;top:46.7%;width:21.1%;height:6.2%" aria-label="Room 106"></button><button class="map-hotspot" data-room="104" onclick="selectRoom('104')" style="left:1.8%;top:52.9%;width:21.1%;height:6.2%" aria-label="Room 104"></button><button class="map-hotspot" data-room="102" onclick="selectRoom('102')" style="left:1.8%;top:59.1%;width:21.1%;height:6.2%" aria-label="Room 102"></button><button class="map-hotspot" data-room="115" onclick="selectRoom('115')" style="left:79.0%;top:8.2%;width:19.8%;height:6.7%" aria-label="Room 115"></button><button class="map-hotspot" data-room="113" onclick="selectRoom('113')" style="left:79.0%;top:14.9%;width:19.8%;height:6.3%" aria-label="Room 113"></button><button class="map-hotspot" data-room="111" onclick="selectRoom('111')" style="left:79.0%;top:21.2%;width:19.8%;height:6.5%" aria-label="Room 111"></button><button class="map-hotspot selected-user" data-room="109" onclick="selectRoom('109')" style="left:79.0%;top:27.7%;width:19.8%;height:6.0%" aria-label="Room 109"><span class="your-room-label">Your Room<br><b>A-4</b></span></button><button class="map-hotspot" data-room="107" onclick="selectRoom('107')" style="left:79.0%;top:39.9%;width:19.8%;height:6.8%" aria-label="Room 107"></button><button class="map-hotspot" data-room="105" onclick="selectRoom('105')" style="left:79.0%;top:46.7%;width:19.8%;height:6.2%" aria-label="Room 105"></button><button class="map-hotspot" data-room="103" onclick="selectRoom('103')" style="left:79.0%;top:52.9%;width:19.8%;height:6.2%" aria-label="Room 103"></button></div></div></section><aside style="display:grid;gap:10px"><section class="card card-pad"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#bed"></use></svg> Room Details</h3><div class="detail-list"><div class="detail-line"><b>Building</b><span>Main School Building</span></div><div class="detail-line"><b>Room</b><span>A-4 (Room 109)</span></div><div class="detail-line"><b>Capacity</b><span>10 persons</span></div><div class="detail-line"><b>Occupied</b><span>8 persons</span></div><div class="detail-line"><b>Available</b><span>2 slots</span></div><div class="detail-line"><b>Assigned Date</b><span>Aug 6, 2026 10:24 AM</span></div><div class="detail-line"><b>Shelter Status</b><span style="color:#25a84f;font-weight:700">Active</span></div></div></section><section class="card card-pad facility-list"><h3 class="section-h">Nearby Facilities</h3><div class="detail-line"><b>Designated Restroom</b><span>Beside the Stage (North)</span><span class="muted">Short walk</span></div><div class="detail-line"><b>Main Lobby</b><span>Ground Floor</span><span class="muted">Short walk</span></div><div class="detail-line"><b>Physical Fitness Room</b><span>At the back of Atrium</span><span class="muted">Short walk</span></div><div class="detail-line"><b>Clinic</b><span>Near Registrar's Office</span><span class="muted">Short walk</span></div><div class="detail-line"><b>Stairs</b><span>North and South Wings</span><span class="muted">Short walk</span></div></section><section class="card card-pad"><h3 class="section-h">Quick Actions</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="btn out">Contact Shelter Staff</button><button class="btn red">Report an Issue</button></div></section></aside></div></main><script src="assets/app.js"></script></body></html>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ScanSafe User</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+
+<body class="user-shell">
+    <header class="user-top"><img class="logo-img" src="assets/logo.svg">
+        <div class="top-actions" style="color:#0f2744">
+            <div class="notif"><svg class="icon ">
+                    <use href="assets/icons.svg#bell"></use>
+                </svg></div>
+            <div class="avatar">J</div>
+            <div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red"
+                onclick="logout()"><svg class="icon sm">
+                    <use href="assets/icons.svg#logout"></use>
+                </svg> Logout</button>
+        </div>
+    </header>
+    <aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon ">
+                <use href="assets/icons.svg#home"></use>
+            </svg><span>Home</span></a><a class="nav-item " href="my-information.html"><svg class="icon ">
+                <use href="assets/icons.svg#user"></use>
+            </svg><span>My Information</span></a><a class="nav-item active" href="user-room.html"><svg class="icon ">
+                <use href="assets/icons.svg#bed"></use>
+            </svg><span>Accommodation Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg
+                class="icon ">
+                <use href="assets/icons.svg#bell"></use>
+            </svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon ">
+                <use href="assets/icons.svg#message"></use>
+            </svg><span>Messages</span></a><a class="nav-item " href="profile.html"><svg class="icon ">
+                <use href="assets/icons.svg#settings"></use>
+            </svg><span>Profile</span></a></aside>
+    <main class="user-main">
+        <section class="user-hero">
+            <h1>Accommodation Assignment</h1>
+            <p>View your assigned hallway accommodation space inside the evacuation shelter.</p>
+            <div class="date-card"><svg class="icon lg">
+                    <use href="assets/icons.svg#calendar"></use>
+                </svg>
+                <div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div>
+            </div>
+        </section>
+        <section class="assignment-summary">
+            <div class="assignment-cell" style="display:flex;gap:15px;align-items:center"><span style="color:#d00"><svg
+                        class="icon xl">
+                        <use href="assets/icons.svg#home"></use>
+                    </svg></span>
+                <div><span style="font-size:9px">Your Assigned Space</span>
+                    <h2 style="font-size:19px;margin:4px 0">Main School Building</h2><b>Hallway A1</b>
+                    <div style="font-size:9px;color:#d00;margin-top:4px">Ground Floor &nbsp;|&nbsp; View on Floor Plan →
+                    </div>
+                </div>
+            </div>
+            <div class="assignment-cell"><span class="muted" style="font-size:9px">Space Capacity</span>
+                <div style="font-size:26px;font-weight:800">6</div><span class="muted"
+                    style="font-size:9px">Persons</span>
+            </div>
+            <div class="assignment-cell"><span class="muted" style="font-size:9px">Occupied</span>
+                <div style="font-size:26px;font-weight:800">4</div><span class="muted"
+                    style="font-size:9px">Persons</span>
+            </div>
+            <div class="assignment-cell"><span class="muted" style="font-size:9px">Available</span>
+                <div style="font-size:26px;font-weight:800">2</div><span class="muted"
+                    style="font-size:9px">Slots</span>
+            </div>
+            <div class="assignment-cell"><b style="color:#21a34b">✓ Active</b>
+                <div class="muted" style="font-size:9px;margin-top:6px">Assigned Date<br>Aug 6, 2026 10:24 AM</div>
+            </div>
+        </section>
+        <div class="user-room-grid">
+            <section class="card floor-card">
+                <div class="floor-title">Ground Floor – Floor Plan</div>
+                <div class="floor-sub">Main School Building (During Evacuation)</div>
+                <div class="floor-wrap exact-floor-wrap" style="margin-top:8px">
+                    <div class="floor-image-stage user-floor-stage"><img src="assets/floor-plan-light.png"
+                            class="floor-plan-image" alt="Ground Floor Room Layout"><button
+                            class="map-hotspot hallway-hotspot" data-space="A1" onclick="selectSpace('A1')"
+                            style="left:23.0%;top:8.2%;width:12.4%;height:19.2%" aria-label="Hallway A1"
+                            title="Hallway A1"></button><button class="map-hotspot hallway-hotspot" data-space="A2"
+                            onclick="selectSpace('A2')" style="left:23.0%;top:27.4%;width:12.4%;height:15.0%"
+                            aria-label="Hallway A2" title="Hallway A2"></button><button
+                            class="map-hotspot hallway-hotspot" data-space="A3" onclick="selectSpace('A3')"
+                            style="left:23.0%;top:42.4%;width:12.4%;height:16.8%" aria-label="Hallway A3"
+                            title="Hallway A3"></button><button class="map-hotspot hallway-hotspot" data-space="A4"
+                            onclick="selectSpace('A4')" style="left:64.5%;top:8.2%;width:14.0%;height:19.2%"
+                            aria-label="Hallway A4" title="Hallway A4"></button><button
+                            class="map-hotspot hallway-hotspot" data-space="A5" onclick="selectSpace('A5')"
+                            style="left:64.5%;top:27.4%;width:14.0%;height:15.0%" aria-label="Hallway A5"
+                            title="Hallway A5"></button><button class="map-hotspot hallway-hotspot" data-space="A6"
+                            onclick="selectSpace('A6')" style="left:64.5%;top:42.4%;width:14.0%;height:16.8%"
+                            aria-label="Hallway A6" title="Hallway A6"></button></div>
+                </div>
+            </section>
+            <aside style="display:grid;gap:10px">
+                <section class="card card-pad">
+                    <h3 class="section-h"><svg class="icon ">
+                            <use href="assets/icons.svg#bed"></use>
+                        </svg> Accommodation Space Details</h3>
+                    <div id="spaceDetail">
+                        <div class="detail-list">
+                            <div class="detail-line"><b>Building</b><span>Main School Building</span></div>
+                            <div class="detail-line"><b>Space</b><span>Hallway A1</span></div>
+                            <div class="detail-line"><b>Capacity</b><span>6 persons</span></div>
+                            <div class="detail-line"><b>Occupied</b><span>4 persons</span></div>
+                            <div class="detail-line"><b>Available</b><span>2 slots</span></div>
+                            <div class="detail-line"><b>Assigned Date</b><span>Aug 6, 2026 10:24 AM</span></div>
+                            <div class="detail-line"><b>Shelter Status</b><span
+                                    style="color:#25a84f;font-weight:700">Active</span></div>
+                        </div>
+                    </div>
+                </section>
+                <section class="card card-pad facility-list">
+                    <h3 class="section-h">Nearby Facilities</h3>
+                    <div class="detail-line"><b>Designated Restroom</b><span>Beside the Stage (North)</span><span
+                            class="muted">Short walk</span></div>
+                    <div class="detail-line"><b>Main Lobby</b><span>Ground Floor</span><span class="muted">Short
+                            walk</span></div>
+                    <div class="detail-line"><b>Physical Fitness Room</b><span>At the back of Atrium</span><span
+                            class="muted">Short walk</span></div>
+                    <div class="detail-line"><b>Clinic</b><span>Near Registrar's Office</span><span class="muted">Short
+                            walk</span></div>
+                    <div class="detail-line"><b>Stairs</b><span>North and South Wings</span><span class="muted">Short
+                            walk</span></div>
+                </section>
+                <section class="card card-pad">
+                    <h3 class="section-h">Quick Actions</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="btn out">Contact
+                            Shelter Staff</button><button class="btn red">Report an Issue</button></div>
+                </section>
+            </aside>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>

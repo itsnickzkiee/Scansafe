@@ -1,1 +1,239 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe User</title><link rel="stylesheet" href="assets/style.css"></head><body class="user-shell"><header class="user-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions" style="color:#0f2744"><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><div class="avatar">J</div><div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Home</span></a><a class="nav-item active" href="my-information.html"><svg class="icon "><use href="assets/icons.svg#user"></use></svg><span>My Information</span></a><a class="nav-item " href="user-room.html"><svg class="icon "><use href="assets/icons.svg#bed"></use></svg><span>Room Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="profile.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Profile</span></a></aside><main class="user-main"><section class="user-hero"><h1>My Information</h1><p>View and manage your personal information and group details.</p><div class="date-card"><svg class="icon lg"><use href="assets/icons.svg#calendar"></use></svg><div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div></div></section><div class="profile-layout"><section class="card card-pad"><div style="display:flex;justify-content:space-between"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#user"></use></svg> Personal Information</h3><div><button class="btn out" onclick="editInfo()">Edit</button><button id="saveInfo" class="btn red hidden" onclick="saveInfo()">Save</button></div></div><div class="profile-card-inner"><div style="text-align:center"><div class="person-round" style="margin:auto"><svg class="icon xl"><use href="assets/icons.svg#user"></use></svg></div><h2 style="font-size:16px;margin:10px 0 3px" data-editable>Juan Dela Cruz</h2><div class="muted" style="font-size:10px">Age: 25 &nbsp; | &nbsp; Male<br>Group: 4</div></div><div class="info-lines"><div class="info-line"><b>Address</b><span data-editable>Barangay San Jose, Marilao, Bulacan</span></div><div class="info-line"><b>Contact Number</b><span data-editable>0999XXXXXXXX</span></div><div class="info-line"><b>Special Needs</b><span data-editable>None</span></div><div class="info-line"><b>Accommodation Needs</b><span data-editable>None</span></div><div class="info-line"><b>Emergency Contact</b><span data-editable>Maria Dela Cruz (Mother)<br>0998XXXXXXXX</span></div></div></div></section><aside class="card card-pad"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#home"></use></svg> Assigned Shelter & Room</h3><div style="background:#fff0f0;border-radius:8px;padding:14px"><div style="display:flex;gap:12px;align-items:center;color:#d00"><svg class="icon lg"><use href="assets/icons.svg#home"></use></svg><div><b>Main School Building</b><div class="muted" style="font-size:9px">Barangay San Jose, Marilao, Bulacan</div><a href="user-room.html" style="font-size:9px">View Shelter Details →</a></div></div></div><div style="background:#fff0f0;border-radius:8px;padding:14px;margin-top:8px"><div style="display:flex;gap:12px;align-items:center;color:#d00"><svg class="icon lg"><use href="assets/icons.svg#bed"></use></svg><div><b>Room A-4</b><div class="muted" style="font-size:9px">Capacity: 10 | Occupied: 8 | Available: 2</div><a href="user-room.html" style="font-size:9px">View Room Details →</a></div></div></div></aside></div><div class="group-grid"><section class="card card-pad"><div style="display:flex;justify-content:space-between"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#users"></use></svg> Group Members (4)</h3><button class="btn out">+ Add Member</button></div><table class="table"><tr><th>#</th><th>Name</th><th>Age</th><th>Gender</th><th>Relationship</th><th>Status</th><th>Action</th></tr><tr><td>1</td><td>Juan Dela Cruz</td><td>25</td><td>Male</td><td>Self</td><td><span class="pill green">Verified</span></td><td>-</td></tr><tr><td>2</td><td>Maria Santos</td><td>22</td><td>Female</td><td>Sister</td><td><span class="pill green">Verified</span></td><td><svg class="icon sm"><use href="assets/icons.svg#edit"></use></svg></td></tr><tr><td>3</td><td>Pedro Reyes</td><td>41</td><td>Male</td><td>Father</td><td><span class="pill green">Verified</span></td><td><svg class="icon sm"><use href="assets/icons.svg#edit"></use></svg></td></tr><tr><td>4</td><td>Ana Cruz</td><td>19</td><td>Female</td><td>Mother</td><td><span class="pill green">Verified</span></td><td><svg class="icon sm"><use href="assets/icons.svg#edit"></use></svg></td></tr></table></section><section class="card card-pad"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#check"></use></svg> Verification Status</h3><div style="background:#effcf4;padding:12px;border-radius:8px;color:#07963a"><b style="font-size:16px">Verified</b><div style="font-size:9px">Your information has been verified by shelter staff.</div></div><div class="timeline" style="margin-top:12px"><div class="timeline-row"><span class="timeline-dot">✓</span><div><b style="font-size:10px">Information Submitted</b><div class="muted" style="font-size:9px">Aug 6, 2026 09:12 AM</div></div></div><div class="timeline-row"><span class="timeline-dot">✓</span><div><b style="font-size:10px">Under Review</b><div class="muted" style="font-size:9px">Aug 6, 2026 10:02 AM</div></div></div><div class="timeline-row"><span class="timeline-dot">✓</span><div><b style="font-size:10px">Verified</b><div class="muted" style="font-size:9px">Aug 6, 2026 10:24 AM</div></div></div></div></section><section class="card card-pad barcode-card"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg> Evacuee ID Barcode</h3><div class="barcode"></div><b style="font-size:10px">EV-0001-2026-2487</b><p class="muted" style="font-size:9px">Present this barcode for faster processing at the shelter.</p><button class="btn out full" onclick="window.print()">Print ID</button></section></div><div class="user-grid"><section class="card card-pad"><div style="display:flex;justify-content:space-between"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg> Account Details</h3><button class="btn out">Edit</button></div><div class="info-lines"><div class="info-line"><b>Full Name</b><span>Juan Dela Cruz</span></div><div class="info-line"><b>Email Address</b><span>juan.delacruz@email.com</span></div><div class="info-line"><b>Contact Number</b><span>0999XXXXXXXX</span></div><div class="info-line"><b>Password</b><span>********</span></div></div></section><section class="card card-pad" style="background:#fff3f3"><h3 class="section-h"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg> Quick Actions</h3><div class="account-actions"><button class="quick" onclick="editInfo()"><div><svg class="icon "><use href="assets/icons.svg#edit"></use></svg><br><b>Edit Personal Information</b><br><span class="muted" style="font-size:8px">Update your details</span></div></button><button class="quick"><div><svg class="icon "><use href="assets/icons.svg#users"></use></svg><br><b>Manage Group Members</b><br><span class="muted" style="font-size:8px">Add or edit group members</span></div></button><button class="quick" onclick="window.print()"><div><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><br><b>Print Evacuee ID</b></div></button><button class="quick"><div>◷<br><b>View Activity Log</b></div></button></div></section></div></main><script src="assets/app.js"></script></body></html>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ScanSafe User</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+
+<body class="user-shell">
+    <header class="user-top"><img class="logo-img" src="assets/logo.svg">
+        <div class="top-actions" style="color:#0f2744">
+            <div class="notif"><svg class="icon ">
+                    <use href="assets/icons.svg#bell"></use>
+                </svg></div>
+            <div class="avatar">J</div>
+            <div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red"
+                onclick="logout()"><svg class="icon sm">
+                    <use href="assets/icons.svg#logout"></use>
+                </svg> Logout</button>
+        </div>
+    </header>
+    <aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon ">
+                <use href="assets/icons.svg#home"></use>
+            </svg><span>Home</span></a><a class="nav-item active" href="my-information.html"><svg class="icon ">
+                <use href="assets/icons.svg#user"></use>
+            </svg><span>My Information</span></a><a class="nav-item " href="user-room.html"><svg class="icon ">
+                <use href="assets/icons.svg#bed"></use>
+            </svg><span>Accommodation Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg
+                class="icon ">
+                <use href="assets/icons.svg#bell"></use>
+            </svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon ">
+                <use href="assets/icons.svg#message"></use>
+            </svg><span>Messages</span></a><a class="nav-item " href="profile.html"><svg class="icon ">
+                <use href="assets/icons.svg#settings"></use>
+            </svg><span>Profile</span></a></aside>
+    <main class="user-main">
+        <section class="user-hero">
+            <h1>My Information</h1>
+            <p>View and manage your personal information and group details.</p>
+            <div class="date-card"><svg class="icon lg">
+                    <use href="assets/icons.svg#calendar"></use>
+                </svg>
+                <div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div>
+            </div>
+        </section>
+        <div class="profile-layout">
+            <section class="card card-pad">
+                <div style="display:flex;justify-content:space-between">
+                    <h3 class="section-h"><svg class="icon ">
+                            <use href="assets/icons.svg#user"></use>
+                        </svg> Personal Information</h3>
+                    <div><button class="btn out" onclick="editInfo()">Edit</button><button id="saveInfo"
+                            class="btn red hidden" onclick="saveInfo()">Save</button></div>
+                </div>
+                <div class="profile-card-inner">
+                    <div style="text-align:center">
+                        <div class="person-round" style="margin:auto"><svg class="icon xl">
+                                <use href="assets/icons.svg#user"></use>
+                            </svg></div>
+                        <h2 style="font-size:16px;margin:10px 0 3px" data-editable>Juan Dela Cruz</h2>
+                        <div class="muted" style="font-size:10px">Age: 25 &nbsp; | &nbsp; Male<br>Group: 4</div>
+                    </div>
+                    <div class="info-lines">
+                        <div class="info-line"><b>Address</b><span data-editable>Barangay San Jose, Marilao,
+                                Bulacan</span></div>
+                        <div class="info-line"><b>Contact Number</b><span data-editable>0999XXXXXXXX</span></div>
+                        <div class="info-line"><b>Special Needs</b><span data-editable>None</span></div>
+                        <div class="info-line"><b>Accommodation Needs</b><span data-editable>None</span></div>
+                        <div class="info-line"><b>Emergency Contact</b><span data-editable>Maria Dela Cruz
+                                (Mother)<br>0998XXXXXXXX</span></div>
+                    </div>
+                </div>
+            </section>
+            <aside class="card card-pad">
+                <h3 class="section-h"><svg class="icon ">
+                        <use href="assets/icons.svg#home"></use>
+                    </svg> Assigned Shelter & Room</h3>
+                <div style="background:#fff0f0;border-radius:8px;padding:14px">
+                    <div style="display:flex;gap:12px;align-items:center;color:#d00"><svg class="icon lg">
+                            <use href="assets/icons.svg#home"></use>
+                        </svg>
+                        <div><b>Main School Building</b>
+                            <div class="muted" style="font-size:9px">Barangay San Jose, Marilao, Bulacan</div><a
+                                href="user-room.html" style="font-size:9px">View Shelter Details →</a>
+                        </div>
+                    </div>
+                </div>
+                <div style="background:#fff0f0;border-radius:8px;padding:14px;margin-top:8px">
+                    <div style="display:flex;gap:12px;align-items:center;color:#d00"><svg class="icon lg">
+                            <use href="assets/icons.svg#bed"></use>
+                        </svg>
+                        <div><b>Hallway A1</b>
+                            <div class="muted" style="font-size:9px">Capacity: 10 | Occupied: 8 | Available: 2</div><a
+                                href="user-room.html" style="font-size:9px">View Assignment Details →</a>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+        <div class="group-grid">
+            <section class="card card-pad">
+                <div style="display:flex;justify-content:space-between">
+                    <h3 class="section-h"><svg class="icon ">
+                            <use href="assets/icons.svg#users"></use>
+                        </svg> Group Members (4)</h3><button class="btn out">+ Add Member</button>
+                </div>
+                <table class="table">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Gender</th>
+                        <th>Relationship</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>Juan Dela Cruz</td>
+                        <td>25</td>
+                        <td>Male</td>
+                        <td>Self</td>
+                        <td><span class="pill green">Verified</span></td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Maria Santos</td>
+                        <td>22</td>
+                        <td>Female</td>
+                        <td>Sister</td>
+                        <td><span class="pill green">Verified</span></td>
+                        <td><svg class="icon sm">
+                                <use href="assets/icons.svg#edit"></use>
+                            </svg></td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Pedro Reyes</td>
+                        <td>41</td>
+                        <td>Male</td>
+                        <td>Father</td>
+                        <td><span class="pill green">Verified</span></td>
+                        <td><svg class="icon sm">
+                                <use href="assets/icons.svg#edit"></use>
+                            </svg></td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>Ana Cruz</td>
+                        <td>19</td>
+                        <td>Female</td>
+                        <td>Mother</td>
+                        <td><span class="pill green">Verified</span></td>
+                        <td><svg class="icon sm">
+                                <use href="assets/icons.svg#edit"></use>
+                            </svg></td>
+                    </tr>
+                </table>
+            </section>
+            <section class="card card-pad">
+                <h3 class="section-h"><svg class="icon ">
+                        <use href="assets/icons.svg#check"></use>
+                    </svg> Verification Status</h3>
+                <div style="background:#effcf4;padding:12px;border-radius:8px;color:#07963a"><b
+                        style="font-size:16px">Verified</b>
+                    <div style="font-size:9px">Your information has been verified by shelter staff.</div>
+                </div>
+                <div class="timeline" style="margin-top:12px">
+                    <div class="timeline-row"><span class="timeline-dot">✓</span>
+                        <div><b style="font-size:10px">Information Submitted</b>
+                            <div class="muted" style="font-size:9px">Aug 6, 2026 09:12 AM</div>
+                        </div>
+                    </div>
+                    <div class="timeline-row"><span class="timeline-dot">✓</span>
+                        <div><b style="font-size:10px">Under Review</b>
+                            <div class="muted" style="font-size:9px">Aug 6, 2026 10:02 AM</div>
+                        </div>
+                    </div>
+                    <div class="timeline-row"><span class="timeline-dot">✓</span>
+                        <div><b style="font-size:10px">Verified</b>
+                            <div class="muted" style="font-size:9px">Aug 6, 2026 10:24 AM</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="card card-pad barcode-card">
+                <h3 class="section-h"><svg class="icon ">
+                        <use href="assets/icons.svg#barcode"></use>
+                    </svg> Evacuee ID Barcode</h3>
+                <div class="barcode"></div><b style="font-size:10px">EV-0001-2026-2487</b>
+                <p class="muted" style="font-size:9px">Present this barcode for faster processing at the shelter.</p>
+                <button class="btn out full" onclick="window.print()">Print ID</button>
+            </section>
+        </div>
+        <div class="user-grid">
+            <section class="card card-pad">
+                <div style="display:flex;justify-content:space-between">
+                    <h3 class="section-h"><svg class="icon ">
+                            <use href="assets/icons.svg#settings"></use>
+                        </svg> Account Details</h3><button class="btn out">Edit</button>
+                </div>
+                <div class="info-lines">
+                    <div class="info-line"><b>Full Name</b><span>Juan Dela Cruz</span></div>
+                    <div class="info-line"><b>Email Address</b><span>juan.delacruz@email.com</span></div>
+                    <div class="info-line"><b>Contact Number</b><span>0999XXXXXXXX</span></div>
+                    <div class="info-line"><b>Password</b><span>********</span></div>
+                </div>
+            </section>
+            <section class="card card-pad" style="background:#fff3f3">
+                <h3 class="section-h"><svg class="icon ">
+                        <use href="assets/icons.svg#bell"></use>
+                    </svg> Quick Actions</h3>
+                <div class="account-actions"><button class="quick" onclick="editInfo()">
+                        <div><svg class="icon ">
+                                <use href="assets/icons.svg#edit"></use>
+                            </svg><br><b>Edit Personal Information</b><br><span class="muted"
+                                style="font-size:8px">Update your details</span></div>
+                    </button><button class="quick">
+                        <div><svg class="icon ">
+                                <use href="assets/icons.svg#users"></use>
+                            </svg><br><b>Manage Group Members</b><br><span class="muted" style="font-size:8px">Add or
+                                edit group members</span></div>
+                    </button><button class="quick" onclick="window.print()">
+                        <div><svg class="icon ">
+                                <use href="assets/icons.svg#barcode"></use>
+                            </svg><br><b>Print Evacuee ID</b></div>
+                    </button><button class="quick">
+                        <div>◷<br><b>View Activity Log</b></div>
+                    </button></div>
+            </section>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>

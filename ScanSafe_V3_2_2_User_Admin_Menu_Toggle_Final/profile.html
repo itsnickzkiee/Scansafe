@@ -1,1 +1,75 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe User</title><link rel="stylesheet" href="assets/style.css"></head><body class="user-shell"><header class="user-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions" style="color:#0f2744"><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><div class="avatar">J</div><div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Home</span></a><a class="nav-item " href="my-information.html"><svg class="icon "><use href="assets/icons.svg#user"></use></svg><span>My Information</span></a><a class="nav-item " href="user-room.html"><svg class="icon "><use href="assets/icons.svg#bed"></use></svg><span>Room Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item active" href="profile.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Profile</span></a></aside><main class="user-main"><section class="user-hero"><h1>Profile</h1><p>Manage your account and ScanSafe preferences.</p><div class="date-card"><svg class="icon lg"><use href="assets/icons.svg#calendar"></use></svg><div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div></div></section><div class="profile-layout"><section class="card card-pad"><div style="display:flex;gap:18px;align-items:center"><div class="person-round"><svg class="icon xl"><use href="assets/icons.svg#user"></use></svg></div><div><h2 style="margin:0">Juan Dela Cruz</h2><div class="muted" style="font-size:10px">Evacuee • Verified</div></div></div><div class="info-lines"><div class="info-line"><b>Email Address</b><span>juan.delacruz@email.com</span></div><div class="info-line"><b>Contact Number</b><span>0999XXXXXXXX</span></div><div class="info-line"><b>Assigned Shelter</b><span>Main School Building</span></div><div class="info-line"><b>Assigned Room</b><span>Room A-4</span></div></div><button class="btn out">Edit Profile</button></section><aside class="card card-pad"><h3 class="section-h">Account</h3><button class="btn out full">Change Password</button><button class="btn red full" style="margin-top:8px" onclick="logout()">Logout</button></aside></div></main><script src="assets/app.js"></script></body></html>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ScanSafe User</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+
+<body class="user-shell">
+    <header class="user-top"><img class="logo-img" src="assets/logo.svg">
+        <div class="top-actions" style="color:#0f2744">
+            <div class="notif"><svg class="icon ">
+                    <use href="assets/icons.svg#bell"></use>
+                </svg></div>
+            <div class="avatar">J</div>
+            <div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red"
+                onclick="logout()"><svg class="icon sm">
+                    <use href="assets/icons.svg#logout"></use>
+                </svg> Logout</button>
+        </div>
+    </header>
+    <aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon ">
+                <use href="assets/icons.svg#home"></use>
+            </svg><span>Home</span></a><a class="nav-item " href="my-information.html"><svg class="icon ">
+                <use href="assets/icons.svg#user"></use>
+            </svg><span>My Information</span></a><a class="nav-item " href="user-room.html"><svg class="icon ">
+                <use href="assets/icons.svg#bed"></use>
+            </svg><span>Accommodation Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg
+                class="icon ">
+                <use href="assets/icons.svg#bell"></use>
+            </svg><span>Notifications</span></a><a class="nav-item " href="user-messages.html"><svg class="icon ">
+                <use href="assets/icons.svg#message"></use>
+            </svg><span>Messages</span></a><a class="nav-item active" href="profile.html"><svg class="icon ">
+                <use href="assets/icons.svg#settings"></use>
+            </svg><span>Profile</span></a></aside>
+    <main class="user-main">
+        <section class="user-hero">
+            <h1>Profile</h1>
+            <p>Manage your account and ScanSafe preferences.</p>
+            <div class="date-card"><svg class="icon lg">
+                    <use href="assets/icons.svg#calendar"></use>
+                </svg>
+                <div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div>
+            </div>
+        </section>
+        <div class="profile-layout">
+            <section class="card card-pad">
+                <div style="display:flex;gap:18px;align-items:center">
+                    <div class="person-round"><svg class="icon xl">
+                            <use href="assets/icons.svg#user"></use>
+                        </svg></div>
+                    <div>
+                        <h2 style="margin:0">Juan Dela Cruz</h2>
+                        <div class="muted" style="font-size:10px">Evacuee • Verified</div>
+                    </div>
+                </div>
+                <div class="info-lines">
+                    <div class="info-line"><b>Email Address</b><span>juan.delacruz@email.com</span></div>
+                    <div class="info-line"><b>Contact Number</b><span>0999XXXXXXXX</span></div>
+                    <div class="info-line"><b>Assigned Shelter</b><span>Main School Building</span></div>
+                    <div class="info-line"><b>Assigned Space</b><span>Hallway A1</span></div>
+                </div><button class="btn out">Edit Profile</button>
+            </section>
+            <aside class="card card-pad">
+                <h3 class="section-h">Account</h3><button class="btn out full">Change Password</button><button
+                    class="btn red full" style="margin-top:8px" onclick="logout()">Logout</button>
+            </aside>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>
