@@ -1,0 +1,31 @@
+ScanSafe Prototype Logic + UI Revision
+
+CHANGED ONLY WHERE NEEDED:
+- Admin dashboard redesigned to the approved red professional/user-friendly reference.
+- Desktop admin/user sidebars can slide left/right so content can use full width.
+- Evacuee flow: Registration -> Pending Approval -> Admin Review -> Approve/Reject -> QR Issued -> Accommodation Assignment -> QR Check-In.
+- Approval simulates an email confirmation and QR issuance for presentation/demo purposes.
+- Accommodation assignment only allows approved groups with issued QR codes.
+- Capacity validation prevents assignment when a group is larger than available slots.
+- Main Lobby added as an interactive/selectable accommodation hotspot.
+- User portal revised to mobile-first app-like UI while still working on desktop.
+- User accommodation page includes Show/Hide Map toggle; mobile defaults to hidden for a cleaner app view.
+- Mobile user pages use bottom navigation similar to Android/iOS app navigation.
+- User status/QR/accommodation/check-in states are linked through localStorage for interactive prototype demonstrations.
+- Address uses Abangan Norte, Marilao, Bulacan.
+
+MAP PROTECTION:
+- assets/floor-plan-light.png was NOT edited.
+- SHA-256: 490269ccd518b8a1e7fa46487b8bbf95fdccd0cfb18814c264095039e7b6c68f
+- Only transparent interactive hotspots were added/updated around the existing image.
+
+DEMO FLOW:
+1. Open index.html and optionally Register as Evacuee.
+2. Login as Administrator.
+3. Review a pending registration on Dashboard and click Approve & Issue QR.
+4. Open Accommodation Map and assign the approved evacuee/group to an available hallway or Main Lobby.
+5. Login as Evacuee / User to see the QR and accommodation state.
+6. Admin can scan the QR on QR / Barcode Scanner to simulate check-in.
+
+NOTE:
+This remains a frontend prototype. Email sending and database writes are simulated locally for presentation using browser localStorage.

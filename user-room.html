@@ -1,0 +1,809 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScanSafe Accommodation</title>
+<link rel="stylesheet" href="assets/style.css">
+
+<style id="singleFileMobileMapFix">
+/* ScanSafe one-file mobile map fix.
+   Only affects user-room.html on screens <= 720px.
+   The original assets/floor-plan-light.png is NOT modified. */
+.single-map-mobile-help,
+.single-map-explore-btn,
+#singleUserMapViewer { display:none; }
+
+@media (max-width:720px) {
+  /* Replace the oversized inline map with one Explore button on phones. */
+  .user-map-control .desktop-map-toggle,
+  .user-map-control .desktop-map-help { display:none !important; }
+
+  .user-map-control .mobile-map-help,
+  .single-map-mobile-help { display:block !important; }
+
+  .user-map-control .mobile-explore-map-btn,
+  .single-map-explore-btn {
+    display:inline-flex !important;
+    min-height:38px;
+    padding:9px 13px !important;
+    border-radius:10px !important;
+    white-space:nowrap;
+    flex:0 0 auto;
+  }
+
+  .prototype-user-room-grid > #userMapPanel {
+    display:none !important;
+  }
+
+  .user-map-control {
+    position:static !important;
+    top:auto !important;
+    z-index:auto !important;
+    align-items:center !important;
+  }
+
+  #singleUserMapViewer {
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:2147483000;
+    background:#f4f6fa;
+    color:#0d1b2a;
+    grid-template-rows:64px minmax(0,1fr) auto;
+    overscroll-behavior:none;
+  }
+
+  #singleUserMapViewer.is-open { display:grid !important; }
+
+  body.single-user-map-open {
+    overflow:hidden !important;
+    touch-action:none !important;
+  }
+
+  .single-map-topbar {
+    display:grid;
+    grid-template-columns:42px 1fr 58px;
+    gap:8px;
+    align-items:center;
+    min-height:64px;
+    padding:max(8px, env(safe-area-inset-top)) 12px 8px;
+    background:#fff;
+    border-bottom:1px solid #e4e9ef;
+    box-shadow:0 2px 10px rgba(15,23,42,.06);
+    z-index:5;
+  }
+
+  .single-map-topbar b {
+    display:block;
+    font-size:13px;
+  }
+
+  .single-map-topbar small {
+    display:block;
+    color:#7d8999;
+    font-size:8px;
+    margin-top:2px;
+  }
+
+  .single-map-back,
+  .single-map-reset {
+    border:0;
+    min-height:36px;
+    border-radius:10px;
+    background:#f2f4f7;
+    color:#17263a;
+    font-weight:800;
+  }
+
+  .single-map-back {
+    font-size:27px;
+    line-height:1;
+  }
+
+  .single-map-reset {
+    font-size:9px;
+  }
+
+  #singleMapViewport {
+    position:relative;
+    overflow:hidden;
+    min-height:0;
+    background:
+      radial-gradient(circle at 50% 45%, rgba(255,255,255,.96), rgba(235,240,246,.98)),
+      #edf2f7;
+    touch-action:none;
+    cursor:grab;
+  }
+
+  #singleMapViewport.is-dragging { cursor:grabbing; }
+
+  #singleMapCanvas {
+    position:absolute;
+    left:0;
+    top:0;
+    transform-origin:0 0;
+    will-change:transform;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+
+  #singleMapCanvas .floor-image-stage.user-floor-stage {
+    width:820px !important;
+    min-width:820px !important;
+    max-width:none !important;
+    margin:0 !important;
+    box-shadow:0 8px 28px rgba(15,23,42,.15) !important;
+  }
+
+  #singleMapCanvas .floor-plan-image {
+    pointer-events:none !important;
+  }
+
+  #singleMapCanvas .map-hotspot {
+    pointer-events:auto !important;
+    cursor:pointer !important;
+  }
+
+  #singleMapCanvas .map-hotspot.single-viewer-selected,
+  #singleMapCanvas .map-hotspot.single-viewer-selected.selected-user {
+    background:rgba(226,7,7,.11) !important;
+    box-shadow:
+      inset 0 0 0 4px #e20707,
+      0 0 0 2px #fff,
+      0 3px 12px rgba(226,7,7,.28) !important;
+    z-index:20 !important;
+  }
+
+  .single-map-zoom {
+    position:fixed;
+    right:14px;
+    bottom:calc(145px + env(safe-area-inset-bottom));
+    z-index:2147483003;
+    display:grid;
+    gap:8px;
+  }
+
+  .single-map-zoom button {
+    width:44px;
+    height:44px;
+    border:1px solid #e1e6ec;
+    border-radius:12px;
+    background:rgba(255,255,255,.97);
+    color:#17263a;
+    box-shadow:0 4px 16px rgba(15,23,42,.15);
+    font-size:22px;
+    font-weight:800;
+  }
+
+  .single-map-sheet {
+    background:#fff;
+    border-top:1px solid #e4e9ef;
+    padding:11px 13px calc(11px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 18px rgba(15,23,42,.09);
+    z-index:5;
+  }
+
+  .single-map-summary {
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:10px;
+    align-items:center;
+  }
+
+  .single-map-summary small {
+    display:block;
+    color:#8a96a6;
+    font-size:8px;
+  }
+
+  .single-map-summary strong {
+    display:block;
+    font-size:14px;
+    margin:2px 0;
+  }
+
+  .single-map-summary span {
+    display:block;
+    color:#657287;
+    font-size:8px;
+    line-height:1.4;
+  }
+
+  #singleMapStatus {
+    min-width:64px;
+    text-align:center;
+    border-radius:999px;
+    padding:7px 9px;
+    background:#eef2f6;
+    color:#536174 !important;
+    font-size:8px !important;
+    font-weight:800;
+  }
+
+  #singleMapStatus.available {
+    background:#e4f7ea;
+    color:#178b3b !important;
+  }
+
+  #singleMapStatus.near {
+    background:#fff1d7;
+    color:#a86b00 !important;
+  }
+
+  #singleMapStatus.full {
+    background:#ffe2e2;
+    color:#c70000 !important;
+  }
+
+  .single-map-actions {
+    display:grid;
+    grid-template-columns:1fr .7fr;
+    gap:8px;
+    margin-top:10px;
+  }
+
+  .single-map-actions .btn {
+    min-height:38px;
+    border-radius:10px;
+  }
+}
+
+@media (max-width:380px) {
+  .user-map-control .mobile-explore-map-btn,
+  .single-map-explore-btn {
+    padding:8px 10px !important;
+    font-size:9px !important;
+  }
+
+  #singleMapCanvas .floor-image-stage.user-floor-stage {
+    width:760px !important;
+    min-width:760px !important;
+  }
+}
+</style>
+
+</head>
+<body class="user-shell mobile-app-ready">
+<header class="user-top">
+<img class="logo-img" src="assets/logo.svg">
+<div class="top-actions" style="color:#0f2744">
+<div class="notif">
+<svg class="icon">
+<use href="assets/icons.svg#bell">
+</use>
+</svg>
+</div>
+<div class="avatar">J</div>
+<div class="identity">
+<strong data-user-name>Juan Dela Cruz</strong>Evacuee</div>
+<button class="btn red user-logout" onclick="logout()">
+<svg class="icon sm">
+<use href="assets/icons.svg#logout">
+</use>
+</svg> Logout</button>
+</div>
+</header>
+<aside class="user-side">
+<a class="nav-item " href="user-portal.html">
+<svg class="icon">
+<use href="assets/icons.svg#home">
+</use>
+</svg>
+<span>Home</span>
+</a>
+<a class="nav-item " href="my-information.html">
+<svg class="icon">
+<use href="assets/icons.svg#user">
+</use>
+</svg>
+<span>My Information</span>
+</a>
+<a class="nav-item active" href="user-room.html">
+<svg class="icon">
+<use href="assets/icons.svg#bed">
+</use>
+</svg>
+<span>Accommodation</span>
+</a>
+<a class="nav-item " href="user-notifications.html">
+<svg class="icon">
+<use href="assets/icons.svg#bell">
+</use>
+</svg>
+<span>Notifications</span>
+</a>
+<a class="nav-item " href="user-messages.html">
+<svg class="icon">
+<use href="assets/icons.svg#message">
+</use>
+</svg>
+<span>Messages</span>
+</a>
+<a class="nav-item " href="profile.html">
+<svg class="icon">
+<use href="assets/icons.svg#settings">
+</use>
+</svg>
+<span>Profile</span>
+</a>
+</aside>
+<main class="user-main app-user-main">
+<section class="mobile-page-head">
+<div>
+<small>ScanSafe Accommodation</small>
+<h1>My Accommodation</h1>
+<p>View your assigned space and the ground-floor map.</p>
+</div>
+</section>
+<section class="card assignment-state-card" id="userAssignmentSummary">
+</section>
+<section class="card user-map-control">
+<div>
+<b>Accommodation Map</b>
+<small class="desktop-map-help">Show or hide the approved ground-floor map.</small>
+<small class="mobile-map-help">Open the approved floor map in a touch-friendly viewer.</small>
+</div>
+<label class="map-switch desktop-map-toggle">
+<input id="userMapToggle" type="checkbox" onchange="toggleUserMap(this.checked)">
+<span>
+</span>
+<b>Show Map</b>
+</label>
+<button type="button" class="btn red mobile-explore-map-btn" onclick="openUserMapViewer()">Explore Floor Map</button>
+</section>
+<div class="user-room-grid prototype-user-room-grid">
+<section class="card floor-card user-map-panel" id="userMapPanel">
+<div class="floor-title">Ground Floor – Floor Plan</div>
+<div class="floor-sub">Original approved floor-plan image from your project.</div>
+<div class="floor-wrap exact-floor-wrap" style="margin-top:8px">
+<div class="floor-image-stage user-floor-stage">
+<img src="assets/floor-plan-light.png" class="floor-plan-image" alt="Ground Floor Room Layout">
+<button class="map-hotspot hallway-hotspot" data-space="A1" onclick="selectSpace('A1')" style="left:23.0%;top:8.2%;width:12.4%;height:19.2%" aria-label="Hallway A1">
+</button>
+<button class="map-hotspot hallway-hotspot" data-space="A2" onclick="selectSpace('A2')" style="left:23.0%;top:27.4%;width:12.4%;height:15.0%" aria-label="Hallway A2">
+</button>
+<button class="map-hotspot hallway-hotspot" data-space="A3" onclick="selectSpace('A3')" style="left:23.0%;top:42.4%;width:12.4%;height:16.8%" aria-label="Hallway A3">
+</button>
+<button class="map-hotspot hallway-hotspot" data-space="A4" onclick="selectSpace('A4')" style="left:64.5%;top:8.2%;width:14.0%;height:19.2%" aria-label="Hallway A4">
+</button>
+<button class="map-hotspot hallway-hotspot" data-space="A5" onclick="selectSpace('A5')" style="left:64.5%;top:27.4%;width:14.0%;height:15.0%" aria-label="Hallway A5">
+</button>
+<button class="map-hotspot hallway-hotspot" data-space="A6" onclick="selectSpace('A6')" style="left:64.5%;top:42.4%;width:14.0%;height:16.8%" aria-label="Hallway A6">
+</button>
+<button class="map-hotspot hallway-hotspot main-lobby-hotspot" data-space="ML" onclick="selectSpace('ML')" style="left:35.4%;top:60.0%;width:29.0%;height:23.0%" aria-label="Main Lobby">
+</button>
+</div>
+</div>
+</section>
+<aside class="user-space-side">
+<section class="card card-pad">
+<h3 class="section-h">
+<svg class="icon">
+<use href="assets/icons.svg#bed">
+</use>
+</svg> Space Details</h3>
+<div id="spaceDetail">
+<div class="space-placeholder">Your assigned accommodation details will appear here after admin assignment.</div>
+</div>
+</section>
+<section class="card card-pad">
+<div class="panel-head">
+<h3>Available Areas</h3>
+<span>Reference only</span>
+</div>
+<div id="userSpaceList" class="mobile-space-list">
+</div>
+</section>
+<section class="card card-pad">
+<h3 class="section-h">Quick Actions</h3>
+<div class="prototype-action-row">
+<button class="btn out" onclick="toast('Shelter staff contact request sent.')">Contact Staff</button>
+<button class="btn red" onclick="toast('Issue reporting form opened.')">Report an Issue</button>
+</div>
+</section>
+</aside>
+</div>
+</main>
+
+<div id="singleUserMapViewer" aria-hidden="true">
+  <div class="single-map-topbar">
+    <button type="button" class="single-map-back" onclick="closeSingleUserMapViewer()" aria-label="Back">‹</button>
+    <div>
+      <b>Ground Floor Map</b>
+      <small>Drag to move • Pinch or use + / − to zoom</small>
+    </div>
+    <button type="button" class="single-map-reset" onclick="resetSingleUserMapViewer()">Reset</button>
+  </div>
+
+  <div id="singleMapViewport">
+    <div id="singleMapCanvas"></div>
+  </div>
+
+  <div class="single-map-zoom">
+    <button type="button" onclick="zoomSingleUserMap(1)" aria-label="Zoom in">+</button>
+    <button type="button" onclick="zoomSingleUserMap(-1)" aria-label="Zoom out">−</button>
+  </div>
+
+  <div class="single-map-sheet">
+    <div class="single-map-summary">
+      <div>
+        <small id="singleMapEyebrow">Accommodation Map</small>
+        <strong id="singleMapTitle">Explore the ground floor</strong>
+        <span id="singleMapMeta">Tap A1–A6 or Main Lobby to view the area.</span>
+      </div>
+      <span id="singleMapStatus">Map</span>
+    </div>
+    <div class="single-map-actions">
+      <button type="button" class="btn out" onclick="centerSingleMapOnMySpace()">Center on My Space</button>
+      <button type="button" class="btn red" onclick="closeSingleUserMapViewer()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js">
+</script>
+
+<script id="singleFileMobileMapScript">
+(function () {
+  const S = {
+    scale: 1, x: 0, y: 0, minScale: .35, maxScale: 3,
+    pointers: new Map(), panLast: null,
+    pinchDistance: 0, pinchScale: 1, pinchWorldX: 0, pinchWorldY: 0
+  };
+
+  function qs(sel) { return document.querySelector(sel); }
+
+  function assignmentId() {
+    try {
+      if (typeof currentState === 'function') {
+        const s = currentState();
+        if (s && s.user && s.user.assignment) return s.user.assignment;
+      }
+    } catch (e) {}
+    try {
+      const raw = localStorage.getItem('scansafePrototypeStateV4');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && s.user && s.user.assignment) return s.user.assignment;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function mapData(id) {
+    try {
+      if (typeof getSpaceBase === 'function') {
+        const d = getSpaceBase(id);
+        if (d) return d;
+      }
+    } catch (e) {}
+    try {
+      if (typeof HALLWAY_SPACES !== 'undefined' && HALLWAY_SPACES[id]) return HALLWAY_SPACES[id];
+    } catch (e) {}
+    if (id === 'ML') return {
+      name:'Main Lobby', side:'Main Lobby - Ground Floor',
+      cap:30, occ:18, status:'available'
+    };
+    return {name:'Hallway ' + id, side:'Ground Floor', cap:6, occ:0, status:'available'};
+  }
+
+  function occupancy(id, d) {
+    try {
+      if (typeof getDynamicOccupancy === 'function') return getDynamicOccupancy(id);
+    } catch (e) {}
+    return Number(d.occ || 0);
+  }
+
+  function spaceStatus(id, d, occ) {
+    try {
+      if (typeof getSpaceStatus === 'function') return getSpaceStatus(id);
+    } catch (e) {}
+    if (d.status) return d.status;
+    if (occ >= d.cap) return 'full';
+    if (occ / d.cap >= .71) return 'near';
+    return 'available';
+  }
+
+  function prettyName(id, d) {
+    try {
+      if (typeof formatSpaceName === 'function') return formatSpaceName(id);
+    } catch (e) {}
+    return d.name || (id === 'ML' ? 'Main Lobby' : 'Hallway ' + id);
+  }
+
+  function applyTransform() {
+    const canvas = qs('#singleMapCanvas');
+    if (!canvas) return;
+    canvas.style.transform =
+      'translate3d(' + S.x + 'px,' + S.y + 'px,0) scale(' + S.scale + ')';
+  }
+
+  function clampScale(v) {
+    return Math.max(S.minScale, Math.min(S.maxScale, v));
+  }
+
+  function buildCanvas() {
+    const canvas = qs('#singleMapCanvas');
+    const source = qs('#userMapPanel .user-floor-stage');
+    if (!canvas || !source) return false;
+
+    canvas.innerHTML = '';
+    const clone = source.cloneNode(true);
+
+    clone.querySelectorAll('[data-space]').forEach(function (spot) {
+      const id = spot.getAttribute('data-space');
+      spot.removeAttribute('onclick');
+      spot.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        showSingleMapSpace(id, false);
+        try { if (typeof selectSpace === 'function') selectSpace(id); } catch (e) {}
+      });
+    });
+
+    canvas.appendChild(clone);
+    return true;
+  }
+
+  window.showSingleMapSpace = function (id, center) {
+    const canvas = qs('#singleMapCanvas');
+    if (!canvas) return;
+
+    canvas.querySelectorAll('[data-space]').forEach(function (spot) {
+      spot.classList.toggle(
+        'single-viewer-selected',
+        spot.getAttribute('data-space') === id
+      );
+    });
+
+    const d = mapData(id);
+    const occ = occupancy(id, d);
+    const cap = Number(d.cap || 0);
+    const avail = Math.max(0, cap - occ);
+    const st = spaceStatus(id, d, occ);
+    const mine = assignmentId() === id;
+
+    qs('#singleMapEyebrow').textContent =
+      mine ? 'Your Assigned Space' : 'Designated Accommodation Space';
+    qs('#singleMapTitle').textContent = prettyName(id, d);
+    qs('#singleMapMeta').textContent =
+      (d.side || 'Ground Floor') + ' • ' + occ + '/' + cap +
+      ' occupied • ' + avail + ' available';
+
+    const badge = qs('#singleMapStatus');
+    badge.className = st || '';
+    badge.id = 'singleMapStatus';
+    badge.textContent =
+      st === 'near' ? 'Near Full' :
+      st === 'full' ? 'Full' : 'Available';
+
+    if (center) centerSingleMapOnSpace(id);
+  };
+
+  window.resetSingleUserMapViewer = function () {
+    const viewport = qs('#singleMapViewport');
+    const stage = qs('#singleMapCanvas .user-floor-stage');
+    if (!viewport || !stage) return;
+
+    const sw = stage.offsetWidth || 820;
+    const sh = stage.offsetHeight || 650;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    const fit = Math.min((vw - 18) / sw, (vh - 18) / sh);
+
+    S.minScale = Math.max(.28, Math.min(.9, fit));
+    S.scale = S.minScale;
+    S.x = (vw - sw * S.scale) / 2;
+    S.y = (vh - sh * S.scale) / 2;
+    applyTransform();
+  };
+
+  window.zoomSingleUserMap = function (dir) {
+    const viewport = qs('#singleMapViewport');
+    if (!viewport) return;
+
+    const old = S.scale;
+    const next = clampScale(old * (dir > 0 ? 1.25 : .8));
+    const cx = viewport.clientWidth / 2;
+    const cy = viewport.clientHeight / 2;
+    const wx = (cx - S.x) / old;
+    const wy = (cy - S.y) / old;
+
+    S.scale = next;
+    S.x = cx - wx * next;
+    S.y = cy - wy * next;
+    applyTransform();
+  };
+
+  window.centerSingleMapOnSpace = function (id) {
+    const viewport = qs('#singleMapViewport');
+    const canvas = qs('#singleMapCanvas');
+    const spot = canvas && canvas.querySelector('[data-space="' + id + '"]');
+    if (!viewport || !spot) return;
+
+    const target = clampScale(Math.max(S.minScale * 1.85, .92));
+    const cx = spot.offsetLeft + spot.offsetWidth / 2;
+    const cy = spot.offsetTop + spot.offsetHeight / 2;
+
+    S.scale = target;
+    S.x = viewport.clientWidth / 2 - cx * target;
+    S.y = viewport.clientHeight / 2 - cy * target;
+    applyTransform();
+  };
+
+  window.centerSingleMapOnMySpace = function () {
+    const id = assignmentId();
+    if (!id) {
+      resetSingleUserMapViewer();
+      try {
+        if (typeof toast === 'function') toast('No accommodation assignment yet.');
+      } catch (e) {}
+      return;
+    }
+    showSingleMapSpace(id, true);
+  };
+
+  window.openSingleUserMapViewer = function () {
+    const viewer = qs('#singleUserMapViewer');
+    if (!viewer || !buildCanvas()) return;
+
+    viewer.classList.add('is-open');
+    viewer.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('single-user-map-open');
+
+    requestAnimationFrame(function () {
+      resetSingleUserMapViewer();
+      const id = assignmentId();
+      if (id) {
+        showSingleMapSpace(id, true);
+      } else {
+        qs('#singleMapEyebrow').textContent = 'Accommodation Map';
+        qs('#singleMapTitle').textContent = 'Explore the ground floor';
+        qs('#singleMapMeta').textContent =
+          'Tap A1–A6 or Main Lobby to view the area.';
+        const badge = qs('#singleMapStatus');
+        badge.className = '';
+        badge.id = 'singleMapStatus';
+        badge.textContent = 'Map';
+      }
+    });
+  };
+
+  window.closeSingleUserMapViewer = function () {
+    const viewer = qs('#singleUserMapViewer');
+    if (!viewer) return;
+    viewer.classList.remove('is-open');
+    viewer.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('single-user-map-open');
+    S.pointers.clear();
+    S.panLast = null;
+  };
+
+  /* Keep compatibility with the Explore button already present in this HTML. */
+  window.openUserMapViewer = window.openSingleUserMapViewer;
+  window.closeUserMapViewer = window.closeSingleUserMapViewer;
+  window.resetUserMapViewer = window.resetSingleUserMapViewer;
+  window.userMapZoom = window.zoomSingleUserMap;
+  window.centerUserMapOnAssignment = window.centerSingleMapOnMySpace;
+
+  function initGestures() {
+    const viewport = qs('#singleMapViewport');
+    if (!viewport || viewport.dataset.ready === '1') return;
+    viewport.dataset.ready = '1';
+
+    function dist(a,b) {
+      return Math.hypot(b.x-a.x, b.y-a.y);
+    }
+    function mid(a,b) {
+      return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    }
+
+    viewport.addEventListener('pointerdown', function (ev) {
+      if (!qs('#singleUserMapViewer').classList.contains('is-open')) return;
+
+      S.pointers.set(ev.pointerId, {x:ev.clientX, y:ev.clientY});
+      try { viewport.setPointerCapture(ev.pointerId); } catch (e) {}
+
+      if (S.pointers.size === 1) {
+        S.panLast = {x:ev.clientX, y:ev.clientY};
+      } else if (S.pointers.size === 2) {
+        const pts = Array.from(S.pointers.values());
+        const m = mid(pts[0], pts[1]);
+        const rect = viewport.getBoundingClientRect();
+
+        S.pinchDistance = dist(pts[0], pts[1]);
+        S.pinchScale = S.scale;
+        S.pinchWorldX = (m.x - rect.left - S.x) / S.scale;
+        S.pinchWorldY = (m.y - rect.top - S.y) / S.scale;
+        S.panLast = null;
+      }
+    });
+
+    viewport.addEventListener('pointermove', function (ev) {
+      if (!S.pointers.has(ev.pointerId)) return;
+      S.pointers.set(ev.pointerId, {x:ev.clientX, y:ev.clientY});
+
+      if (S.pointers.size >= 2) {
+        const pts = Array.from(S.pointers.values());
+        const now = dist(pts[0], pts[1]);
+        if (!S.pinchDistance) return;
+
+        const next = clampScale(S.pinchScale * (now / S.pinchDistance));
+        const m = mid(pts[0], pts[1]);
+        const rect = viewport.getBoundingClientRect();
+        const mx = m.x - rect.left;
+        const my = m.y - rect.top;
+
+        S.scale = next;
+        S.x = mx - S.pinchWorldX * next;
+        S.y = my - S.pinchWorldY * next;
+        applyTransform();
+        return;
+      }
+
+      if (S.panLast) {
+        const dx = ev.clientX - S.panLast.x;
+        const dy = ev.clientY - S.panLast.y;
+        if (Math.abs(dx) + Math.abs(dy) > 1) {
+          viewport.classList.add('is-dragging');
+        }
+
+        S.x += dx;
+        S.y += dy;
+        S.panLast = {x:ev.clientX, y:ev.clientY};
+        applyTransform();
+      }
+    });
+
+    function endPointer(ev) {
+      S.pointers.delete(ev.pointerId);
+      viewport.classList.remove('is-dragging');
+
+      if (S.pointers.size === 1) {
+        const p = Array.from(S.pointers.values())[0];
+        S.panLast = {x:p.x, y:p.y};
+      } else {
+        S.panLast = null;
+      }
+      S.pinchDistance = 0;
+    }
+
+    viewport.addEventListener('pointerup', endPointer);
+    viewport.addEventListener('pointercancel', endPointer);
+
+    viewport.addEventListener('wheel', function (ev) {
+      if (!qs('#singleUserMapViewer').classList.contains('is-open')) return;
+      ev.preventDefault();
+      zoomSingleUserMap(ev.deltaY < 0 ? 1 : -1);
+    }, {passive:false});
+
+    document.addEventListener('keydown', function (ev) {
+      if (
+        ev.key === 'Escape' &&
+        qs('#singleUserMapViewer') &&
+        qs('#singleUserMapViewer').classList.contains('is-open')
+      ) closeSingleUserMapViewer();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initGestures();
+
+    /* Force correct mobile UI even if the old style.css is still installed. */
+    if (window.matchMedia('(max-width:720px)').matches) {
+      const btn = qs('.mobile-explore-map-btn');
+      if (btn) {
+        btn.classList.add('single-map-explore-btn');
+        btn.onclick = openSingleUserMapViewer;
+      }
+
+      const help = qs('.mobile-map-help');
+      if (help) help.classList.add('single-map-mobile-help');
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScanSafe Login</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="login">
+<section class="login-left">
+<img class="logo-img" src="assets/logo-login.svg">
+<h1>Safer Evacuations.<br>Smarter Shelter Management.</h1>
+<p>QR-assisted evacuee registration, organized accommodation assignment, occupancy monitoring, notifications, and emergency information in one ScanSafe portal.</p>
+</section>
+
+<section class="login-right">
+<form class="login-card" onsubmit="loginDemo(event)">
+<h2 style="font-size:30px;margin:0">Welcome to ScanSafe</h2>
+<p class="muted">Sign in using your authorized ScanSafe account.</p>
+
+<div class="field">
+<label>Username</label>
+<input id="loginUsername" required autocomplete="username" placeholder="Enter username">
+</div>
+
+<div class="field">
+<label>Password</label>
+<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter password">
+</div>
+
+<button class="btn red full">Login</button>
+
+<div id="loginError" style="display:none;margin-top:10px;padding:9px 10px;border:1px solid #ffd0d0;background:#fff3f3;color:#b90000;border-radius:7px;font-size:10px;text-align:center">
+Invalid username or password.
+</div>
+
+<div class="login-divider"><span>or</span></div>
+
+<button type="button" class="btn out full" onclick="openPublicRegistration()">Register as Evacuee</button>
+
+<p style="font-size:10px;color:#98a2b3;text-align:center;margin-top:14px">
+Evacuee registration is reviewed by the admin before QR issuance.
+</p>
+</form>
+</section>
+</div>
+
+<div id="publicRegistrationModal" class="prototype-modal hidden">
+<form class="card prototype-dialog public-register" onsubmit="registerPublicEvacuee(event)">
+<div class="dialog-head">
+<div><span class="eyebrow">Evacuee Registration</span><h2>Submit Registration</h2></div>
+<button type="button" class="btn out" onclick="closePublicRegistration()">Close</button>
+</div>
+
+<p class="muted">Submit your information for admin review. Registration does not immediately issue a QR code.</p>
+
+<div class="prototype-form-grid">
+<div class="field"><label>Full Name</label><input id="publicName" value="Juan Dela Cruz" required></div>
+<div class="field"><label>Email Address</label><input id="publicEmail" type="email" value="juan.delacruz@email.com" required></div>
+<div class="field"><label>Age</label><input id="publicAge" type="number" value="25" min="1" required></div>
+<div class="field"><label>Gender</label><select id="publicGender"><option>Male</option><option>Female</option></select></div>
+<div class="field"><label>Group Size</label><input id="publicGroup" type="number" value="4" min="1" required></div>
+<div class="field"><label>Special / Medical Needs</label><input id="publicNeeds" value="None" placeholder="None"></div>
+<div class="field full-span"><label>Complete Address</label><input id="publicAddress" value="Abangan Norte, Marilao, Bulacan" placeholder="House No. / Street / Purok" required></div>
+<div class="field"><label>Barangay</label><input id="publicBarangay" value="Abangan Norte" required></div>
+<div class="field"><label>Municipality / City</label><input id="publicCity" value="Marilao" required></div>
+
+<div class="field">
+<label>Valid ID Type</label>
+<select id="publicValidIdType" required>
+<option value="">Select valid ID</option>
+<option>National ID</option>
+<option>Barangay ID</option>
+<option>Voter's ID</option>
+<option>Driver's License</option>
+<option>School ID</option>
+<option>Senior Citizen ID</option>
+<option>PWD ID</option>
+<option>Passport</option>
+<option>Other Government ID</option>
+</select>
+</div>
+
+<div class="field">
+<label>Valid ID Number</label>
+<input id="publicValidIdNumber" type="text" placeholder="Enter ID number" required>
+</div>
+
+<div class="field full-span">
+<label>Upload Valid ID Image</label>
+<input id="publicValidIdImage" type="file" accept="image/png,image/jpeg,image/webp" required>
+<small class="muted" style="display:block;margin-top:5px">Upload a clear JPG, PNG, or WEBP image. Maximum 2 MB for this prototype.</small>
+<div id="publicValidIdPreview" style="display:none;margin-top:8px"></div>
+</div>
+</div>
+
+<div class="coverage-helper"><b>Coverage verification:</b> Registrations from Abangan Norte, Marilao are marked within the configured service area. Other locations can still submit but will require manual admin verification.</div>
+
+<button class="btn red full">Submit Registration</button>
+
+<div class="registration-helper">After submission: Pending Approval → Admin Review → QR Issued after approval → Eligible for accommodation assignment.</div>
+</form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const input=document.getElementById('publicValidIdImage');
+  const preview=document.getElementById('publicValidIdPreview');
+  if(!input||!preview)return;
+
+  input.addEventListener('change',function(){
+    const file=input.files&&input.files[0];
+    if(!file){
+      preview.style.display='none';
+      preview.innerHTML='';
+      return;
+    }
+
+    if(file.size>2*1024*1024){
+      input.value='';
+      preview.style.display='block';
+      preview.innerHTML='<div style="padding:8px;border:1px solid #ffd0d0;background:#fff3f3;color:#b90000;border-radius:7px;font-size:10px">Image is too large. Please upload a file up to 2 MB.</div>';
+      return;
+    }
+
+    const reader=new FileReader();
+    reader.onload=function(){
+      preview.style.display='block';
+      preview.innerHTML='<img src="'+reader.result+'" alt="Valid ID preview" style="display:block;max-width:220px;max-height:130px;object-fit:contain;border:1px solid #e4e8ee;border-radius:8px;background:#fff;padding:5px">';
+    };
+    reader.readAsDataURL(file);
+  });
+});
+</script>
+<script src="assets/app.js"></script>
+</body>
+</html>
