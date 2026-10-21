@@ -19,6 +19,33 @@
     profile: null
   };
 
+  window.ScanSafeEvacueeAuth = {
+    resendConfirmation: async function(email){
+      const sb=readyClient();
+      const normalized=String(email||'').trim().toLowerCase();
+      if(!sb) return {ok:false,error:'Supabase is not configured.'};
+      if(!normalized || !normalized.includes('@')) return {ok:false,error:'Enter a valid email.'};
+
+      const {error}=await sb.auth.resend({
+        type:'signup',
+        email:normalized
+      });
+
+      if(error){
+        console.warn('ScanSafe confirmation resend failed:',error);
+        return {ok:false,error:error.message,code:error.code||null,status:error.status||null};
+      }
+      return {ok:true,email:normalized};
+    },
+
+    project: function(){
+      return {
+        configured,
+        projectUrl:cfg.url||null
+      };
+    }
+  };
+
   window.ScanSafeLoginDebug = async function(){
     const sb=readyClient();
     if(!sb){
@@ -136,7 +163,29 @@
     }
 
     const {data,error}=await sb.auth.signInWithPassword({email:username,password});
-    if(error || !data?.user){ uiError(error?.message || 'Unable to sign in.'); return; }
+    if(error || !data?.user){
+      const code=String(error?.code||'');
+      console.warn('ScanSafe Auth sign-in failed:', {
+        code,
+        status:error?.status||null,
+        message:error?.message||null,
+        email:username,
+        projectUrl:cfg.url
+      });
+
+      if(code==='email_not_confirmed'){
+        uiError('Your email is not confirmed yet. Open the confirmation email from ScanSafe/Supabase, confirm your account, then log in again.');
+      }else if(code==='invalid_credentials'){
+        uiError('Invalid email or password. Use the exact email and password created during registration.');
+      }else if(code==='email_provider_disabled' || code==='provider_disabled'){
+        uiError('Email/password login is currently disabled in Supabase Authentication settings.');
+      }else if(Number(error?.status)===429){
+        uiError('Too many login attempts. Please try again later.');
+      }else{
+        uiError(error?.message || 'Unable to sign in.');
+      }
+      return;
+    }
 
     window.ScanSafeDB.session=data.session;
 
@@ -225,13 +274,33 @@
     const {data:signupData,error:signupError}=await sb.auth.signUp({
       email:payload.p_email,
       password,
-      options:{ data:{ full_name:payload.p_full_name, role:'evacuee' } }
+      options:{
+        data:{ full_name:payload.p_full_name, role:'evacuee' }
+      }
     });
     if(signupError || !signupData?.user){
-      if(typeof toast==='function') toast('Account could not be created. '+(signupError?.message||''));
+      const code=String(signupError?.code||'');
+      console.warn('ScanSafe Auth sign-up failed:', {
+        code,
+        status:signupError?.status||null,
+        message:signupError?.message||null,
+        email:payload.p_email,
+        projectUrl:cfg.url
+      });
+
+      if(code==='email_exists' || /already registered/i.test(String(signupError?.message||''))){
+        if(typeof toast==='function') toast('This email already has a ScanSafe account. Log in instead, or reset the account password in Supabase if needed.');
+      }else if(code==='weak_password'){
+        if(typeof toast==='function') toast('Password is too weak. Use a stronger password with at least 8 characters.');
+      }else if(code==='email_provider_disabled' || code==='provider_disabled'){
+        if(typeof toast==='function') toast('Email/password registration is disabled in Supabase Authentication settings.');
+      }else{
+        if(typeof toast==='function') toast('Account could not be created. '+(signupError?.message||''));
+      }
       return;
     }
 
+    const emailConfirmationRequired=!signupData.session;
     payload.p_auth_user_id=signupData.user.id;
     const {data,error}=await sb.rpc('submit_public_registration_account', payload);
     if(error){
@@ -241,7 +310,20 @@
     }
 
     if(typeof window.closePublicRegistration==='function') window.closePublicRegistration();
-    if(typeof toast==='function') toast('Account created. Registration '+String(data||'')+' is pending admin approval. No QR code is available yet.');
+
+    if(typeof toast==='function'){
+      if(emailConfirmationRequired){
+        toast(
+          'Registration '+String(data||'')+
+          ' was submitted. Check your email and confirm the account before logging in. Admin approval is still required before QR issuance.'
+        );
+      }else{
+        toast(
+          'Account created. Registration '+String(data||'')+
+          ' is pending admin approval. You may log in with the same email and password; no QR is available until approval.'
+        );
+      }
+    }
 
     // Do not keep a newly-created evacuee signed in on the public/admin login page.
     if(signupData.session) await sb.auth.signOut();
