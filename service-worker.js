@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v6-production-backend';
+const CACHE_NAME='scansafe-pwa-v7-login-profile-fix';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

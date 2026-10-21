@@ -19,6 +19,32 @@
     profile: null
   };
 
+  window.ScanSafeLoginDebug = async function(){
+    const sb=readyClient();
+    if(!sb){
+      return {configured:false,projectUrl:cfg.url||null};
+    }
+    const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+    const session=sessionData?.session||null;
+    let profile=null;
+    let profileError=null;
+    if(session?.user){
+      const result=await sb.rpc('get_my_profile');
+      profile=normalizeProfileRpcResult(result.data);
+      profileError=result.error?.message||null;
+    }
+    return {
+      configured,
+      projectUrl:cfg.url||null,
+      authenticated:!!session?.user,
+      authUserId:session?.user?.id||null,
+      email:session?.user?.email||null,
+      profile,
+      profileError,
+      sessionError:sessionError?.message||null
+    };
+  };
+
   function readyClient(){
     if(!configured || !window.supabase || !window.supabase.createClient) return null;
     if(!window.ScanSafeDB.client){
@@ -36,11 +62,47 @@
     else console.error(message);
   }
 
+  function normalizeProfileRpcResult(data){
+    if(!data) return null;
+    if(Array.isArray(data)) return data[0]||null;
+    if(typeof data==='object' && data.id) return data;
+    return null;
+  }
+
   async function getProfile(userId){
     const sb=readyClient();
     if(!sb || !userId) return null;
-    const {data,error}=await sb.from('profiles').select('id,full_name,role').eq('id',userId).maybeSingle();
-    if(error){ console.warn('ScanSafe profile lookup:', error.message); return null; }
+
+    // Preferred path: server-side helper bound to auth.uid().
+    // This avoids false "no profile" results caused by frontend RLS/policy timing.
+    try{
+      const {data,error}=await sb.rpc('get_my_profile');
+      if(!error){
+        const profile=normalizeProfileRpcResult(data);
+        if(profile && String(profile.id)===String(userId)){
+          window.ScanSafeDB.profile=profile;
+          return profile;
+        }
+      }else{
+        console.warn('ScanSafe profile RPC:', error.message);
+      }
+    }catch(err){
+      console.warn('ScanSafe profile RPC exception:', err);
+    }
+
+    // Compatibility fallback for databases where the login-fix SQL
+    // has not yet been applied.
+    const {data,error}=await sb
+      .from('profiles')
+      .select('id,full_name,role')
+      .eq('id',userId)
+      .maybeSingle();
+
+    if(error){
+      console.warn('ScanSafe profile fallback lookup:', error.message);
+      return null;
+    }
+
     window.ScanSafeDB.profile=data||null;
     return data||null;
   }
@@ -77,10 +139,31 @@
     if(error || !data?.user){ uiError(error?.message || 'Unable to sign in.'); return; }
 
     window.ScanSafeDB.session=data.session;
-    const profile=await getProfile(data.user.id);
+
+    // Profile request can occasionally race immediately after an Auth session
+    // refresh. Retry briefly before treating the account as unprovisioned.
+    let profile=null;
+    for(let attempt=0; attempt<3 && !profile; attempt++){
+      profile=await getProfile(data.user.id);
+      if(!profile && attempt<2){
+        await new Promise(resolve=>setTimeout(resolve,250));
+      }
+    }
+
     if(!profile){
+      console.error('ScanSafe login profile mismatch', {
+        authUserId:data.user.id,
+        email:data.user.email,
+        projectUrl:cfg.url
+      });
       await sb.auth.signOut();
-      uiError('Account has no ScanSafe profile yet. Ask the administrator to create one.');
+      uiError('Login succeeded, but ScanSafe could not load this account profile. Refresh the page and try again. If it continues, verify that this site is connected to the same Supabase project as the account.');
+      return;
+    }
+
+    if(!['admin','staff','evacuee'].includes(String(profile.role||''))){
+      await sb.auth.signOut();
+      uiError('This ScanSafe account has an invalid access role.');
       return;
     }
 
