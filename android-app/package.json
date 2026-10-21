@@ -1,0 +1,27 @@
+{
+  "name": "scansafe-evacuee-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android wrapper for the ScanSafe evacuee app.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare:web": "node scripts/prepare-web.mjs",
+    "android:init": "npm run prepare:web && npx cap add android",
+    "android:sync": "npm run prepare:web && npx cap sync android",
+    "android:assets": "npx capacitor-assets generate --android",
+    "android:open": "npx cap open android",
+    "android:doctor": "npx cap doctor android",
+    "android:run": "npm run android:sync && npx cap run android",
+    "android:apk": "npm run android:sync && npm run android:assets && node scripts/build-debug-apk.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/core": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "latest",
+    "@capacitor/cli": "latest"
+  }
+}

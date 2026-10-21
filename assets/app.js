@@ -519,21 +519,26 @@ function setNow(){
 }
 
 function qrMarkup(value){
-
-  const text=String(value||'SCANSAFE'); let seed=0;for(const ch of text)seed=(seed*31+ch.charCodeAt(0))>>>0;
-
-  const size=21,cells=[]; const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
-
-  const finder=(x,y)=>{for(let r=0;r<7;r++)for(let c=0;c<7;c++){const edge=r===0||r===6||c===0||c===6;const core=r>=2&&r<=4&&c>=2&&c<=4;if(edge||core)cells.push([x+c,y+r])}};
-
-  finder(0,0);finder(size-7,0);finder(0,size-7);
-
-  const reserved=(x,y)=>(x<8&&y<8)||(x>=size-8&&y<8)||(x<8&&y>=size-8);
-
-  for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(!reserved(x,y)&&rand()>.52)cells.push([x,y]);
-
-  return `<div class="prototype-qr"><svg viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" aria-label="Prototype QR code"><rect width="${size}" height="${size}" fill="white"/>${cells.map(([x,y])=>`<rect x="${x}" y="${y}" width="1" height="1" fill="#111"/>`).join('')}</svg></div><div class="qr-code-label">${esc(text)}</div>`
-
+  const text=String(value||'SCANSAFE');
+  const id='scansafe-qr-'+Math.random().toString(36).slice(2,10);
+  setTimeout(()=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(typeof QRCode==='undefined'){
+      el.innerHTML='<div class="qr-load-error">QR library unavailable. Please check your internet connection and reload.</div>';
+      return;
+    }
+    el.innerHTML='';
+    new QRCode(el,{
+      text,
+      width:220,
+      height:220,
+      colorDark:'#111111',
+      colorLight:'#ffffff',
+      correctLevel:QRCode.CorrectLevel.H
+    });
+  },0);
+  return `<div class="scansafe-real-qr-frame"><div id="${id}" class="scansafe-real-qr" aria-label="ScanSafe QR code"></div><span class="scansafe-qr-logo-bg"><img class="scansafe-qr-logo" src="assets/barangay-abangan-norte-seal.png" alt="Barangay Abangan Norte seal"></span></div><div class="qr-code-label">${esc(text)}</div>`;
 }
 
 
@@ -748,7 +753,7 @@ function scanNow(){
 
 }
 
-function manualScan(){let v=q('#manualBarcode')?.value.trim();if(!v){toast('Enter a QR / barcode number.');return}scanNow()}
+function manualScan(){let v=q('#manualBarcode')?.value.trim();if(!v){toast('Enter a QR code value.');return}scanNow()}
 
 
 
@@ -782,7 +787,7 @@ function enhanceAdminNavigation(){
 
   const hasReq=[...side.querySelectorAll('.nav-item span')].some(x=>x.textContent.trim()==='Registration Requests');if(!hasReq){const dash=side.querySelector('.nav-item');if(dash){const a=document.createElement('a');a.className='nav-item';a.href='admin-dashboard.html#registrationRequests';a.innerHTML=`${ico('alert')}<span>Registration Requests</span><b class="nav-badge" data-pending-count>0</b>`;dash.insertAdjacentElement('afterend',a)}}
 
-  side.querySelectorAll('.nav-item span').forEach(x=>{if(x.textContent.trim()==='Shelter & Room')x.textContent='Accommodation Map';if(x.textContent.trim()==='Barcode Scanner')x.textContent='QR / Barcode Scanner'});
+  side.querySelectorAll('.nav-item span').forEach(x=>{if(x.textContent.trim()==='Shelter & Room')x.textContent='Accommodation Map';if(x.textContent.trim()==='QR Scanner')x.textContent='QR / QR Scanner'});
 
 }
 
@@ -828,7 +833,7 @@ function ensureReviewModal(){
 
   modal.id='reviewModal';modal.className='prototype-modal hidden';
 
-  modal.innerHTML=`<div class="card prototype-dialog"><div class="dialog-head"><div><span class="eyebrow">Registration Review</span><h2 id="reviewName">Evacuee</h2></div><button class="btn out" onclick="closeReviewModal()">Close</button></div><div id="reviewDetails" class="review-details"></div><div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Issue QR</button></div><p class="prototype-note">Prototype: approval simulates sending the confirmation email and QR code.</p></div>`;
+  modal.innerHTML=`<div class="card prototype-dialog"><div class="dialog-head"><div><span class="eyebrow">Registration Review</span><h2 id="reviewName">Evacuee</h2></div><button class="btn out" onclick="closeReviewModal()">Close</button></div><div id="reviewDetails" class="review-details"></div><div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Generate QR</button></div><p class="prototype-note">Prototype: approval simulates sending the confirmation email and QR code.</p></div>`;
 
   document.body.appendChild(modal);return modal;
 
@@ -1647,7 +1652,7 @@ function reviewRegistration(id){
   notice.innerHTML=coverage==='Within Coverage'
     ? `<div class="coverage-review-box ok"><b>Within configured coverage.</b><br>Address matches Abangan Norte, Marilao. Continue normal identity review before approval.</div>`
     : `<div class="coverage-review-box verify"><b>Manual verification required.</b><br>This online request is outside the configured local coverage area. Confirm eligibility with shelter personnel before approving and issuing a QR.</div>`;
-  q('#approveBtn').textContent=coverage==='Within Coverage'?'Approve & Issue QR':'Verify & Approve QR';
+  q('#approveBtn').textContent=coverage==='Within Coverage'?'Approve & Generate QR':'Verify & Generate QR';
   q('#approveBtn').onclick=()=>approveRegistration(id);
   q('#rejectBtn').onclick=()=>rejectRegistration(id);
   modal.classList.remove('hidden');
@@ -1849,7 +1854,7 @@ function enhanceAdminNavigation(){
 
   side.querySelectorAll('.nav-item span').forEach(x=>{
     if(x.textContent.trim()==='Shelter & Room')x.textContent='Accommodation Map';
-    if(x.textContent.trim()==='Barcode Scanner')x.textContent='QR / Barcode Scanner';
+    if(x.textContent.trim()==='QR Scanner')x.textContent='QR / QR Scanner';
   });
 }
 
@@ -2029,6 +2034,17 @@ function readScanSafeImageFile(file){
 async function registerPublicEvacuee(e){
   e.preventDefault();
 
+  const password=q('#publicPassword')?.value||'';
+  const confirmPassword=q('#publicConfirmPassword')?.value||'';
+  if(password.length<8){
+    toast('Password must be at least 8 characters.');
+    return;
+  }
+  if(password!==confirmPassword){
+    toast('Password and confirm password do not match.');
+    return;
+  }
+
   const s=currentState();
   const barangay=(q('#publicBarangay')?.value||'').trim();
   const city=(q('#publicCity')?.value||'').trim();
@@ -2145,7 +2161,7 @@ async function registerPublicEvacuee(e){
 
   toast(
     coverage==='Within Coverage'
-      ? 'Registration submitted with valid ID. Please wait for admin approval before QR issuance.'
+      ? 'Account created and registration submitted. Please wait for admin approval before QR issuance.'
       : 'Registration submitted with valid ID and marked for coverage verification.'
   );
 }
@@ -2188,7 +2204,7 @@ function reviewRegistration(id){
     ? `<div class="coverage-review-box ok"><b>Within configured coverage.</b><br>Review the submitted valid ID and information before approval.</div>`
     : `<div class="coverage-review-box verify"><b>Manual verification required.</b><br>This request is outside the configured local coverage area. Verify the uploaded ID and eligibility before issuing a QR.</div>`;
 
-  q('#approveBtn').textContent=coverage==='Within Coverage'?'Approve & Issue QR':'Verify & Approve QR';
+  q('#approveBtn').textContent=coverage==='Within Coverage'?'Approve & Generate QR':'Verify & Generate QR';
   q('#approveBtn').onclick=()=>approveRegistration(id);
   q('#rejectBtn').onclick=()=>rejectRegistration(id);
 

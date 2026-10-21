@@ -1,0 +1,34 @@
+{
+  "name": "ScanSafe Evacuee App",
+  "short_name": "ScanSafe",
+  "description": "ScanSafe evacuee QR, accommodation, notifications, messages, and profile portal.",
+  "start_url": "./user-portal.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8f0d0d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./user-portal.html",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "categories": [
+    "utilities",
+    "productivity"
+  ]
+}

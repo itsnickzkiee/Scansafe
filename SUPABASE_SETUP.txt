@@ -1,0 +1,62 @@
+SCANSafe SUPABASE SETUP — DESIGN-PRESERVING BUILD
+==================================================
+
+This package does NOT change the ScanSafe visual design.
+No CSS was modified. Existing page layout, cards, map, colors, and icons remain the same.
+
+1) In Supabase SQL Editor, make sure Phase 1 schema has already been run.
+2) Run SUPABASE_PHASE2_INTEGRATION.sql.
+3) Go to Authentication > Users and create the first admin user with EMAIL + PASSWORD.
+4) Copy that user's UUID.
+5) In SQL Editor run:
+
+   insert into public.profiles(id,full_name,role)
+   values ('PASTE-ADMIN-AUTH-UUID','ScanSafe Administrator','admin')
+   on conflict (id) do update
+   set full_name=excluded.full_name, role='admin';
+
+6) In Supabase Project Settings/API, copy:
+   - Project URL
+   - anon/publishable key
+
+7) Open assets/supabase-config.js and paste those TWO values only.
+   NEVER paste the service_role key into frontend code.
+
+8) Deploy the folder normally to Vercel/GitHub.
+
+LOGIN
+-----
+Once configured, the existing ScanSafe login form uses Supabase Auth.
+Enter the admin EMAIL in the existing Username field and the password created in Supabase.
+No design changes are needed.
+
+PUBLIC REGISTRATION
+-------------------
+The existing registration modal writes to Supabase through a restricted RPC.
+New records are saved as Pending Approval.
+
+ADMIN APPROVAL
+--------------
+The existing Approve button calls Supabase. Approval updates the evacuee record,
+and the existing Phase 1 trigger creates a unique barcode record automatically.
+
+VALID ID IMAGE
+--------------
+The current UI still accepts and previews the image, but this setup does NOT upload
+identity-document images to Supabase Storage yet. That should be added in a later
+secured-storage phase because those files contain sensitive personal information.
+
+IMPORTANT
+---------
+If assets/supabase-config.js still contains placeholder values, the system keeps the
+existing prototype/demo behavior so the UI remains usable while setup is incomplete.
+
+
+PHASE 3 - EVACUEE ACCOUNT REGISTRATION
+---------------------------------------
+1. Run SUPABASE_PHASE3_EVACUEE_ACCOUNT.sql in the Supabase SQL Editor.
+2. Registration now includes Password + Confirm Password.
+3. The password is stored only by Supabase Auth, never in ScanSafe tables/localStorage.
+4. A new evacuee account is created immediately, while the registration remains Pending Approval.
+5. NO barcode is created during registration. The existing admin approval flow creates the barcode only after approval.
+6. If Supabase email confirmation is enabled, the user may need to confirm their email before they can sign in later.

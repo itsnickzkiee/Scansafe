@@ -39,6 +39,17 @@ Invalid username or password.
 
 <button type="button" class="btn out full" onclick="openPublicRegistration()">Register as Evacuee</button>
 
+<a id="scanSafeAndroidDownload"
+   href="downloads/ScanSafe-Evacuee.apk"
+   download="ScanSafe-Evacuee.apk"
+   class="btn soft full"
+   style="text-decoration:none;box-sizing:border-box;margin-top:8px">
+  Download ScanSafe Android App
+</a>
+<p id="scanSafeAndroidDownloadNote" style="font-size:9px;color:#98a2b3;text-align:center;margin:7px 0 0">
+Android only • Direct APK download
+</p>
+
 <p style="font-size:10px;color:#98a2b3;text-align:center;margin-top:14px">
 Evacuee registration is reviewed by the admin before QR issuance.
 </p>
@@ -53,11 +64,13 @@ Evacuee registration is reviewed by the admin before QR issuance.
 <button type="button" class="btn out" onclick="closePublicRegistration()">Close</button>
 </div>
 
-<p class="muted">Submit your information for admin review. Registration does not immediately issue a QR code.</p>
+<p class="muted">Submit your information for admin review. Your account will be created after submission, but no QR code is issued until admin approval.</p>
 
 <div class="prototype-form-grid">
 <div class="field"><label>Full Name</label><input id="publicName" value="Juan Dela Cruz" required></div>
-<div class="field"><label>Email Address</label><input id="publicEmail" type="email" value="juan.delacruz@email.com" required></div>
+<div class="field"><label>Email Address</label><input id="publicEmail" type="email" value="juan.delacruz@email.com" autocomplete="email" required></div>
+<div class="field"><label>Password</label><input id="publicPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters" required></div>
+<div class="field"><label>Confirm Password</label><input id="publicConfirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Re-enter password" required></div>
 <div class="field"><label>Age</label><input id="publicAge" type="number" value="25" min="1" required></div>
 <div class="field"><label>Gender</label><select id="publicGender"><option>Male</option><option>Female</option></select></div>
 <div class="field"><label>Group Size</label><input id="publicGroup" type="number" value="4" min="1" required></div>
@@ -99,7 +112,7 @@ Evacuee registration is reviewed by the admin before QR issuance.
 
 <button class="btn red full">Submit Registration</button>
 
-<div class="registration-helper">After submission: Pending Approval → Admin Review → QR Issued after approval → Eligible for accommodation assignment.</div>
+<div class="registration-helper">After submission: Account Created → Pending Approval → Admin Review → QR Code Issued after approval → Eligible for accommodation assignment.</div>
 </form>
 </div>
 
@@ -133,6 +146,25 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/supabase-bridge.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var nativeApp = !!(window.Capacitor &&
+    typeof window.Capacitor.isNativePlatform === 'function' &&
+    window.Capacitor.isNativePlatform());
+  if(nativeApp){
+    var dl=document.getElementById('scanSafeAndroidDownload');
+    var note=document.getElementById('scanSafeAndroidDownloadNote');
+    if(dl) dl.style.display='none';
+    if(note) note.style.display='none';
+  }
+});
+</script>
+
 </body>
 </html>

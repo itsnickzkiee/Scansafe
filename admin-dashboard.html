@@ -25,7 +25,7 @@
 <a class="nav-item" href="evacuees.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a>
 <a class="nav-item" href="user-management.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>User Management</span></a>
 <a class="nav-item" href="shelter-room.html"><svg class="icon"><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a>
-<a class="nav-item" href="barcode-scanner.html"><svg class="icon"><use href="assets/icons.svg#barcode"></use></svg><span>QR / Barcode Scanner</span></a>
+<a class="nav-item" href="barcode-scanner.html"><svg class="icon"><use href="assets/icons.svg#barcode"></use></svg><span>QR / QR Scanner</span></a>
 <a class="nav-item" href="reports.html"><svg class="icon"><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a>
 <a class="nav-item" href="messages.html"><svg class="icon"><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a>
 <a class="nav-item" href="settings.html"><svg class="icon"><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a>
@@ -95,11 +95,15 @@
 <div class="dialog-head"><div><span class="eyebrow">Registration Review</span><h2 id="reviewName">Evacuee</h2></div><button class="btn out" onclick="closeReviewModal()">Close</button></div>
 <div id="reviewDetails" class="review-details"></div>
 <div id="coverageReviewNotice"></div>
-<div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Issue QR</button></div>
+<div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Generate QR</button></div>
 <p class="prototype-note">Prototype: approval simulates sending the confirmation email and QR code.</p>
 </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/supabase-bridge.js"></script>
 </body>
 </html>

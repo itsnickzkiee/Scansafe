@@ -30,7 +30,7 @@
                 </svg><span>Accommodation Map</span></a><a class="nav-item active" href="barcode-scanner.html"><svg
                     class="icon ">
                     <use href="assets/icons.svg#barcode"></use>
-                </svg><span>QR / Barcode Scanner</span></a><a class="nav-item " href="reports.html"><svg class="icon ">
+                </svg><span>QR / QR Scanner</span></a><a class="nav-item " href="reports.html"><svg class="icon ">
                     <use href="assets/icons.svg#chart"></use>
                 </svg><span>Reports & Analytics</span></a><a class="nav-item " href="messages.html"><svg class="icon ">
                     <use href="assets/icons.svg#message"></use>
@@ -41,8 +41,8 @@
             <section class="page">
                 <div class="page-title">
                     <div>
-                        <h1>Barcode Scanner</h1>
-                        <p>Scan evacuee barcode to retrieve information, verify status, and manage shelter records.</p>
+                        <h1>QR Scanner</h1>
+                        <p>Scan evacuee QR code to retrieve information, verify status, and manage shelter records.</p>
                     </div>
                     <div class="date-line"><svg class="icon sm">
                             <use href="assets/icons.svg#calendar"></use>
@@ -53,15 +53,15 @@
                         <div class="panel-head-red">
                             <h2><svg class="icon ">
                                     <use href="assets/icons.svg#barcode"></use>
-                                </svg> Scan Barcode</h2>
-                            <p>Point the camera at the barcode or enter the code manually.</p>
+                                </svg> Scan QR Code</h2>
+                            <p>Point the camera at the QR code or enter the code manually.</p>
                         </div>
                         <div class="scan-body">
                             <div class="scan-frame" style="height:230px">
                                 <div>
                                     <div class="barcode" style="width:140px;height:70px"></div>
                                     <h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3>
-                                    <div class="muted" style="font-size:10px">Ensure the barcode is within the frame.
+                                    <div class="muted" style="font-size:10px">Ensure the QR code is within the frame.
                                     </div>
                                 </div>
                             </div><button class="btn red full" style="margin-top:10px" onclick="scanNow()">Start
@@ -71,7 +71,7 @@
                             <div class="manual">
                                 <div class="searchbar"><svg class="icon sm">
                                         <use href="assets/icons.svg#barcode"></use>
-                                    </svg><input id="manualBarcode" placeholder="Enter evacuee barcode number..."></div>
+                                    </svg><input id="manualBarcode" placeholder="Enter evacuee QR value..."></div>
                                 <button class="btn red" onclick="manualScan()"><svg class="icon sm">
                                         <use href="assets/icons.svg#search"></use>
                                     </svg> Search</button>
@@ -106,7 +106,7 @@
                             <h3 style="margin:0;font-size:14px"><svg class="icon ">
                                     <use href="assets/icons.svg#check"></use>
                                 </svg> Verification Result</h3>
-                            <div style="font-size:10px">Barcode scanned successfully.</div>
+                            <div style="font-size:10px">QR code scanned successfully.</div>
                         </div>
                         <div class="scan-body">
                             <div id="scanResult" class="verify-box">
@@ -117,7 +117,7 @@
                                 <p style="text-align:center;font-size:10px;color:#667085">Evacuee record found in
                                     system.</p>
                                 <div class="detail-list">
-                                    <div class="detail-line"><b>Barcode Number</b><span>EV-001234</span></div>
+                                    <div class="detail-line"><b>QR Code Value</b><span>EV-001234</span></div>
                                     <div class="detail-line"><b>Name</b><span>Juan Dela Cruz</span></div>
                                     <div class="detail-line"><b>Group</b><span>4</span></div>
                                     <div class="detail-line"><b>Space</b><span>Hallway A1</span></div>
@@ -140,7 +140,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>Name</th>
-                                <th>Barcode</th>
+                                <th>QR Code</th>
                                 <th>Room</th>
                                 <th>Time</th>
                                 <th>Status</th>
@@ -205,7 +205,7 @@
                         <table class="table">
                             <tr>
                                 <th>Time</th>
-                                <th>Barcode</th>
+                                <th>QR Code</th>
                                 <th>Reason</th>
                                 <th>Action</th>
                             </tr>
@@ -224,7 +224,7 @@
                             <tr>
                                 <td>09:32</td>
                                 <td>EV-001241</td>
-                                <td>Invalid barcode</td>
+                                <td>Invalid QR code</td>
                                 <td><button class="btn out">Review</button></td>
                             </tr>
                         </table>
@@ -233,7 +233,11 @@
             </section>
         </main>
     </div>
-    <script src="assets/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/supabase-bridge.js"></script>
 </body>
 
 </html>
