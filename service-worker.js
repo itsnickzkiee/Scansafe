@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v8-evacuee-auth-fix';
+const CACHE_NAME='scansafe-pwa-v9-evacuee-login-permanent-fix';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

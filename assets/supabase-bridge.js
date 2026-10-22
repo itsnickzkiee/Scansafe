@@ -101,7 +101,6 @@
     if(!sb || !userId) return null;
 
     // Preferred path: server-side helper bound to auth.uid().
-    // This avoids false "no profile" results caused by frontend RLS/policy timing.
     try{
       const {data,error}=await sb.rpc('get_my_profile');
       if(!error){
@@ -117,8 +116,24 @@
       console.warn('ScanSafe profile RPC exception:', err);
     }
 
-    // Compatibility fallback for databases where the login-fix SQL
-    // has not yet been applied.
+    // Repair path for evacuee accounts created before the automatic
+    // auth->profile trigger was installed.
+    try{
+      const repair=await sb.rpc('repair_my_evacuee_profile');
+      if(!repair.error){
+        const repaired=normalizeProfileRpcResult(repair.data);
+        if(repaired && String(repaired.id)===String(userId)){
+          window.ScanSafeDB.profile=repaired;
+          return repaired;
+        }
+      }else{
+        console.warn('ScanSafe profile repair:', repair.error.message);
+      }
+    }catch(err){
+      console.warn('ScanSafe profile repair exception:', err);
+    }
+
+    // Compatibility fallback.
     const {data,error}=await sb
       .from('profiles')
       .select('id,full_name,role')
@@ -133,6 +148,44 @@
     window.ScanSafeDB.profile=data||null;
     return data||null;
   }
+
+  window.ScanSafeEvacueeAccountCheck = async function(){
+    const sb=readyClient();
+    if(!sb) return {configured:false,projectUrl:cfg.url||null};
+
+    const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+    const session=sessionData?.session||null;
+
+    if(!session?.user){
+      return {
+        configured,
+        projectUrl:cfg.url||null,
+        authenticated:false,
+        sessionError:sessionError?.message||null
+      };
+    }
+
+    const [profileResult, evacResult]=await Promise.all([
+      sb.rpc('get_my_profile'),
+      sb.from('evacuees')
+        .select('evacuee_id,registration_code,approval_status,current_status,auth_user_id,email')
+        .eq('auth_user_id',session.user.id)
+        .maybeSingle()
+    ]);
+
+    return {
+      configured,
+      projectUrl:cfg.url||null,
+      authenticated:true,
+      authUserId:session.user.id,
+      email:session.user.email,
+      profile:normalizeProfileRpcResult(profileResult.data),
+      profileError:profileResult.error?.message||null,
+      evacuee:evacResult.data||null,
+      evacueeError:evacResult.error?.message||null,
+      sessionError:sessionError?.message||null
+    };
+  };
 
   async function bootstrapSession(){
     const sb=readyClient();
