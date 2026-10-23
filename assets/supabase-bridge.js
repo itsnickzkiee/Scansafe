@@ -20,24 +20,6 @@
   };
 
   window.ScanSafeEvacueeAuth = {
-    resendConfirmation: async function(email){
-      const sb=readyClient();
-      const normalized=String(email||'').trim().toLowerCase();
-      if(!sb) return {ok:false,error:'Supabase is not configured.'};
-      if(!normalized || !normalized.includes('@')) return {ok:false,error:'Enter a valid email.'};
-
-      const {error}=await sb.auth.resend({
-        type:'signup',
-        email:normalized
-      });
-
-      if(error){
-        console.warn('ScanSafe confirmation resend failed:',error);
-        return {ok:false,error:error.message,code:error.code||null,status:error.status||null};
-      }
-      return {ok:true,email:normalized};
-    },
-
     project: function(){
       return {
         configured,
@@ -227,7 +209,7 @@
       });
 
       if(code==='email_not_confirmed'){
-        uiError('Your email is not confirmed yet. Open the confirmation email from ScanSafe/Supabase, confirm your account, then log in again.');
+        uiError('This older test account was created before the current ScanSafe login setup. Please register a new evacuee account or ask the administrator to reset this test account.');
       }else if(code==='invalid_credentials'){
         uiError('Invalid email or password. Use the exact email and password created during registration.');
       }else if(code==='email_provider_disabled' || code==='provider_disabled'){
@@ -353,7 +335,6 @@
       return;
     }
 
-    const emailConfirmationRequired=!signupData.session;
     payload.p_auth_user_id=signupData.user.id;
     const {data,error}=await sb.rpc('submit_public_registration_account', payload);
     if(error){
@@ -365,17 +346,10 @@
     if(typeof window.closePublicRegistration==='function') window.closePublicRegistration();
 
     if(typeof toast==='function'){
-      if(emailConfirmationRequired){
-        toast(
-          'Registration '+String(data||'')+
-          ' was submitted. Check your email and confirm the account before logging in. Admin approval is still required before QR issuance.'
-        );
-      }else{
-        toast(
-          'Account created. Registration '+String(data||'')+
-          ' is pending admin approval. You may log in with the same email and password; no QR is available until approval.'
-        );
-      }
+      toast(
+        'Account created. Registration '+String(data||'')+
+        ' is pending admin approval. You may log in now using the same email and password; no QR is available until approval.'
+      );
     }
 
     // Do not keep a newly-created evacuee signed in on the public/admin login page.
@@ -431,7 +405,7 @@
     const {data,error}=await sb.rpc('approve_evacuee_registration',{p_evacuee_id:req.dbId});
     if(error){ if(typeof toast==='function') toast('Approval failed: '+error.message); return; }
     if(typeof window.closeReviewModal==='function') window.closeReviewModal();
-    if(typeof toast==='function') toast('Approved. QR code generated: '+String(data||''));
+    if(typeof toast==='function') toast('Approved. barcode generated: '+String(data||''));
     await loadPendingIntoPrototype();
   }
 
@@ -588,14 +562,14 @@
     const hint=document.getElementById('assignmentHint');
     const list=document.getElementById('eligibleGroupsList');
     if(title) title.textContent=`Assign to ${row.space_name || (spaceCode==='ML'?'Main Lobby':'Hallway '+spaceCode)}`;
-    if(hint) hint.textContent=`${available} slot${available===1?'':'s'} available. Only approved evacuees with active QR codes and no current assignment can be assigned.`;
+    if(hint) hint.textContent=`${available} slot${available===1?'':'s'} available. Only approved evacuees with active barcodes and no current assignment can be assigned.`;
     if(list){
       list.innerHTML=groups.length?groups.map(g=>{
         const fits=Number(g.group)<=available;
         const safeName=typeof esc==='function'?esc(g.name):g.name;
         const safeNeeds=typeof esc==='function'?esc(g.needs||'No special needs'):(g.needs||'No special needs');
         return `<div class="eligible-group ${fits?'':'ineligible'}"><div><b>${safeName}</b><small>Group size: ${g.group} • ${safeNeeds}</small></div><button class="btn ${fits?'red':'soft'}" ${fits?'':'disabled'} onclick="confirmSpaceAssignment('${spaceCode}','${g.id}')">${fits?'Assign':'Insufficient Slots'}</button></div>`;
-      }).join(''):`<div class="space-placeholder">No eligible groups right now. Approve a registration and issue its QR first, or verify that the group has no active assignment.</div>`;
+      }).join(''):`<div class="space-placeholder">No eligible groups right now. Approve a registration and issue its barcode first, or verify that the group has no active assignment.</div>`;
     }
     modal.classList.remove('hidden');
   }
@@ -625,6 +599,94 @@
     return data;
   }
 
+
+  function setScanSafeText(el,value){
+    if(!el) return;
+    el.textContent=String(value??'');
+  }
+
+  function syncRealEvacueeDom(ev,userState,session){
+    const name=ev?.full_name || userState?.name || window.ScanSafeDB.profile?.full_name || session?.user?.email || 'Evacuee';
+    const email=ev?.email || userState?.email || session?.user?.email || '';
+    const contact=ev?.contact_number || 'Not provided';
+    const address=ev?.address || 'Not provided';
+    const status=userState?.registrationStatus || 'Pending Approval';
+    const assigned=!!userState?.assignment;
+    const shelter=assigned ? 'Main School Building' : 'Waiting for assignment';
+    const space=assigned
+      ? (typeof window.formatSpaceName==='function' ? window.formatSpaceName(userState.assignment) : userState.assignment)
+      : 'Not assigned yet';
+
+    // Common identity elements used across evacuee pages.
+    document.querySelectorAll('[data-user-name]').forEach(el=>setScanSafeText(el,name));
+    document.querySelectorAll('[data-user-email]').forEach(el=>setScanSafeText(el,email));
+    document.querySelectorAll('[data-user-group]').forEach(el=>setScanSafeText(el,userState?.group || ev?.group_size || 1));
+    document.querySelectorAll('[data-user-needs]').forEach(el=>setScanSafeText(el,userState?.needs || ev?.needs_summary || 'None'));
+
+    const topIdentity=document.querySelector('.user-top .identity strong');
+    if(topIdentity) setScanSafeText(topIdentity,name);
+
+    const topRole=document.querySelector('.user-top .identity small');
+    if(topRole) setScanSafeText(topRole,'Evacuee');
+
+    // Update visible avatar initials without changing styles.
+    const initial=(String(name).trim().charAt(0)||'E').toUpperCase();
+    document.querySelectorAll(
+      '.user-top .avatar, .profile-avatar, .avatar-circle, .identity-avatar'
+    ).forEach(el=>{
+      if(el.children.length===0 || /^[A-Za-z]$/.test(el.textContent.trim())){
+        setScanSafeText(el,initial);
+      }
+    });
+
+    // Profile page: update the static prototype content from the real DB row.
+    if(mapPage()==='profile.html'){
+      const layout=document.querySelector('.profile-layout');
+      if(layout){
+        const heading=[...layout.querySelectorAll('h1,h2,h3,strong')]
+          .find(el=>{
+            const t=el.textContent.trim();
+            return t && !/^(Profile|Account|Change Password|Logout)$/i.test(t)
+              && !/^(Email Address|Contact Number|Assigned Shelter|Assigned Space)$/i.test(t);
+          });
+        if(heading) setScanSafeText(heading,name);
+
+        const statusEl=layout.querySelector('.muted');
+        if(statusEl) setScanSafeText(statusEl,`Evacuee • ${status}`);
+
+        layout.querySelectorAll('.info-line').forEach(row=>{
+          const label=row.querySelector('b,strong,label');
+          const value=row.querySelector('span');
+          if(!label || !value) return;
+          const key=label.textContent.trim().toLowerCase();
+          if(key.includes('email')) setScanSafeText(value,email || 'Not provided');
+          else if(key.includes('contact')) setScanSafeText(value,contact);
+          else if(key.includes('assigned shelter')) setScanSafeText(value,shelter);
+          else if(key.includes('assigned space')) setScanSafeText(value,space);
+          else if(key==='address' || key.includes('home address')) setScanSafeText(value,address);
+        });
+      }
+    }
+
+    // My Information page: map known label/value rows to live DB values.
+    if(mapPage()==='my-information.html'){
+      document.querySelectorAll('.info-line,.detail-line,.profile-info-row').forEach(row=>{
+        const label=row.querySelector('b,strong,label,small');
+        const value=row.querySelector('span,p');
+        if(!label || !value) return;
+        const key=label.textContent.trim().toLowerCase();
+        if(key.includes('full name') || key==='name') setScanSafeText(value,name);
+        else if(key.includes('email')) setScanSafeText(value,email || 'Not provided');
+        else if(key.includes('contact')) setScanSafeText(value,contact);
+        else if(key==='address' || key.includes('home address')) setScanSafeText(value,address);
+        else if(key.includes('gender')) setScanSafeText(value,ev?.gender || userState?.gender || 'Not provided');
+        else if(key.includes('age')) setScanSafeText(value,ev?.age ?? userState?.age ?? 'Not provided');
+        else if(key.includes('group')) setScanSafeText(value,ev?.group_size || userState?.group || 1);
+        else if(key.includes('need')) setScanSafeText(value,ev?.needs_summary || userState?.needs || 'None');
+      });
+    }
+  }
+
   async function loadCurrentEvacueeIntoPrototype(){
     const sb=readyClient();
     if(!sb || typeof window.currentState!=='function' || typeof window.saveScanSafeState!=='function') return;
@@ -634,10 +696,28 @@
     if(profile?.role!=='evacuee') return;
 
     const {data:ev,error}=await sb.from('evacuees')
-      .select('evacuee_id,auth_user_id,group_id,registration_code,full_name,email,age,gender,group_size,needs_summary,approval_status,current_status')
+      .select('evacuee_id,auth_user_id,group_id,registration_code,full_name,email,age,gender,contact_number,address,birth_date,group_size,needs_summary,approval_status,current_status')
       .eq('auth_user_id',session.user.id)
       .maybeSingle();
-    if(error || !ev){ if(error) console.warn('Evacuee portal sync:',error.message); return; }
+    if(error || !ev){
+      if(error) console.warn('Evacuee portal sync:',error.message);
+
+      // Never leave prototype Juan Dela Cruz data visible for a real authenticated user.
+      const s=window.currentState();
+      s.user={
+        ...s.user,
+        name:profile?.full_name || session.user.email || 'Evacuee',
+        email:session.user.email || '',
+        registrationStatus:'Pending Approval',
+        qrIssued:false,
+        qrCode:null,
+        assignment:null
+      };
+      window.saveScanSafeState(s);
+      if(typeof window.renderUserPrototype==='function') window.renderUserPrototype();
+      syncRealEvacueeDom(null,s.user,session);
+      return;
+    }
 
     const [{data:qr},{data:asg}]=await Promise.all([
       sb.from('barcodes').select('barcode_value,status').eq('evacuee_id',ev.evacuee_id).eq('status','active').maybeSingle(),
@@ -669,6 +749,7 @@
     };
     window.saveScanSafeState(s);
     if(typeof window.renderUserPrototype==='function') window.renderUserPrototype();
+    syncRealEvacueeDom(ev,s.user,session);
   }
 
   document.addEventListener('DOMContentLoaded', async function(){
@@ -754,7 +835,7 @@
     setScannerButton(false);
     const frame=document.querySelector('.scan-frame');
     if(frame && !frame.querySelector('#scanSafeQrReader')){
-      frame.innerHTML='<div><div class="barcode" style="width:140px;height:70px"></div><h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the QR code</h3><div class="muted" style="font-size:10px">Ensure the QR code is within the frame.</div></div>';
+      frame.innerHTML='<div><div class="barcode" style="width:140px;height:70px"></div><h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3><div class="muted" style="font-size:10px">Center the full 1D barcode inside the frame.</div></div>';
     }
   }
 
@@ -767,7 +848,7 @@
     const status=ok?'VERIFIED':String(data?.result||'INVALID').toUpperCase();
     const statusClass=ok?'green':'red';
     const color=ok?'#0a9637':'#b42318';
-    const message=ok?'Evacuee record found and verified in ScanSafe.':scanEsc(data?.message||'QR code could not be verified.');
+    const message=ok?'Evacuee record found and verified in ScanSafe.':scanEsc(data?.message||'barcode could not be verified.');
     const assignment=data?.space_name || data?.space_code || 'Not assigned';
     const now=data?.scanned_at ? new Date(data.scanned_at) : new Date();
 
@@ -776,7 +857,7 @@
       <h2 style="color:${color};text-align:center;margin:10px 0 4px">${scanEsc(status)}</h2>
       <p style="text-align:center;font-size:10px;color:#667085">${message}</p>
       <div class="detail-list">
-        <div class="detail-line"><b>QR Code Value</b><span>${scanEsc(data?.qr_value||'')}</span></div>
+        <div class="detail-line"><b>Barcode Value</b><span>${scanEsc(data?.qr_value||'')}</span></div>
         <div class="detail-line"><b>Name</b><span>${scanEsc(data?.full_name||'—')}</span></div>
         <div class="detail-line"><b>Group</b><span>${scanEsc(data?.group_size||'—')}</span></div>
         <div class="detail-line"><b>Space</b><span>${scanEsc(assignment)}</span></div>
@@ -819,7 +900,7 @@
     if(error){ console.warn('Scan history:',error.message); return; }
     const table=document.querySelector('.scanner-bottom section:first-child table.table');
     if(!table) return;
-    const head=table.querySelector('tr')?.outerHTML || '<tr><th>#</th><th>Name</th><th>QR Code</th><th>Room</th><th>Time</th><th>Status</th></tr>';
+    const head=table.querySelector('tr')?.outerHTML || '<tr><th>#</th><th>Name</th><th>Barcode</th><th>Room</th><th>Time</th><th>Status</th></tr>';
     const rows=(data||[]).map((r,i)=>`
       <tr>
         <td>${i+1}</td>
@@ -835,7 +916,7 @@
   async function verifyScanSafeQr(qrValue){
     const sb=readyClient();
     const value=String(qrValue||'').trim();
-    if(!value){ if(typeof toast==='function') toast('Enter or scan a QR code.'); return null; }
+    if(!value){ if(typeof toast==='function') toast('Enter or scan a barcode.'); return null; }
     if(!sb){
       if(typeof toast==='function') toast('Supabase is not configured yet.');
       return null;
@@ -843,7 +924,7 @@
 
     const {data,error}=await sb.rpc('verify_qr_code',{p_qr_value:value});
     if(error){
-      console.error('QR verification:',error);
+      console.error('Barcode verification:',error);
       renderQrVerificationResult({valid:false,result:'invalid',qr_value:value,message:error.message});
       return null;
     }
@@ -861,7 +942,7 @@
 
     const loaded=await ensureQrScannerLibrary();
     if(!loaded){
-      if(typeof toast==='function') toast('QR scanner library could not load. Use manual QR search.');
+      if(typeof toast==='function') toast('barcode scanner library could not load. Use manual QR search.');
       return;
     }
 
@@ -870,13 +951,28 @@
     frame.innerHTML='<div id="scanSafeQrReader" style="width:100%;height:100%"></div>';
 
     try{
-      scanSafeCamera=new window.Html5Qrcode('scanSafeQrReader');
+      const formats=window.Html5QrcodeSupportedFormats
+        ? [
+            window.Html5QrcodeSupportedFormats.CODE_128,
+            window.Html5QrcodeSupportedFormats.CODE_39,
+            window.Html5QrcodeSupportedFormats.EAN_13,
+            window.Html5QrcodeSupportedFormats.EAN_8,
+            window.Html5QrcodeSupportedFormats.UPC_A,
+            window.Html5QrcodeSupportedFormats.UPC_E,
+            window.Html5QrcodeSupportedFormats.ITF,
+            window.Html5QrcodeSupportedFormats.CODABAR
+          ].filter(Boolean)
+        : undefined;
+      scanSafeCamera=new window.Html5Qrcode(
+        'scanSafeQrReader',
+        formats ? {formatsToSupport:formats, verbose:false} : {verbose:false}
+      );
       scanSafeCameraActive=true;
       setScannerButton(true);
 
       await scanSafeCamera.start(
         {facingMode:'environment'},
-        {fps:10, qrbox:{width:180,height:180}, aspectRatio:1.0},
+        {fps:10, qrbox:{width:250,height:100}, aspectRatio:1.777},
         async(decodedText)=>{
           if(!decodedText || decodedText===scanSafeLastDecoded) return;
           scanSafeLastDecoded=decodedText;
@@ -890,7 +986,7 @@
       console.error(err);
       await stopScanSafeCamera();
       if(typeof toast==='function'){
-        toast('Camera could not start. Allow camera permission and use HTTPS/localhost, or enter the QR manually.');
+        toast('Camera could not start. Allow camera permission and use HTTPS/localhost, or enter the barcode manually.');
       }
     }
   }
@@ -1944,7 +2040,7 @@
               </div>`;
           }).join('')
         : `<div class="space-placeholder">
-             No eligible groups right now. Approve a registration, issue its QR,
+             No eligible groups right now. Approve a registration, issue its barcode,
              and confirm that the group has no active assignment.
            </div>`;
     }
@@ -2107,5 +2203,180 @@
       await loadCurrentEvacueeIntoPrototype();
     }
   });
+
+
+  // =========================================================
+  // ScanSafe Barcode Mode
+  // Real 1D CODE128 rendering. Existing database field/table
+  // names are preserved for backward compatibility.
+  // =========================================================
+  let scanSafeJsBarcodePromise=null;
+
+  async function ensureScanSafeBarcodeLibrary(){
+    if(window.JsBarcode) return true;
+    if(scanSafeJsBarcodePromise) return scanSafeJsBarcodePromise;
+
+    scanSafeJsBarcodePromise=new Promise((resolve)=>{
+      const existing=document.querySelector('script[data-scansafe-jsbarcode]');
+      if(existing){
+        existing.addEventListener('load',()=>resolve(!!window.JsBarcode),{once:true});
+        existing.addEventListener('error',()=>resolve(false),{once:true});
+        return;
+      }
+
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js';
+      s.async=true;
+      s.dataset.scansafeJsbarcode='1';
+      s.onload=()=>resolve(!!window.JsBarcode);
+      s.onerror=()=>resolve(false);
+      document.head.appendChild(s);
+    });
+
+    return scanSafeJsBarcodePromise;
+  }
+
+  async function renderScanSafeBarcodes(root=document){
+    const nodes=[...root.querySelectorAll?.('.scansafe-barcode[data-barcode-value]')||[]];
+    if(!nodes.length) return;
+
+    if(!(await ensureScanSafeBarcodeLibrary())) return;
+
+    nodes.forEach((svg)=>{
+      const value=svg.getAttribute('data-barcode-value')||'';
+      if(!value || svg.dataset.barcodeRendered===value) return;
+
+      try{
+        window.JsBarcode(svg,value,{
+          format:'CODE128',
+          displayValue:false,
+          lineColor:'#111111',
+          background:'#ffffff',
+          height:72,
+          width:1.65,
+          margin:4
+        });
+        svg.dataset.barcodeRendered=value;
+      }catch(err){
+        console.warn('ScanSafe barcode render:',err);
+      }
+    });
+  }
+
+  function replaceBarcodeTerminologyText(value){
+    let text=String(value??'');
+    text=text
+      .replace(/QR\s*\/\s*Barcode Scanner/gi,'Barcode Scanner')
+      .replace(/QR-assisted/gi,'Barcode-assisted')
+      .replace(/QR\s*\/\s*barcode/gi,'Barcode')
+      .replace(/QR codes/gi,'barcodes')
+      .replace(/QR code/gi,'barcode')
+      .replace(/\bQR\b/g,'Barcode')
+      .replace(/Barcode code/gi,'Barcode')
+      .replace(/Barcode \/ Barcode Scanner/gi,'Barcode Scanner');
+    return text;
+  }
+
+  function applyBarcodeTerminology(root=document.body){
+    if(!root) return;
+
+    const walker=document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node){
+          const tag=node.parentElement?.tagName;
+          if(['SCRIPT','STYLE','NOSCRIPT','TEXTAREA'].includes(tag)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    const changes=[];
+    while(walker.nextNode()){
+      const node=walker.currentNode;
+      const next=replaceBarcodeTerminologyText(node.nodeValue);
+      if(next!==node.nodeValue) changes.push([node,next]);
+    }
+    changes.forEach(([node,next])=>{ node.nodeValue=next; });
+
+    root.querySelectorAll?.('[placeholder],[title],[aria-label]').forEach(el=>{
+      ['placeholder','title','aria-label'].forEach(attr=>{
+        if(!el.hasAttribute(attr)) return;
+        const old=el.getAttribute(attr);
+        const next=replaceBarcodeTerminologyText(old);
+        if(next!==old) el.setAttribute(attr,next);
+      });
+    });
+  }
+
+  function setupBarcodeMode(){
+    applyBarcodeTerminology(document.body);
+    renderScanSafeBarcodes(document);
+
+    let queued=false;
+    const observer=new MutationObserver((mutations)=>{
+      if(queued) return;
+      queued=true;
+      queueMicrotask(()=>{
+        queued=false;
+        for(const mutation of mutations){
+          mutation.addedNodes.forEach(node=>{
+            if(node.nodeType===Node.ELEMENT_NODE){
+              applyBarcodeTerminology(node);
+              renderScanSafeBarcodes(node);
+            }else if(node.nodeType===Node.TEXT_NODE && node.parentElement){
+              const next=replaceBarcodeTerminologyText(node.nodeValue);
+              if(next!==node.nodeValue) node.nodeValue=next;
+            }
+          });
+        }
+        renderScanSafeBarcodes(document);
+      });
+    });
+
+    observer.observe(document.body,{childList:true,subtree:true});
+  }
+
+  window.ScanSafeBarcode={
+    render:()=>renderScanSafeBarcodes(document),
+    value:()=>window.currentState?.().user?.qrCode||null
+  };
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setupBarcodeMode();
+    setTimeout(()=>renderScanSafeBarcodes(document),150);
+  });
+
+
+  window.ScanSafeRealUser={
+    refresh:async function(){
+      await bootstrapSession();
+      await loadCurrentEvacueeIntoPrototype();
+      return window.currentState?.().user || null;
+    },
+    inspect:async function(){
+      const sb=readyClient();
+      if(!sb) return {configured:false};
+      const {data:sd}=await sb.auth.getSession();
+      const session=sd?.session||null;
+      if(!session?.user) return {configured:true,authenticated:false};
+
+      const {data:ev,error}=await sb.from('evacuees')
+        .select('evacuee_id,auth_user_id,registration_code,full_name,email,contact_number,address,approval_status,current_status')
+        .eq('auth_user_id',session.user.id)
+        .maybeSingle();
+
+      return {
+        configured:true,
+        authenticated:true,
+        authUserId:session.user.id,
+        authEmail:session.user.email,
+        evacuee:ev||null,
+        error:error?.message||null,
+        localUser:window.currentState?.().user||null
+      };
+    }
+  };
 
 })();
