@@ -67,15 +67,15 @@ Evacuee registration is reviewed by the admin before QR issuance.
 <p class="muted">Submit your information for admin review. Your account will be created after submission, but no QR code is issued until admin approval.</p>
 
 <div class="prototype-form-grid">
-<div class="field"><label>Full Name</label><input id="publicName" value="Juan Dela Cruz" required></div>
-<div class="field"><label>Email Address</label><input id="publicEmail" type="email" value="juan.delacruz@email.com" autocomplete="email" required></div>
+<div class="field"><label>Full Name</label><input id="publicName" placeholder="Full name" required></div>
+<div class="field"><label>Email Address</label><input id="publicEmail" type="email" placeholder="Email address" autocomplete="email" required></div>
 <div class="field"><label>Password</label><input id="publicPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters" required></div>
 <div class="field"><label>Confirm Password</label><input id="publicConfirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Re-enter password" required></div>
-<div class="field"><label>Age</label><input id="publicAge" type="number" value="25" min="1" required></div>
+<div class="field"><label>Age</label><input id="publicAge" type="number" min="1" required></div>
 <div class="field"><label>Gender</label><select id="publicGender"><option>Male</option><option>Female</option></select></div>
-<div class="field"><label>Group Size</label><input id="publicGroup" type="number" value="4" min="1" required></div>
+<div class="field"><label>Group Size</label><input id="publicGroup" type="number" value="1" min="1" required></div>
 <div class="field"><label>Special / Medical Needs</label><input id="publicNeeds" value="None" placeholder="None"></div>
-<div class="field full-span"><label>Complete Address</label><input id="publicAddress" value="Abangan Norte, Marilao, Bulacan" placeholder="House No. / Street / Purok" required></div>
+<div class="field full-span"><label>Complete Address</label><input id="publicAddress" placeholder="House No. / Street / Purok" required></div>
 <div class="field"><label>Barangay</label><input id="publicBarangay" value="Abangan Norte" required></div>
 <div class="field"><label>Municipality / City</label><input id="publicCity" value="Marilao" required></div>
 
@@ -103,7 +103,7 @@ Evacuee registration is reviewed by the admin before QR issuance.
 <div class="field full-span">
 <label>Upload Valid ID Image</label>
 <input id="publicValidIdImage" type="file" accept="image/png,image/jpeg,image/webp" required>
-<small class="muted" style="display:block;margin-top:5px">Upload a clear JPG, PNG, or WEBP image. Maximum 2 MB for this prototype.</small>
+<small class="muted" style="display:block;margin-top:5px">Upload a clear JPG, PNG, or WEBP image. Maximum 2 MB.</small>
 <div id="publicValidIdPreview" style="display:none;margin-top:8px"></div>
 </div>
 </div>

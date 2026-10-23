@@ -11,7 +11,7 @@
 <header class="admin-top">
 <img class="logo-img" src="assets/logo.svg">
 <div class="top-actions">
-<div class="prototype-pending-chip"><span data-pending-count>3</span> pending approvals</div>
+<div class="prototype-pending-chip"><span data-pending-count>--</span> pending approvals</div>
 <div class="avatar">A</div>
 <div class="identity"><strong>Admin</strong>Administrator</div>
 <div class="notif"><svg class="icon"><use href="assets/icons.svg#bell"></use></svg></div>
@@ -21,7 +21,7 @@
 
 <aside class="admin-side">
 <a class="nav-item" href="admin-dashboard.html"><svg class="icon"><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a>
-<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>3</b></a>
+<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>--</b></a>
 <a class="nav-item" href="evacuees.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a>
 <a class="nav-item active" href="user-management.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>User Management</span></a>
 <a class="nav-item" href="shelter-room.html"><svg class="icon"><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a>
@@ -32,17 +32,17 @@
 </aside>
 
 <main class="admin-main">
-<section class="page">
+<section class="page"><div id="adminDataStatus" class="muted" role="status" style="padding:10px 0">Loading live database records...</div>
 <div class="page-title">
 <div><h1>User Management</h1><p>Create and manage authorized ScanSafe personnel accounts and system roles. Evacuee registrations are managed separately.</p></div>
 <div class="date-line"><svg class="icon sm"><use href="assets/icons.svg#calendar"></use></svg><span data-now></span></div>
 </div>
 
 <div class="user-management-kpis">
-<section class="card um-kpi"><span>Total System Users</span><strong data-um-total>0</strong><small>Authorized personnel accounts</small></section>
-<section class="card um-kpi"><span>Active Accounts</span><strong data-um-active>0</strong><small>Can access the admin portal</small></section>
-<section class="card um-kpi"><span>Defined Roles</span><strong data-um-roles>0</strong><small>Role-based access categories</small></section>
-<section class="card um-kpi"><span>Inactive Accounts</span><strong data-um-inactive>0</strong><small>Temporarily disabled access</small></section>
+<section class="card um-kpi"><span>Total System Users</span><strong data-um-total>--</strong><small>Authorized personnel accounts</small></section>
+<section class="card um-kpi"><span>Administrators</span><strong data-um-admins>--</strong><small>Assigned admin role</small></section>
+<section class="card um-kpi"><span>Defined Roles</span><strong data-um-roles>--</strong><small>Role-based access categories</small></section>
+<section class="card um-kpi"><span>Evacuee Accounts</span><strong data-um-evacuees>--</strong><small>Managed in Evacuees</small></section>
 </div>
 
 <section class="card card-pad user-management-card">
@@ -51,26 +51,23 @@
 <h3 class="section-h"><svg class="icon"><use href="assets/icons.svg#users"></use></svg> Authorized System Users</h3>
 <p class="muted">These accounts are for administrators and authorized shelter personnel only. Public evacuee registration does not create a staff account.</p>
 </div>
-<button class="btn red" onclick="openSystemUserModal()"><svg class="icon sm"><use href="assets/icons.svg#plus"></use></svg> Register User</button>
+<span class="muted">Personnel accounts are provisioned through Supabase Authentication.</span>
 </div>
 
 <div class="um-filters">
-<div class="searchbar"><svg class="icon sm"><use href="assets/icons.svg#search"></use></svg><input id="systemUserSearch" oninput="renderSystemUsers()" placeholder="Search name, username, email..."></div>
-<select class="select" id="systemUserRoleFilter" onchange="renderSystemUsers()">
+<div class="searchbar"><svg class="icon sm"><use href="assets/icons.svg#search"></use></svg><input id="systemUserSearch" oninput="ScanSafeAdminLive.renderSystemUsers()" placeholder="Search name, account ID, role..."></div>
+<select class="select" id="systemUserRoleFilter" onchange="ScanSafeAdminLive.renderSystemUsers()">
 <option value="all">All Roles</option>
-<option>Administrator</option>
-<option>Registration Staff</option>
-<option>Shelter Staff</option>
-<option>QR / Check-in Staff</option>
-<option>Reports Viewer</option>
+<option value="admin">Administrator</option>
+<option value="staff">Shelter Staff</option>
 </select>
-<select class="select" id="systemUserStatusFilter" onchange="renderSystemUsers()"><option value="all">All Statuses</option><option>Active</option><option>Inactive</option></select>
+<select class="select" id="systemUserStatusFilter" onchange="ScanSafeAdminLive.renderSystemUsers()"><option value="all">All Statuses</option><option value="active">Authorized accounts</option></select>
 </div>
 
 <div class="table-scroll">
 <table class="table system-user-table">
-<thead><tr><th>User</th><th>Username</th><th>Role</th><th>Email</th><th>Status</th><th>Last Activity</th><th>Actions</th></tr></thead>
-<tbody id="systemUserBody"></tbody>
+<thead><tr><th>User</th><th>Account ID</th><th>Role</th><th>Account Type</th><th>Profile</th><th>Access</th><th>Actions</th></tr></thead>
+<tbody id="systemUserBody"><tr><td colspan="7">Loading personnel accounts...</td></tr></tbody>
 </table>
 </div>
 </section>
@@ -78,7 +75,7 @@
 <section class="card card-pad role-guide">
 <h3 class="section-h">Role Guide</h3>
 <div class="role-guide-grid">
-<div><b>Administrator</b><span>Full prototype access including user management and settings.</span></div>
+<div><b>Administrator</b><span>Administrator access including user management and settings.</span></div>
 <div><b>Registration Staff</b><span>Reviews registrations and assists evacuee data entry.</span></div>
 <div><b>Shelter Staff</b><span>Handles accommodation assignment and occupancy monitoring.</span></div>
 <div><b>QR / Check-in Staff</b><span>Verifies QR codes and confirms shelter check-in.</span></div>
@@ -89,27 +86,10 @@
 </main>
 </div>
 
-<div id="systemUserModal" class="prototype-modal hidden">
-<form class="card prototype-dialog" onsubmit="createSystemUser(event)">
-<div class="dialog-head"><div><span class="eyebrow">Authorized Account</span><h2>Register System User</h2></div><button type="button" class="btn out" onclick="closeSystemUserModal()">Close</button></div>
-<p class="muted">Use this form only for authorized personnel. Evacuees should use the public registration workflow instead.</p>
-<div class="prototype-form-grid">
-<div class="field"><label>Full Name</label><input id="systemUserName" required></div>
-<div class="field"><label>Username</label><input id="systemUsername" required></div>
-<div class="field"><label>Email Address</label><input id="systemUserEmail" type="email" required></div>
-<div class="field"><label>Role</label><select id="systemUserRole"><option>Registration Staff</option><option>Shelter Staff</option><option>QR / Check-in Staff</option><option>Reports Viewer</option><option>Administrator</option></select></div>
-<div class="field"><label>Account Status</label><select id="systemUserStatus"><option>Active</option><option>Inactive</option></select></div>
-<div class="field"><label>Temporary Password</label><input id="systemUserPassword" type="password" placeholder="Prototype only" required></div>
-</div>
-<button class="btn red full">Create User Account</button>
-<p class="prototype-note">Prototype only: password delivery and email invitation are simulated and are not connected to a real authentication server.</p>
-</form>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js"></script>
-<script src="assets/supabase-bridge.js"></script>
+<script src="assets/app.js?v=admin-live-v14"></script>
+<script src="assets/supabase-bridge.js?v=admin-live-v14"></script>
 </body>
 </html>

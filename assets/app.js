@@ -2,22 +2,22 @@
 const ROOMS={
 '116':{name:'Room 116',type:'Classroom',cap:30,occ:0,status:'available',notes:'Standard classroom with chairs and tables. Suitable for families.'},
 '115':{name:'Room 115',type:'Classroom',cap:30,occ:0,status:'available',notes:'Standard classroom available for evacuee groups.'},
-'114':{name:'Room 114',type:'Classroom',cap:30,occ:0,status:'near',notes:'Near capacity; assign small groups only.'},
-'113':{name:'Room 113',type:'Classroom',cap:30,occ:0,status:'near',notes:'Near capacity; three slots remain.'},
+'114':{name:'Room 114',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
+'113':{name:'Room 113',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 '112':{name:'Room 112',type:'Classroom',cap:30,occ:0,status:'available',notes:'Available classroom with good remaining capacity.'},
 '111':{name:'Room 111',type:'Classroom',cap:30,occ:0,status:'available',notes:'Available for family or individual evacuees.'},
-'110':{name:'Room 110',type:'Classroom',cap:30,occ:0,status:'full',notes:'Full. No additional evacuees can be assigned.'},
-'109':{name:'Room 109',type:'Classroom',cap:30,occ:0,status:'full',notes:'Full. No additional evacuees can be assigned.'},
+'110':{name:'Room 110',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
+'109':{name:'Room 109',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 '108':{name:'Room 108',type:'Classroom',cap:30,occ:0,status:'available',notes:'Available classroom.'},
 '107':{name:'Room 107',type:'Classroom',cap:30,occ:0,status:'available',notes:'Available classroom.'},
-'106':{name:'Room 106',type:'Classroom',cap:30,occ:0,status:'near',notes:'Near capacity.'},
-'105':{name:'Room 105',type:'Classroom',cap:30,occ:0,status:'near',notes:'Near capacity.'},
+'106':{name:'Room 106',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
+'105':{name:'Room 105',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 '104':{name:'Room 104',type:'Classroom',cap:30,occ:0,status:'available',notes:'Available classroom.'},
-'103':{name:'Room 103',type:'Classroom',cap:30,occ:0,status:'full',notes:'Full. No additional evacuees can be assigned.'},
-'102':{name:'Room 102',type:'Classroom',cap:30,occ:0,status:'full',notes:'Full. No additional evacuees can be assigned.'},
+'103':{name:'Room 103',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
+'102':{name:'Room 102',type:'Classroom',cap:30,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 'atrium':{name:'Atrium',type:'Common Area',cap:80,occ:0,status:'available',notes:'Central common area; use only when authorized by shelter staff.'},
 'fitness':{name:'Physical Fitness Room',type:'Activity Room',cap:40,occ:0,status:'available',notes:'Overflow accommodation area.'},
-'lobby':{name:'Main Lobby',type:'Designated Evacuees Area',cap:100,occ:0,status:'near',notes:'Primary designated evacuees area on the ground floor.'}
+'lobby':{name:'Main Lobby',type:'Designated Evacuees Area',cap:100,occ:0,status:'available',notes:'Primary designated evacuees area on the ground floor.'}
 };
 
 
@@ -26,9 +26,9 @@ const ROOMS={
 // they may be used only as overflow when designated hallway spaces are full.
 const HALLWAY_SPACES={
 'A1':{name:'Hallway A1',type:'Designated Corridor Space',side:'Left Hallway - North',cap:6,occ:0,status:'available',notes:'Primary hallway accommodation zone. Suitable for a group of up to 6 persons.'},
-'A2':{name:'Hallway A2',type:'Designated Corridor Space',side:'Left Hallway - Center',cap:6,occ:0,status:'full',notes:'This hallway space is currently full.'},
+'A2':{name:'Hallway A2',type:'Designated Corridor Space',side:'Left Hallway - Center',cap:6,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 'A3':{name:'Hallway A3',type:'Designated Corridor Space',side:'Left Hallway - South',cap:6,occ:0,status:'available',notes:'Available designated hallway accommodation zone.'},
-'A4':{name:'Hallway A4',type:'Designated Corridor Space',side:'Right Hallway - North',cap:6,occ:0,status:'near',notes:'Near capacity; suitable only for a small additional group.'},
+'A4':{name:'Hallway A4',type:'Designated Corridor Space',side:'Right Hallway - North',cap:6,occ:0,status:'available',notes:'Accommodation availability is based on current registrations.'},
 'A5':{name:'Hallway A5',type:'Designated Corridor Space',side:'Right Hallway - Center',cap:6,occ:0,status:'available',notes:'Available designated hallway accommodation zone.'},
 'A6':{name:'Hallway A6',type:'Designated Corridor Space',side:'Right Hallway - South',cap:6,occ:0,status:'available',notes:'Available designated hallway accommodation zone.'}
 };
@@ -72,13 +72,10 @@ function filterSpaces(){
 function assignSpace(id){localStorage.setItem('selectedSpace',id);location.href='evacuees.html?assignSpace='+encodeURIComponent(id)}
 
 function renderEvacs(){const b=q('#evacBody');if(!b)return;let term=(q('#evacSearch')?.value||'').toLowerCase(),status=q('#evacStatus')?.value||'all',shelter=q('#evacShelter')?.value||'all';const data=EVACS.filter(e=>(!term||e.name.toLowerCase().includes(term)||e.id.toLowerCase().includes(term))&&(status==='all'||e.status===status)&&(shelter==='all'||e.shelter===shelter));b.innerHTML=data.map((e,i)=>`<tr class="${i===0?'selected-row':''}" onclick="showEvac('${e.id}')"><td><input type="checkbox" ${i===0?'checked':''}></td><td>${e.id}</td><td><b>${e.name}</b></td><td>${e.age}</td><td>${e.gender}</td><td>${e.group}</td><td>${e.shelter}<br><span class="muted">${e.room}</span></td><td>${statusPill(e.status)}</td><td><span class="actions">${ico('eye','sm')}${ico('edit','sm')}${ico('trash','sm')}</span></td></tr>`).join('')}
-function showEvac(id){const e=EVACS.find(x=>x.id===id),box=q('#evacDetail');if(!e||!box)return;box.innerHTML=`<div style="display:flex;justify-content:space-between"><h3 class="section-h">${ico('user')} Evacuee Details</h3><button class="btn out">${ico('edit','sm')} Edit</button></div><div class="detail-top"><div class="person-round">${ico('user','xl')}</div><div><h2 style="font-size:16px;margin:0 0 4px">${e.name}</h2><div class="muted" style="font-size:10px">ID: ${e.id}</div><div style="margin-top:7px">${statusPill(e.status)}</div></div></div><div class="barcode" style="width:150px;margin:15px auto 5px"></div><div style="text-align:center;font-weight:700;font-size:10px">${e.id}</div><button class="btn out full" style="margin-top:7px" onclick="window.print()">Print ID</button><div class="detail-list"><div class="detail-line"><b>Age / Gender</b><span>${e.age} years old &nbsp;|&nbsp; ${e.gender}</span></div><div class="detail-line"><b>Group Size</b><span>${e.group} members</span></div><div class="detail-line"><b>Accommodation Assignment</b><span>${e.shelter}<br>${e.room}</span></div><div class="detail-line"><b>Special Needs</b><span>None</span></div><div class="detail-line"><b>Emergency Contact</b><span>Maria Dela Cruz (Mother)<br>0917 123 4567</span></div><div class="detail-line"><b>Registration Time</b><span>Aug 6, 2026 &nbsp;10:12 AM</span></div><div class="detail-line"><b>Remarks</b><span>Family with young children.</span></div></div>`}
 function openRegister(){const m=q('#registerModal');if(m)m.classList.remove('hidden')}
 function closeRegister(){q('#registerModal')?.classList.add('hidden')}
 function registerEvac(e){e.preventDefault();const sid=q('#assignSpace')?.value,group=parseInt(q('#groupSize')?.value||'1',10);if(sid){const d=HALLWAY_SPACES[sid],available=d.cap-d.occ;if(group>available){toast(`Group size (${group}) exceeds ${sid} available slots (${available}). Choose another hallway space.`);return}}toast('Evacuee registered successfully.');closeRegister()}
-function scanNow(){q('#scanResult')?.classList.remove('hidden');toast('Barcode verified: EV-001234')}
-function manualScan(){let v=q('#manualBarcode')?.value.trim();if(!v){toast('Enter a barcode number.');return}scanNow()}
-function exportCSV(name='scansafe-report.csv'){let data='Report,Value\\nTotal Evacuees,248\\nVerified,220\\nPending,28\\n';let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/csv'}));a.download=name;a.click();URL.revokeObjectURL(a.href);toast('CSV generated.')}
+function exportCSV(){toast('Connect to the database to export a live report.')}
 function generatePDF(){toast('Opening print dialog — choose Save as PDF.');setTimeout(()=>window.print(),300)}
 function sendMessage(){let inp=q('#messageInput');if(!inp||!inp.value.trim())return;let row=document.createElement('div');row.className='bubble-row mine';row.innerHTML=`<div class="bubble">${inp.value.replace(/</g,'&lt;')}</div><div class="avatar">A</div>`;q('#thread').appendChild(row);inp.value='';q('#thread').scrollTop=q('#thread').scrollHeight}
 function sendAnnouncement(){let t=q('#announcement');if(!t?.value.trim()){toast('Type an announcement first.');return}toast('Announcement sent to '+q('#announceTo').value);t.value=''}
@@ -290,7 +287,7 @@ function renderDashboardPrototype(){renderPendingRequests();renderRecentActivity
 function reviewRegistration(id){
   const r=getRequest(id),modal=q('#reviewModal');if(!r||!modal)return;
   q('#reviewName').textContent=r.name;
-  q('#reviewDetails').innerHTML=`<div class="review-field"><b>Request ID</b><span>${esc(r.id)}</span></div><div class="review-field"><b>Email</b><span>${esc(r.email)}</span></div><div class="review-field"><b>Age / Gender</b><span>${r.age} / ${esc(r.gender)}</span></div><div class="review-field"><b>Group Size</b><span>${r.group} persons</span></div><div class="review-field"><b>Special / Medical Needs</b><span>${esc(r.needs||'None')}</span></div><div class="review-field"><b>Current Status</b><span>${statusPill(r.status)}</span></div>`;
+  q('#reviewDetails').innerHTML=`<div class="review-field"><b>Request ID</b><span>${esc(r.id)}</span></div><div class="review-field"><b>Email</b><span>${esc(r.email)}</span></div><div class="review-field"><b>Age / Gender</b><span>${r.age} / ${esc(r.gender)}</span></div><div class="review-field"><b>Group Size</b><span>${r.group} persons</span></div><div class="review-field"><b>Special / Medical Needs</b><span>${esc(r.needs||'None')}</span></div><div class="review-field"><b>Address / Coverage</b><span>${esc([r.address,r.barangay,r.city].filter(Boolean).join(', ')||'Not provided')}</span></div><div class="review-field"><b>Valid ID</b><span>${esc([r.validIdType,r.validIdNumber].filter(Boolean).join(' - ')||'Not provided')}</span></div><div class="review-field"><b>Current Status</b><span>${statusPill(r.status)}</span></div>`;
   q('#approveBtn').onclick=()=>approveRegistration(id);q('#rejectBtn').onclick=()=>rejectRegistration(id);modal.classList.remove('hidden');
 }
 function closeReviewModal(){q('#reviewModal')?.classList.add('hidden')}
@@ -415,13 +412,13 @@ function ensureReviewModal(){
   if(modal)return modal;
   modal=document.createElement('div');
   modal.id='reviewModal';modal.className='prototype-modal hidden';
-  modal.innerHTML=`<div class="card prototype-dialog"><div class="dialog-head"><div><span class="eyebrow">Registration Review</span><h2 id="reviewName">Evacuee</h2></div><button class="btn out" onclick="closeReviewModal()">Close</button></div><div id="reviewDetails" class="review-details"></div><div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Issue QR</button></div><p class="prototype-note">Prototype: approval simulates sending the confirmation email and barcode.</p></div>`;
+  modal.innerHTML=`<div class="card prototype-dialog"><div class="dialog-head"><div><span class="eyebrow">Registration Review</span><h2 id="reviewName">Evacuee</h2></div><button class="btn out" onclick="closeReviewModal()">Close</button></div><div id="reviewDetails" class="review-details"></div><div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Issue QR</button></div><p class="prototype-note">Approval updates the database registration and issues the evacuee barcode.</p></div>`;
   document.body.appendChild(modal);return modal;
 }
 function reviewRegistration(id){
   const r=getRequest(id),modal=ensureReviewModal();if(!r)return;
   q('#reviewName').textContent=r.name;
-  q('#reviewDetails').innerHTML=`<div class="review-field"><b>Request ID</b><span>${esc(r.id)}</span></div><div class="review-field"><b>Email</b><span>${esc(r.email)}</span></div><div class="review-field"><b>Age / Gender</b><span>${r.age} / ${esc(r.gender)}</span></div><div class="review-field"><b>Group Size</b><span>${r.group} persons</span></div><div class="review-field"><b>Special / Medical Needs</b><span>${esc(r.needs||'None')}</span></div><div class="review-field"><b>Current Status</b><span>${statusPill(r.status)}</span></div>`;
+  q('#reviewDetails').innerHTML=`<div class="review-field"><b>Request ID</b><span>${esc(r.id)}</span></div><div class="review-field"><b>Email</b><span>${esc(r.email)}</span></div><div class="review-field"><b>Age / Gender</b><span>${r.age} / ${esc(r.gender)}</span></div><div class="review-field"><b>Group Size</b><span>${r.group} persons</span></div><div class="review-field"><b>Special / Medical Needs</b><span>${esc(r.needs||'None')}</span></div><div class="review-field"><b>Address / Coverage</b><span>${esc([r.address,r.barangay,r.city].filter(Boolean).join(', ')||'Not provided')}</span></div><div class="review-field"><b>Valid ID</b><span>${esc([r.validIdType,r.validIdNumber].filter(Boolean).join(' - ')||'Not provided')}</span></div><div class="review-field"><b>Current Status</b><span>${statusPill(r.status)}</span></div>`;
   q('#approveBtn').onclick=()=>approveRegistration(id);q('#rejectBtn').onclick=()=>rejectRegistration(id);modal.classList.remove('hidden');
 }
 document.addEventListener('DOMContentLoaded',()=>{

@@ -11,7 +11,7 @@
 <header class="admin-top">
 <img class="logo-img" src="assets/logo.svg">
 <div class="top-actions">
-<div class="prototype-pending-chip"><span data-pending-count>3</span> pending approvals</div>
+<div class="prototype-pending-chip"><span data-pending-count>--</span> pending approvals</div>
 <div class="avatar">A</div>
 <div class="identity"><strong>Admin</strong>Administrator</div>
 <div class="notif"><svg class="icon"><use href="assets/icons.svg#bell"></use></svg></div>
@@ -21,7 +21,7 @@
 
 <aside class="admin-side">
 <a class="nav-item" href="admin-dashboard.html"><svg class="icon"><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a>
-<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>3</b></a>
+<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>--</b></a>
 <a class="nav-item active" href="evacuees.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a>
 <a class="nav-item" href="user-management.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>User Management</span></a>
 <a class="nav-item" href="shelter-room.html"><svg class="icon"><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a>
@@ -32,17 +32,17 @@
 </aside>
 
 <main class="admin-main">
-<section class="page">
+<section class="page"><div id="adminDataStatus" class="muted" role="status" style="padding:10px 0">Loading live database records...</div>
 <div class="page-title">
 <div><h1>Evacuee Management</h1><p>Review, verify, monitor and manage evacuees submitted through the public registration workflow.</p></div>
 <div class="date-line"><svg class="icon sm"><use href="assets/icons.svg#calendar"></use></svg><span data-now></span></div>
 </div>
 
 <div class="kpi-row">
-<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#users"></use></svg></div><div><div class="kpi-label">Total Evacuees</div><div class="kpi-value">248</div><div class="kpi-sub up">↑ 12 today</div></div></div>
-<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#check"></use></svg></div><div><div class="kpi-label">Approved / QR Issued</div><div class="kpi-value" data-kpi-approved>236</div><div class="kpi-sub">Eligible for assignment</div></div></div>
-<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#alert"></use></svg></div><div><div class="kpi-label">Pending Approval</div><div class="kpi-value" data-kpi-pending>3</div><div class="kpi-sub">Requires admin review</div></div></div>
-<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#users"></use></svg></div><div><div class="kpi-label">Family Groups</div><div class="kpi-value">96</div><div class="kpi-sub">Average size: 2.6</div></div></div>
+<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#users"></use></svg></div><div><div class="kpi-label">Total Evacuees</div><div class="kpi-value" data-kpi-total>--</div><div class="kpi-sub up">Registered records</div></div></div>
+<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#check"></use></svg></div><div><div class="kpi-label">Approved Evacuees</div><div class="kpi-value" data-kpi-approved>--</div><div class="kpi-sub">Admin approved</div></div></div>
+<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#alert"></use></svg></div><div><div class="kpi-label">Pending Approval</div><div class="kpi-value" data-kpi-pending>--</div><div class="kpi-sub">Requires admin review</div></div></div>
+<div class="card kpi"><div class="hex"><svg class="icon lg"><use href="assets/icons.svg#users"></use></svg></div><div><div class="kpi-label">Family Groups</div><div class="kpi-value" data-kpi-groups>--</div><div class="kpi-sub" data-kpi-group-average>Live family registrations</div></div></div>
 </div>
 
 <div class="filter-row">
@@ -60,11 +60,11 @@
 <div class="table-scroll">
 <table class="table">
 <thead><tr><th></th><th>ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Group</th><th>QR</th><th>Coverage</th><th>Accommodation</th><th>Status</th><th>Actions</th></tr></thead>
-<tbody id="evacBody"></tbody>
+<tbody id="evacBody"><tr><td colspan="11">Loading registrations...</td></tr></tbody>
 </table>
 </div>
 </section>
-<aside class="card detail-card" id="evacDetail"></aside>
+<aside class="card detail-card" id="evacDetail"><div class="space-placeholder">Select an evacuee to view their details.</div></aside>
 </div>
 </section>
 </main>
@@ -73,7 +73,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js"></script>
-<script src="assets/supabase-bridge.js"></script>
+<script src="assets/app.js?v=admin-live-v14"></script>
+<script src="assets/supabase-bridge.js?v=admin-live-v14"></script>
 </body>
 </html>

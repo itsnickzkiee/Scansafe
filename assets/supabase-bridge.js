@@ -182,9 +182,8 @@
     event.preventDefault();
     const sb=readyClient();
     if(!sb){
-      if(configured){ uiError('ScanSafe backend is temporarily unavailable. Please reload and try again.'); return; }
-      // Prototype fallback is allowed only when Supabase has not been configured.
-      return window.__scanSafePrototypeLogin ? window.__scanSafePrototypeLogin(event) : undefined;
+      uiError('ScanSafe backend is unavailable. Please reload and try again.');
+      return;
     }
 
     const username=(document.getElementById('loginUsername')?.value||'').trim();
@@ -273,8 +272,8 @@
     event.preventDefault();
     const sb=readyClient();
     if(!sb){
-      if(configured){ if(typeof toast==='function') toast('ScanSafe backend is unavailable. Registration was not submitted.'); return; }
-      return window.__scanSafePrototypeRegister ? window.__scanSafePrototypeRegister(event) : undefined;
+      if(typeof toast==='function') toast('ScanSafe backend is unavailable. Registration was not submitted.');
+      return;
     }
 
     const password=document.getElementById('publicPassword')?.value||'';
@@ -365,8 +364,14 @@
     stats:null,
     evacuees:[],
     spaces:[],
-    activity:[]
+    activity:[],
+    error:null,
+    warnings:[],
+    updatedAt:null,
+    profiles:null
   };
+  let adminLiveRefreshPromise=null;
+  let adminSnapshotRpcUnavailable=false;
 
   function adminLivePage(){
     return (location.pathname.split('/').pop()||'').toLowerCase();
@@ -395,7 +400,7 @@
 
   function adminLiveStatus(row){
     if(row.approval_status==='approved'){
-      return row.current_status==='accommodated'?'Accommodated':'Approved';
+      return ['accommodated','checked_in'].includes(row.current_status)?'Checked-In':'Approved';
     }
     if(row.approval_status==='rejected') return 'Rejected';
     return 'Pending Approval';
@@ -413,6 +418,10 @@
       group:Number(row.group_size||1),
       needs:row.needs_summary || 'None',
       address:row.address || '',
+      barangay:row.barangay || '',
+      city:row.city || '',
+      validIdType:row.valid_id_type || '',
+      validIdNumber:row.valid_id_number || '',
       submitted:row.registered_at
         ? new Date(row.registered_at).toLocaleString()
         : '',
@@ -456,12 +465,22 @@
     }
   }
 
+  function adminLiveCoverage(row){
+    return /abangan norte/i.test(row.barangay||'') && /marilao/i.test(row.city||'')?'Within Coverage':'Requires Verification';
+  }
+
   function renderAdminLiveEvacuees(){
     const body=document.querySelector('#evacBody');
     if(!body) return;
 
+    if(!adminLiveCache.loaded){
+      body.innerHTML='<tr><td colspan="11" style="text-align:center;padding:24px">'+(adminLiveCache.error?'Evacuees could not be loaded. Use Refresh to try again.':'Loading evacuees...')+'</td></tr>';
+      return;
+    }
+
     const term=(document.querySelector('#evacSearch')?.value||'').trim().toLowerCase();
     const statusFilter=document.querySelector('#evacStatus')?.value||'all';
+    const coverageFilter=document.querySelector('#evacCoverage')?.value||'all';
 
     const rows=adminLiveCache.evacuees
       .map(adminLiveRequest)
@@ -470,13 +489,14 @@
           String(row.name).toLowerCase().includes(term) ||
           String(row.evacueeId).toLowerCase().includes(term) ||
           String(row.id).toLowerCase().includes(term) ||
-          String(row.email).toLowerCase().includes(term);
+          String(row.email).toLowerCase().includes(term) ||
+          [row.address,row.barangay,row.city].join(' ').toLowerCase().includes(term);
 
         const matchesStatus=statusFilter==='all' ||
           row.status===statusFilter ||
           row.approvalStatus===String(statusFilter).toLowerCase();
 
-        return matchesTerm && matchesStatus;
+        return matchesTerm && matchesStatus && (coverageFilter==='all' || adminLiveCoverage(row)===coverageFilter);
       });
 
     body.innerHTML=rows.length
@@ -492,6 +512,7 @@
             <td>${adminLiveEsc(row.gender)}</td>
             <td>${row.group}</td>
             <td>${row.qrIssued?'<span class="pill green">Issued</span>':'<span class="pill gray">Not Issued</span>'}</td>
+            <td>${adminLiveEsc(adminLiveCoverage(row))}</td>
             <td>${adminLiveEsc(row.assignmentName||row.assignment||'Waiting for assignment')}</td>
             <td>${typeof statusPill==='function'?statusPill(row.status):adminLiveEsc(row.status)}</td>
             <td>
@@ -551,194 +572,285 @@
     if(window.ScanSafeBarcode?.render) setTimeout(()=>window.ScanSafeBarcode.render(),0);
   }
 
+  const adminLivePages=new Set([
+    'admin-dashboard.html','evacuees.html','shelter-room.html',
+    'barcode-scanner.html','reports.html','messages.html','user-management.html','settings.html'
+  ]);
+
+  function adminSetDataStatus(){
+    const box=document.getElementById('adminDataStatus');
+    if(!box) return;
+    const failed=!!adminLiveCache.error;
+    const message=failed
+      ? (adminLiveCache.loaded?'Refresh failed. Showing the last loaded records. ':'Could not load registrations. ')+adminLiveCache.error
+      : adminLiveCache.loaded
+        ? 'Live database - Updated '+new Date(adminLiveCache.updatedAt).toLocaleTimeString()+
+          (adminLiveCache.warnings.length?' - '+adminLiveCache.warnings.join(' '):'')
+        : 'Loading registrations from the database...';
+    box.setAttribute('role',failed?'alert':'status');
+    box.innerHTML='<span>'+adminLiveEsc(message)+'</span> <button type="button" class="btn out" onclick="ScanSafeAdminLive.refresh()">Refresh</button>';
+  }
+
+  function renderAdminPendingRequests(){
+    const body=document.getElementById('pendingRequestsBody');
+    if(!body) return;
+    if(!adminLiveCache.loaded){
+      body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px">'+
+        (adminLiveCache.error?'Registrations could not be loaded. Use Refresh to try again.':'Loading registrations...')+'</td></tr>';
+      return;
+    }
+    const pending=adminLiveCache.evacuees.map(adminLiveRequest).filter(r=>r.status==='Pending Approval');
+    body.innerHTML=pending.length?pending.map(r=>
+      '<tr><td><div class="ops-person"><div class="ops-initial">'+adminLiveEsc(initials(r.name))+
+      '</div><div><b>'+adminLiveEsc(r.name)+'</b><small>'+adminLiveEsc(r.id)+'</small></div></div></td><td>'+r.group+
+      '</td><td>'+adminLiveEsc(r.needs)+'</td><td>'+adminLiveEsc([r.barangay,r.city].filter(Boolean).join(', ')||'Not provided')+
+      '</td><td>'+adminLiveEsc(r.submitted)+'</td><td>'+statusPill(r.status)+
+      '</td><td><button class="btn red review-btn" data-review-request="'+adminLiveEsc(r.id)+'">Review</button></td></tr>'
+    ).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px">No pending registrations.</td></tr>';
+    body.querySelectorAll('[data-review-request]').forEach(button=>{
+      button.addEventListener('click',()=>window.reviewRegistration(button.dataset.reviewRequest));
+    });
+  }
+
   function renderAdminLiveDashboard(){
-    const s=window.currentState?.();
-    const stats=adminLiveCache.stats||{
-      pending_registrations:0,
-      approved_evacuees:0,
-      current_occupancy:0,
-      total_capacity:0,
-      occupancy_percent:0,
-      available_spaces:0
-    };
-
-    if(s){
-      s.requests=adminLiveCache.evacuees.map(adminLiveRequest);
-      s.activity=adminLiveCache.activity.map(a=>({
+    const state=window.currentState?.();
+    const stats=adminLiveCache.stats||{};
+    if(state){
+      state.requests=adminLiveCache.evacuees.map(adminLiveRequest);
+      state.activity=adminLiveCache.activity.map(a=>({
         title:a.title||a.event_type||'Database activity',
-        desc:a.description||'',
-        time:adminLiveRelativeTime(a.created_at),
-        icon:a.icon||'•'
+        desc:a.description||'',time:adminLiveRelativeTime(a.created_at),icon:a.icon||'+'
       }));
-      s.demoGroups=[];
-      s.demoAssignments={};
-      window.saveScanSafeState?.(s);
+      state.demoGroups=[];
+      state.demoAssignments={};
+      window.saveScanSafeState?.(state);
     }
+    const value=key=>adminLiveCache.loaded && stats[key]!=null?stats[key]:'--';
+    const set=(selector,text)=>document.querySelectorAll(selector).forEach(el=>el.textContent=String(text));
+    set('[data-pending-count],[data-kpi-pending]',value('pending_registrations'));
+    set('[data-kpi-total]',adminLiveCache.loaded?adminLiveCache.evacuees.length:'--');
+    const families=adminLiveCache.evacuees.filter(row=>Number(row.group_size)>1);
+    set('[data-kpi-groups]',adminLiveCache.loaded?families.length:'--');
+    set('[data-kpi-group-average]',adminLiveCache.loaded?'Average size: '+(families.length?(families.reduce((n,row)=>n+Number(row.group_size),0)/families.length).toFixed(1):'0'):'Loading family registrations...');
+    set('[data-kpi-approved]',value('approved_evacuees'));
+    set('[data-kpi-spaces]',value('available_spaces'));
+    const percent=value('occupancy_percent');
+    const occupancy=percent==='--'?percent:percent+'%';
+    set('[data-kpi-occupancy]',occupancy);
+    set('[data-kpi-capacity]',value('current_occupancy')+' / '+value('total_capacity')+' capacity');
+    adminSetKpi('Current Occupancy',occupancy,value('current_occupancy')+' / '+value('total_capacity')+' capacity');
+    adminSetKpi('Approved Evacuees',value('approved_evacuees'),'Admin approved');
+    adminSetKpi('Pending Registrations',value('pending_registrations'),'Needs admin review');
+    adminSetKpi('Available Spaces',value('available_spaces'),'Primary accommodation spaces');
+    renderAdminPendingRequests();
+    if(typeof window.renderRecentActivity==='function') window.renderRecentActivity();
 
-    document.querySelectorAll('[data-pending-count],[data-kpi-pending]')
-      .forEach(el=>el.textContent=String(stats.pending_registrations||0));
-    document.querySelectorAll('[data-kpi-approved]')
-      .forEach(el=>el.textContent=String(stats.approved_evacuees||0));
-    document.querySelectorAll('[data-kpi-spaces]')
-      .forEach(el=>el.textContent=String(stats.available_spaces||0));
-
-    adminSetKpi(
-      'Current Occupancy',
-      `${Number(stats.occupancy_percent||0)}%`,
-      `${Number(stats.current_occupancy||0)} / ${Number(stats.total_capacity||0)} capacity`
-    );
-    adminSetKpi(
-      'Approved Evacuees',
-      Number(stats.approved_evacuees||0),
-      'Approved + Barcode issued'
-    );
-    adminSetKpi(
-      'Pending Registrations',
-      Number(stats.pending_registrations||0),
-      'Needs admin review'
-    );
-    adminSetKpi(
-      'Available Spaces',
-      Number(stats.available_spaces||0),
-      'Primary accommodation spaces'
-    );
-
-    const pendingBody=document.querySelector('#pendingRequestsBody');
-    if(pendingBody && typeof window.renderDashboardPrototype==='function'){
-      window.renderDashboardPrototype();
-    }
-
-    const recent=document.querySelector('#recentActivity');
-    if(recent && typeof window.renderRecentActivity==='function'){
-      window.renderRecentActivity();
-    }
-
-    const overview=document.querySelector('#dashboardSpaceOverview');
+    const primary=adminLiveCache.spaces.filter(row=>row.is_primary && row.status!=='inactive');
+    const overview=document.getElementById('dashboardSpaceOverview');
     if(overview){
-      const primary=adminLiveCache.spaces.filter(s=>s.is_primary);
       overview.innerHTML=primary.length
-        ? `<div class="space-overview">${primary.slice(0,6).map(row=>{
-            const cap=Number(row.capacity||0);
-            const occ=Number(row.current_occupancy||0);
-            const pct=cap>0?Math.round((occ/cap)*100):0;
-            const status=occ>=cap?'full':pct>70?'near':'available';
-            return `<div class="space-overview-row">
-              <div><b>${adminLiveEsc(row.space_name||row.space_code)}</b><small>${occ} / ${cap} occupied</small></div>
-              ${typeof statusPill==='function'?statusPill(status):status}
-              <div class="occupancy-line"><i style="width:${Math.min(100,pct)}%"></i></div>
-            </div>`;
-          }).join('')}</div>`
-        : '<div class="space-placeholder">No accommodation spaces configured in Supabase.</div>';
+        ? '<div class="space-overview">'+primary.map(row=>{
+            const cap=Number(row.capacity||0),occ=Number(row.current_occupancy||0);
+            const pct=cap>0?Math.round(occ/cap*100):0;
+            return '<div class="space-overview-row"><div><b>'+adminLiveEsc(row.space_name||row.space_code)+
+              '</b><small>'+occ+' / '+cap+' occupied</small></div>'+statusPill(normalizeDbSpaceStatus(row))+
+              '<div class="occupancy-line"><i style="width:'+Math.min(100,pct)+'%"></i></div></div>';
+          }).join('')+'</div>'
+        : '<div class="space-placeholder">'+(adminLiveCache.loaded?'No accommodation data available.':'Loading accommodation data...')+'</div>';
     }
-
-    document.querySelectorAll('*').forEach(el=>{
-      if(el.children.length===0 && el.textContent?.trim()==='Live prototype'){
-        el.textContent='Live database';
-      }
+    const alerts=[];
+    if(stats.pending_registrations>0) alerts.push({title:stats.pending_registrations+' pending registration'+(stats.pending_registrations===1?'':'s'),text:'Review identity and coverage before approval.'});
+    primary.filter(row=>Number(row.capacity)>0 && Number(row.current_occupancy)/Number(row.capacity)>.70).forEach(row=>{
+      alerts.push({title:(row.space_name||row.space_code)+' '+(Number(row.current_occupancy)>=Number(row.capacity)?'is full':'is near capacity'),text:Math.max(0,Number(row.capacity)-Number(row.current_occupancy))+' slots available.'});
     });
-
+    set('#adminAlertsCount',adminLiveCache.loaded?alerts.length+' active':'--');
+    const alertBox=document.getElementById('adminAlerts');
+    if(alertBox) alertBox.innerHTML=alerts.length?alerts.map(a=>'<div class="attention-item"><b>'+adminLiveEsc(a.title)+'</b><span>'+adminLiveEsc(a.text)+'</span></div>').join(''):'<div class="space-placeholder">'+(adminLiveCache.loaded?'No current alerts.':'Loading alerts...')+'</div>';
     document.querySelectorAll('.prototype-note').forEach(el=>{
-      if(/confirmation|prototype/i.test(el.textContent||'')){
-        el.textContent='Approval updates the live Supabase record and issues the evacuee barcode.';
-      }
+      el.textContent='Approval updates the registration in the database and issues the evacuee barcode.';
     });
-
+    adminSetDataStatus();
     renderAdminLiveEvacuees();
   }
 
   function clearAdminMockState(){
-    const s=window.currentState?.();
-    if(s){
-      s.requests=[];
-      s.activity=[];
-      s.demoGroups=[];
-      s.demoAssignments={};
-      window.saveScanSafeState?.(s);
+    const state=window.currentState?.();
+    if(state){
+      state.requests=[];
+      state.activity=[];
+      state.demoGroups=[];
+      state.demoAssignments={};
+      window.saveScanSafeState?.(state);
     }
-    adminLiveCache.loaded=true;
-    adminLiveCache.stats={
-      pending_registrations:0,
-      approved_evacuees:0,
-      current_occupancy:0,
-      total_capacity:0,
-      occupancy_percent:0,
-      available_spaces:0
-    };
-    adminLiveCache.evacuees=[];
-    adminLiveCache.spaces=[];
-    adminLiveCache.activity=[];
+    try{ localStorage.removeItem('scansafePrototypeStateV4'); }catch(_){}
     renderAdminLiveDashboard();
   }
 
-  async function loadAdminLiveSnapshot(){
-    const page=adminLivePage();
-    if(!['admin-dashboard.html','evacuees.html','shelter-room.html','barcode-scanner.html','reports.html','messages.html','user-management.html'].includes(page)){
-      return null;
+  // Use existing RLS-protected tables when the optional snapshot RPC has not
+  // been installed. Page through every record so counts are never capped at 1000.
+  async function adminReadAll(sb,table,columns,orderColumn){
+    const rows=[];
+    for(let offset=0;;offset+=1000){
+      const {data,error}=await sb.from(table).select(columns).order(orderColumn,{ascending:false}).range(offset,offset+999);
+      if(error) throw error;
+      rows.push(...(data||[]));
+      if(!data || data.length<1000) return rows;
     }
+  }
 
+  async function adminSnapshotFromTables(sb){
+    const results=await Promise.allSettled([
+      adminReadAll(sb,'evacuees','*','evacuee_id'),
+      adminReadAll(sb,'accommodation_spaces','space_id,space_code,space_name,capacity,current_occupancy,is_primary,status','space_id'),
+      adminReadAll(sb,'barcodes','evacuee_id,barcode_value,status','evacuee_id'),
+      adminReadAll(sb,'accommodation_assignments','group_id,space_id,assignment_status','group_id')
+    ]);
+    if(results[0].status==='rejected') throw results[0].reason;
+    const warnings=[];
+    const optional=(index,label)=>{
+      const result=results[index];
+      if(result.status==='fulfilled') return result.value;
+      console.warn('ScanSafe admin '+label+':',result.reason);
+      warnings.push(label+' could not be loaded.');
+      return [];
+    };
+    const spaces=optional(1,'Accommodation spaces').filter(row=>row.status!=='inactive');
+    const barcodes=optional(2,'Barcodes');
+    const assignments=optional(3,'Assignments');
+    const spaceById=new Map(spaces.map(row=>[String(row.space_id),row]));
+    const barcodeByEvacuee=new Map(barcodes.filter(row=>row.status==='active').map(row=>[String(row.evacuee_id),row]));
+    const assignmentByGroup=new Map(assignments.filter(row=>row.assignment_status==='active').map(row=>[String(row.group_id),row]));
+    const evacuees=results[0].value.map(row=>{
+      const barcode=barcodeByEvacuee.get(String(row.evacuee_id));
+      const assignment=assignmentByGroup.get(String(row.group_id));
+      const space=spaceById.get(String(assignment?.space_id));
+      return {...row,barcode_value:row.approval_status==='approved'?barcode?.barcode_value||null:null,
+        assigned_space_code:space?.space_code||null,assigned_space_name:space?.space_name||null};
+    });
+    const hasSpaces=results[1].status==='fulfilled';
+    const capacity=spaces.reduce((n,row)=>n+Number(row.capacity||0),0);
+    const occupied=spaces.reduce((n,row)=>n+Number(row.current_occupancy||0),0);
+    const activity=evacuees.filter(row=>row.registered_at).map(row=>({
+      title:'Registration submitted',description:row.full_name+' - '+(row.registration_code||''),created_at:row.registered_at,icon:'+'
+    })).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+    return {evacuees,spaces,activity,warnings,stats:{
+      pending_registrations:evacuees.filter(row=>row.approval_status==='pending').length,
+      approved_evacuees:evacuees.filter(row=>row.approval_status==='approved').length,
+      current_occupancy:hasSpaces?occupied:null,total_capacity:hasSpaces?capacity:null,
+      occupancy_percent:hasSpaces?(capacity?Math.round(occupied/capacity*100):0):null,
+      available_spaces:hasSpaces?spaces.filter(row=>row.is_primary && Number(row.current_occupancy)<Number(row.capacity)).length:null
+    }};
+  }
+
+  function renderAdminSystemUsers(){
+    const body=document.getElementById('systemUserBody');
+    if(!body) return;
+    const profiles=adminLiveCache.profiles;
+    if(!profiles){
+      body.innerHTML='<tr><td colspan="7">Personnel accounts have not been loaded. Use Refresh to retry.</td></tr>';
+      return;
+    }
+    const personnel=profiles.filter(row=>['admin','staff'].includes(row.role));
+    const set=(selector,value)=>document.querySelectorAll(selector).forEach(el=>el.textContent=String(value));
+    set('[data-um-total]',personnel.length);
+    set('[data-um-admins]',personnel.filter(row=>row.role==='admin').length);
+    set('[data-um-roles]',new Set(personnel.map(row=>row.role)).size);
+    set('[data-um-evacuees]',profiles.filter(row=>row.role==='evacuee').length);
+    const term=(document.getElementById('systemUserSearch')?.value||'').trim().toLowerCase();
+    const role=document.getElementById('systemUserRoleFilter')?.value||'all';
+    const rows=personnel.filter(row=>(role==='all'||row.role===role) && (!term||[row.full_name,row.id,row.role].join(' ').toLowerCase().includes(term)));
+    body.innerHTML=rows.length?rows.map(row=>'<tr><td><b>'+adminLiveEsc(row.full_name||'Unnamed account')+'</b></td><td>'+adminLiveEsc(row.id)+
+      '</td><td>'+adminLiveEsc(row.role==='admin'?'Administrator':'Shelter Staff')+'</td><td>Personnel</td><td>Registered</td><td>Admin portal</td><td>--</td></tr>').join(''):
+      '<tr><td colspan="7">No matching personnel accounts.</td></tr>';
+  }
+
+  async function performAdminLiveRefresh(){
     const sb=readyClient();
-    if(!sb){
-      if(configured) clearAdminMockState();
-      return null;
-    }
-
-    const {data,error}=await sb.rpc('scansafe_admin_dashboard_snapshot');
-    if(error){
-      console.error('ScanSafe admin live snapshot:',error.message);
-      clearAdminMockState();
-      if(typeof toast==='function'){
-        toast('Could not load live admin data. Demo data has been disabled.');
+    try{
+      if(!sb) throw new Error('The database connection is unavailable. Reload and try again.');
+      if(!window.ScanSafeDB.session?.user) await bootstrapSession();
+      if(!window.ScanSafeDB.session?.user) throw new Error('Sign in with an administrator or staff account.');
+      if(!['admin','staff'].includes(window.ScanSafeDB.profile?.role)) throw new Error('Administrator or staff access is required.');
+      let snapshot;
+      if(!adminSnapshotRpcUnavailable){
+        const {data,error}=await sb.rpc('scansafe_admin_dashboard_snapshot');
+        if(error){
+          const missing=error.code==='PGRST202' || error.code==='42883' || /could not find.*function|function.*does not exist/i.test(error.message||'');
+          if(!missing) throw error;
+          adminSnapshotRpcUnavailable=true;
+        }else{
+          if(!data || !Array.isArray(data.evacuees) || !Array.isArray(data.spaces)) throw new Error('Invalid admin dashboard response.');
+          snapshot=data;
+        }
       }
-      return null;
-    }
-
-    const snapshot=data||{};
-    adminLiveCache.loaded=true;
-    adminLiveCache.stats=snapshot.stats||{};
-    adminLiveCache.evacuees=Array.isArray(snapshot.evacuees)?snapshot.evacuees:[];
-    adminLiveCache.spaces=Array.isArray(snapshot.spaces)?snapshot.spaces:[];
-    adminLiveCache.activity=Array.isArray(snapshot.activity)?snapshot.activity:[];
-
-    // Make map/overview use the exact same live space values.
-    if(typeof HALLWAY_SPACES!=='undefined'){
+      if(!snapshot) snapshot=await adminSnapshotFromTables(sb);
+      adminLiveCache.loaded=true;
+      adminLiveCache.error=null;
+      adminLiveCache.stats=snapshot.stats||{};
+      adminLiveCache.evacuees=snapshot.evacuees;
+      adminLiveCache.spaces=snapshot.spaces;
+      adminLiveCache.activity=Array.isArray(snapshot.activity)?snapshot.activity:[];
+      adminLiveCache.warnings=snapshot.warnings||[];
+      adminLiveCache.updatedAt=new Date().toISOString();
+      if(adminLivePage()==='user-management.html'){
+        try{ adminLiveCache.profiles=await adminReadAll(sb,'profiles','id,full_name,role','id'); }
+        catch(error){ adminLiveCache.warnings.push('Personnel accounts could not be loaded.'); console.warn('ScanSafe personnel:',error); }
+        renderAdminSystemUsers();
+      }
+      mapDbCache.spaces.clear();
       for(const row of adminLiveCache.spaces){
-        if(row?.space_code && HALLWAY_SPACES[row.space_code]){
-          HALLWAY_SPACES[row.space_code].name=row.space_name||HALLWAY_SPACES[row.space_code].name;
-          HALLWAY_SPACES[row.space_code].cap=Number(row.capacity||0);
-          HALLWAY_SPACES[row.space_code].occ=Number(row.current_occupancy||0);
-          HALLWAY_SPACES[row.space_code].status=
-            Number(row.current_occupancy||0)>=Number(row.capacity||0)
-              ? 'full'
-              : (Number(row.capacity||0)>0 && Number(row.current_occupancy||0)/Number(row.capacity||0)>.70)
-                ? 'near'
-                : 'available';
-        }
-
-        if(typeof ROOMS!=='undefined' && row?.space_code && ROOMS[row.space_code]){
-          ROOMS[row.space_code].name=row.space_name||ROOMS[row.space_code].name;
-          ROOMS[row.space_code].cap=Number(row.capacity||0);
-          ROOMS[row.space_code].occ=Number(row.current_occupancy||0);
-          ROOMS[row.space_code].status=
-            Number(row.current_occupancy||0)>=Number(row.capacity||0)
-              ? 'full'
-              : (Number(row.capacity||0)>0 && Number(row.current_occupancy||0)/Number(row.capacity||0)>.70)
-                ? 'near'
-                : 'available';
+        mapDbCache.spaces.set(row.space_code,row);
+      }
+      mapDbCache.ready=true;
+      window.getDynamicOccupancy=id=>Number(mapDbCache.spaces.get(id)?.current_occupancy||0);
+      window.getSpaceStatus=id=>{
+        const row=mapDbCache.spaces.get(id);
+        return row?normalizeDbSpaceStatus(row):'full';
+      };
+      window.getAvailableSlots=id=>{
+        const row=mapDbCache.spaces.get(id);
+        return row?Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0)):0;
+      };
+      for(const row of adminLiveCache.spaces){
+        syncSpaceIntoExistingMap(row);
+        if(typeof ROOMS!=='undefined' && ROOMS[row.space_code]){
+          Object.assign(ROOMS[row.space_code],{name:row.space_name,cap:Number(row.capacity||0),occ:Number(row.current_occupancy||0),status:normalizeDbSpaceStatus(row)});
         }
       }
+      renderAdminLiveDashboard();
+      if(typeof window.renderSpaces==='function') window.renderSpaces();
+      if(typeof window.renderRooms==='function') window.renderRooms();
+      const selectedSpace=document.querySelector('[data-space].selected')?.dataset.space;
+      if(selectedSpace && typeof window.selectSpace==='function') window.selectSpace(selectedSpace);
+      const selectedRoom=document.querySelector('[data-room].selected')?.dataset.room;
+      if(selectedRoom && typeof window.selectRoom==='function') window.selectRoom(selectedRoom);
+      return snapshot;
+    }catch(error){
+      console.error('ScanSafe admin live data:',error);
+      adminLiveCache.error=error.message||'Check your connection and access permissions.';
+      renderAdminLiveDashboard();
+      return null;
     }
+  }
 
-    renderAdminLiveDashboard();
-    return snapshot;
+  function loadAdminLiveSnapshot(){
+    if(!adminLivePages.has(adminLivePage())) return Promise.resolve(null);
+    if(!adminLiveRefreshPromise){
+      adminLiveRefreshPromise=performAdminLiveRefresh().finally(()=>{adminLiveRefreshPromise=null;});
+    }
+    return adminLiveRefreshPromise;
   }
 
   window.ScanSafeAdminLive={
     refresh:loadAdminLiveSnapshot,
+    renderSystemUsers:renderAdminSystemUsers,
     inspect:()=>({
       stats:adminLiveCache.stats,
       evacuees:adminLiveCache.evacuees,
       spaces:adminLiveCache.spaces,
-      activity:adminLiveCache.activity
+      activity:adminLiveCache.activity,
+      loaded:adminLiveCache.loaded,error:adminLiveCache.error,
+      warnings:adminLiveCache.warnings,updatedAt:adminLiveCache.updatedAt
     })
   };
 
@@ -749,8 +861,8 @@
   async function approveByRequestId(requestId){
     const sb=readyClient();
     if(!sb){
-      if(configured){ if(typeof toast==='function') toast('Backend unavailable. Approval was not changed.'); return; }
-      return window.__scanSafePrototypeApprove ? window.__scanSafePrototypeApprove(requestId) : undefined;
+      if(typeof toast==='function') toast('Backend unavailable. Approval was not changed.');
+      return;
     }
     const s=typeof window.currentState==='function'?window.currentState():null;
     const req=s?.requests?.find(r=>r.id===requestId);
@@ -766,8 +878,8 @@
   async function rejectByRequestId(requestId){
     const sb=readyClient();
     if(!sb){
-      if(configured){ if(typeof toast==='function') toast('Backend unavailable. Rejection was not changed.'); return; }
-      return window.__scanSafePrototypeReject ? window.__scanSafePrototypeReject(requestId) : undefined;
+      if(typeof toast==='function') toast('Backend unavailable. Rejection was not changed.');
+      return;
     }
     const s=typeof window.currentState==='function'?window.currentState():null;
     const req=s?.requests?.find(r=>r.id===requestId);
@@ -842,16 +954,19 @@
     window.getDynamicOccupancy=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return Number(row.current_occupancy||0);
+      if(adminLivePages.has(page)) return 0;
       return window.__scanSafePrototypeGetDynamicOccupancy ? window.__scanSafePrototypeGetDynamicOccupancy(id) : 0;
     };
     window.getSpaceStatus=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return normalizeDbSpaceStatus(row);
+      if(adminLivePages.has(page)) return 'full';
       return window.__scanSafePrototypeGetSpaceStatus ? window.__scanSafePrototypeGetSpaceStatus(id) : 'full';
     };
     window.getAvailableSlots=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0));
+      if(adminLivePages.has(page)) return 0;
       return window.__scanSafePrototypeGetAvailableSlots ? window.__scanSafePrototypeGetAvailableSlots(id) : 0;
     };
 
@@ -1250,11 +1365,15 @@
   async function loadRecentScanHistory(){
     const sb=readyClient();
     if(!sb || !scannerPageActive()) return;
-    const {data,error}=await sb.rpc('get_recent_scan_history',{p_limit:10});
-    if(error){ console.warn('Scan history:',error.message); return; }
     const table=document.querySelector('.scanner-bottom section:first-child table.table');
     if(!table) return;
     const head=table.querySelector('tr')?.outerHTML || '<tr><th>#</th><th>Name</th><th>Barcode</th><th>Room</th><th>Time</th><th>Status</th></tr>';
+    const {data,error}=await sb.rpc('get_recent_scan_history',{p_limit:10});
+    if(error){
+      console.warn('Scan history:',error.message);
+      table.innerHTML=head+'<tr><td colspan="6">Scan history could not be loaded. Reload to try again.</td></tr>';
+      return;
+    }
     const rows=(data||[]).map((r,i)=>`
       <tr>
         <td>${i+1}</td>
@@ -2734,27 +2853,31 @@
   };
 
 
-  document.addEventListener('DOMContentLoaded',async()=>{
-    const page=adminLivePage();
-    if(['admin-dashboard.html','evacuees.html','shelter-room.html','barcode-scanner.html','reports.html','messages.html','user-management.html'].includes(page)){
-      // Replace prototype list/detail behavior with live DB behavior.
-      window.renderEvacs=renderAdminLiveEvacuees;
-      window.showEvac=showAdminLiveEvacuee;
-
-      // Old cached prototype state must never be shown on admin pages.
-      try{
-        localStorage.removeItem('scansafePrototypeStateV4');
-      }catch(_){}
-
-      await bootstrapSession();
-      if(!(await phase9AccessGuard())) return;
-      await loadAdminLiveSnapshot();
-
-      // Fallback refresh for deployments where Realtime publication is not enabled.
-      window.__scanSafeAdminLiveTimer=setInterval(()=>{
+  if(adminLivePages.has(adminLivePage())){
+    window.sendMessage=p78SendMessage;
+    window.sendAnnouncement=p78SendAnnouncement;
+    window.exportCSV=p78ExportCsv;
+    window.generatePDF=p78GeneratePdf;
+    window.renderEvacs=renderAdminLiveEvacuees;
+    window.showEvac=showAdminLiveEvacuee;
+    window.renderDashboardPrototype=renderAdminLiveDashboard;
+    window.updatePrototypeCounts=renderAdminLiveDashboard;
+    window.renderDashboardSpaceOverview=renderAdminLiveDashboard;
+    window.renderPendingRequests=renderAdminPendingRequests;
+    window.registerEvac=function(event){
+      event.preventDefault();
+      if(typeof toast==='function') toast('Create evacuee accounts using the registration form on the sign-in page.');
+    };
+    clearAdminMockState();
+    document.addEventListener('DOMContentLoaded',()=>{
+      const refresh=()=>{
         if(document.visibilityState==='visible') loadAdminLiveSnapshot();
-      },15000);
-    }
-  });
+      };
+      window.__scanSafeAdminLiveTimer=setInterval(refresh,15000);
+      window.addEventListener('focus',refresh);
+      document.addEventListener('visibilitychange',refresh);
+      window.addEventListener('pagehide',()=>clearInterval(window.__scanSafeAdminLiveTimer),{once:true});
+    });
+  }
 
 })();

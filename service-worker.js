@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v12-real-user-data';
+const CACHE_NAME='scansafe-pwa-v14-live-admin';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -29,7 +29,7 @@ self.addEventListener('install', event=>{
 self.addEventListener('activate', event=>{
   event.waitUntil(
     caches.keys()
-      .then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))))
+      .then(keys=>Promise.all(keys.filter(k=>k.startsWith('scansafe-') && k!==CACHE_NAME).map(k=>caches.delete(k))))
       .then(()=>self.clients.claim())
   );
 });
@@ -53,6 +53,20 @@ self.addEventListener('fetch', event=>{
     return;
   }
 
+  // Shared app code must revalidate even when a previous PWA installed it.
+  if(/\.(?:js|css)$/.test(url.pathname)){
+    event.respondWith(
+      fetch(req,{cache:'no-cache'}).then(res=>{
+        if(res.ok){
+          const copy=res.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)));
+        }
+        return res;
+      }).catch(()=>caches.match(req).then(cached=>cached||Response.error()))
+    );
+    return;
+  }
+
   if(req.mode==='navigate'){
     event.respondWith(
       fetch(req)
@@ -61,7 +75,7 @@ self.addEventListener('fetch', event=>{
           caches.open(CACHE_NAME).then(cache=>cache.put(req,copy));
           return res;
         })
-        .catch(()=>caches.match(req).then(r=>r||caches.match('./user-portal.html')))
+        .catch(()=>caches.match(req).then(r=>r||new Response('ScanSafe is offline. Reconnect and reload.',{status:503,headers:{'Content-Type':'text/plain'}})))
     );
     return;
   }

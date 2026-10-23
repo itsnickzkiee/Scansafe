@@ -11,7 +11,7 @@
 <header class="admin-top">
 <img class="logo-img" src="assets/logo.svg">
 <div class="top-actions">
-<div class="prototype-pending-chip"><span data-pending-count>3</span> pending approvals</div>
+<div class="prototype-pending-chip"><span data-pending-count>--</span> pending approvals</div>
 <div class="avatar">A</div>
 <div class="identity"><strong>Admin</strong>Administrator</div>
 <div class="notif"><svg class="icon"><use href="assets/icons.svg#bell"></use></svg></div>
@@ -21,7 +21,7 @@
 
 <aside class="admin-side">
 <a class="nav-item active" href="admin-dashboard.html"><svg class="icon"><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a>
-<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>3</b></a>
+<a class="nav-item" href="admin-dashboard.html#registrationRequests"><svg class="icon"><use href="assets/icons.svg#alert"></use></svg><span>Registration Requests</span><b class="nav-badge" data-pending-count>--</b></a>
 <a class="nav-item" href="evacuees.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a>
 <a class="nav-item" href="user-management.html"><svg class="icon"><use href="assets/icons.svg#users"></use></svg><span>User Management</span></a>
 <a class="nav-item" href="shelter-room.html"><svg class="icon"><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a>
@@ -32,7 +32,7 @@
 </aside>
 
 <main class="admin-main">
-<section class="page operations-dashboard">
+<section class="page operations-dashboard"><div id="adminDataStatus" class="muted" role="status" style="padding:10px 0">Loading live database records...</div>
 <div class="ops-greeting">
 <div><h2>Good morning, Admin</h2><p>Here's what needs your attention today.</p></div>
 <div class="date-line"><svg class="icon sm"><use href="assets/icons.svg#calendar"></use></svg><span data-now></span></div>
@@ -43,10 +43,10 @@
 </div>
 
 <div class="ops-kpis">
-<section class="card ops-kpi"><div><span>Pending Registrations</span><strong data-kpi-pending>3</strong><small class="warn">Needs admin review</small></div><i>!</i></section>
-<section class="card ops-kpi"><div><span>Approved Evacuees</span><strong data-kpi-approved>236</strong><small class="ok">Approval + QR issued</small></div><i>✓</i></section>
-<section class="card ops-kpi"><div><span>Current Occupancy</span><strong>78%</strong><small>248 / 320 capacity</small></div><i>⌂</i></section>
-<section class="card ops-kpi"><div><span>Available Spaces</span><strong data-kpi-spaces>5</strong><small class="blue">Hallways + Main Lobby</small></div><i>▦</i></section>
+<section class="card ops-kpi"><div><span>Pending Registrations</span><strong data-kpi-pending>--</strong><small class="warn">Needs admin review</small></div><i>!</i></section>
+<section class="card ops-kpi"><div><span>Approved Evacuees</span><strong data-kpi-approved>--</strong><small class="ok">Admin approved</small></div><i>✓</i></section>
+<section class="card ops-kpi"><div><span>Current Occupancy</span><strong data-kpi-occupancy>--</strong><small data-kpi-capacity>-- / -- capacity</small></div><i>⌂</i></section>
+<section class="card ops-kpi"><div><span>Available Spaces</span><strong data-kpi-spaces>--</strong><small class="blue">Hallways + Main Lobby</small></div><i>▦</i></section>
 </div>
 
 <div class="ops-grid" id="registrationRequests">
@@ -55,35 +55,33 @@
 <div class="table-scroll">
 <table class="table ops-table">
 <thead><tr><th>Evacuee / Group</th><th>Group Size</th><th>Needs</th><th>Coverage</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead>
-<tbody id="pendingRequestsBody"></tbody>
+<tbody id="pendingRequestsBody"><tr><td colspan="7">Loading registrations...</td></tr></tbody>
 </table>
 </div>
-<div class="approval-flow-note">Approval flow: Review registration → Verify coverage / information → Approve → Generate QR → Send confirmation → Eligible for accommodation assignment.</div>
+<div class="approval-flow-note">Approval flow: Review registration → Verify coverage / information → Approve → Generate QR → Eligible for accommodation assignment.</div>
 </section>
 
 <aside class="ops-side-stack">
-<section class="card ops-panel"><div class="panel-head"><h3>Recent Activity</h3><span>Live prototype</span></div><div id="recentActivity" class="activity-list"></div></section>
+<section class="card ops-panel"><div class="panel-head"><h3>Recent Activity</h3><span>Live database</span></div><div id="recentActivity" class="activity-list"></div></section>
 <section class="card ops-panel"><div class="panel-head"><h3>Accommodation Overview</h3><a href="shelter-room.html">Open map</a></div><div id="dashboardSpaceOverview"></div></section>
 </aside>
 </div>
 
 <div class="ops-bottom-grid">
 <section class="card ops-panel workflow-panel">
-<div class="panel-head"><h3>Recommended Admin Workflow</h3><span>Clear and presentation-friendly</span></div>
+<div class="panel-head"><h3>Recommended Admin Workflow</h3><span>Registration to check-in</span></div>
 <div class="workflow-steps">
 <div><b>1. Review</b><small>Registration request</small></div><em>→</em>
 <div><b>2. Verify</b><small>Identity + coverage</small></div><em>→</em>
-<div><b>3. Issue QR</b><small>Send confirmation</small></div><em>→</em>
+<div><b>3. Issue QR</b><small>Issue evacuee barcode</small></div><em>→</em>
 <div><b>4. Assign</b><small>GBEAA recommends space</small></div><em>→</em>
 <div><b>5. Monitor</b><small>Occupancy + check-in</small></div>
 </div>
 </section>
 
 <section class="card ops-panel alerts-panel">
-<div class="panel-head"><h3>Alerts & Attention</h3><span>3 active</span></div>
-<div class="attention-item"><b>Review outside-coverage registrations</b><span>Online submissions outside Abangan Norte, Marilao require manual eligibility verification.</span></div>
-<div class="attention-item"><b>Hallway A4 is near capacity</b><span>Only 1 slot remains. Consider another area for larger groups.</span></div>
-<div class="attention-item"><b>Main Lobby enabled for assignment</b><span>Available as a designated accommodation space.</span></div>
+<div class="panel-head"><h3>Alerts &amp; Attention</h3><span id="adminAlertsCount">--</span></div>
+<div id="adminAlerts"><div class="space-placeholder">Loading alerts...</div></div>
 </section>
 </div>
 </section>
@@ -96,14 +94,14 @@
 <div id="reviewDetails" class="review-details"></div>
 <div id="coverageReviewNotice"></div>
 <div class="review-actions"><button class="btn soft" id="rejectBtn">Reject</button><button class="btn red" id="approveBtn">Approve & Generate QR</button></div>
-<p class="prototype-note">Prototype: approval simulates sending the confirmation email and QR code.</p>
+<p class="prototype-note">Approval updates the database registration and issues the evacuee barcode.</p>
 </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js"></script>
-<script src="assets/supabase-bridge.js"></script>
+<script src="assets/app.js?v=admin-live-v14"></script>
+<script src="assets/supabase-bridge.js?v=admin-live-v14"></script>
 </body>
 </html>
