@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v14-live-admin';
+const CACHE_NAME='scansafe-pwa-v15-live-evacuee';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

@@ -263,6 +263,7 @@
     if(sb) await sb.auth.signOut();
     localStorage.removeItem('scanSafeLoginRole');
     localStorage.removeItem('scansafePrototypeStateV4');
+    localStorage.removeItem('scansafeLiveStateV1');
     sessionStorage.removeItem('scansafePrototypeStateV4');
     sessionStorage.removeItem('scanSafePhase9Guard');
     location.href='index.html';
@@ -871,7 +872,9 @@
     const {data,error}=await sb.rpc('approve_evacuee_registration',{p_evacuee_id:req.dbId});
     if(error){ if(typeof toast==='function') toast('Approval failed: '+error.message); return; }
     if(typeof window.closeReviewModal==='function') window.closeReviewModal();
-    if(typeof toast==='function') toast('Approved. barcode generated: '+String(data||''));
+    if(typeof toast==='function'){
+      toast(data?'Approved. Barcode generated: '+String(data):'Approval saved, but the barcode is unavailable. Refresh or contact system support.');
+    }
     await loadPendingIntoPrototype();
   }
 
@@ -954,24 +957,28 @@
     window.getDynamicOccupancy=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return Number(row.current_occupancy||0);
-      if(adminLivePages.has(page)) return 0;
+      if(adminLivePages.has(page)||isEvacueeAppPage()) return 0;
       return window.__scanSafePrototypeGetDynamicOccupancy ? window.__scanSafePrototypeGetDynamicOccupancy(id) : 0;
     };
     window.getSpaceStatus=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return normalizeDbSpaceStatus(row);
-      if(adminLivePages.has(page)) return 'full';
+      if(adminLivePages.has(page)||isEvacueeAppPage()) return 'full';
       return window.__scanSafePrototypeGetSpaceStatus ? window.__scanSafePrototypeGetSpaceStatus(id) : 'full';
     };
     window.getAvailableSlots=function(id){
       const row=mapDbCache.spaces.get(id);
       if(row) return Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0));
-      if(adminLivePages.has(page)) return 0;
+      if(adminLivePages.has(page)||isEvacueeAppPage()) return 0;
       return window.__scanSafePrototypeGetAvailableSlots ? window.__scanSafePrototypeGetAvailableSlots(id) : 0;
     };
 
     if(typeof window.renderSpaces==='function') window.renderSpaces();
     if(typeof window.renderDashboardPrototype==='function') window.renderDashboardPrototype();
+    if(isEvacueeAppPage()){
+      renderLiveEvacueeAccount();
+      if(typeof window.CustomEvent==='function') document.dispatchEvent(new CustomEvent('scansafe:evacuee-updated'));
+    }
     return true;
   }
 
@@ -1074,151 +1081,308 @@
     el.textContent=String(value??'');
   }
 
-  function syncRealEvacueeDom(ev,userState,session){
-    const name=ev?.full_name || userState?.name || window.ScanSafeDB.profile?.full_name || session?.user?.email || 'Evacuee';
-    const email=ev?.email || userState?.email || session?.user?.email || '';
-    const contact=ev?.contact_number || 'Not provided';
-    const address=ev?.address || 'Not provided';
-    const status=userState?.registrationStatus || 'Pending Approval';
-    const assigned=!!userState?.assignment;
-    const shelter=assigned ? 'Main School Building' : 'Waiting for assignment';
-    const space=assigned
-      ? (typeof window.formatSpaceName==='function' ? window.formatSpaceName(userState.assignment) : userState.assignment)
-      : 'Not assigned yet';
+  const evacueeLiveCache={
+    loaded:false,ownerId:null,evacuee:null,barcode:null,assignment:null,
+    space:null,shelter:null,error:null,warnings:[],updatedAt:null,
+    barcodeError:false,assignmentError:false
+  };
+  let evacueeRefreshPromise=null;
+  let evacueeSnapshotRpcUnavailable=false;
+  let evacueeLiveTimer=null;
+  let evacueeLiveChannel=null;
+  let evacueeLiveChannelOwner=null;
 
-    // Common identity elements used across evacuee pages.
-    document.querySelectorAll('[data-user-name]').forEach(el=>setScanSafeText(el,name));
-    document.querySelectorAll('[data-user-email]').forEach(el=>setScanSafeText(el,email));
-    document.querySelectorAll('[data-user-group]').forEach(el=>setScanSafeText(el,userState?.group || ev?.group_size || 1));
-    document.querySelectorAll('[data-user-needs]').forEach(el=>setScanSafeText(el,userState?.needs || ev?.needs_summary || 'None'));
+  function evacueeDate(value){
+    if(!value) return 'Not recorded';
+    const date=new Date(value);
+    return Number.isNaN(date.getTime())?'Not recorded':date.toLocaleString();
+  }
 
-    const topIdentity=document.querySelector('.user-top .identity strong');
-    if(topIdentity) setScanSafeText(topIdentity,name);
-
-    const topRole=document.querySelector('.user-top .identity small');
-    if(topRole) setScanSafeText(topRole,'Evacuee');
-
-    // Update visible avatar initials without changing styles.
-    const initial=(String(name).trim().charAt(0)||'E').toUpperCase();
-    document.querySelectorAll(
-      '.user-top .avatar, .profile-avatar, .avatar-circle, .identity-avatar'
-    ).forEach(el=>{
-      if(el.children.length===0 || /^[A-Za-z]$/.test(el.textContent.trim())){
-        setScanSafeText(el,initial);
-      }
+  function resetEvacueeLiveAccount(ownerId=null){
+    phase78NotifCache=[];
+    localStorage.removeItem('scansafePrototypeStateV4');
+    sessionStorage.removeItem('scansafePrototypeStateV4');
+    Object.assign(evacueeLiveCache,{
+      loaded:false,ownerId,evacuee:null,barcode:null,assignment:null,
+      space:null,shelter:null,error:null,warnings:[],updatedAt:null,
+      barcodeError:false,assignmentError:false
     });
-
-    // Profile page: update the static prototype content from the real DB row.
-    if(mapPage()==='profile.html'){
-      const layout=document.querySelector('.profile-layout');
-      if(layout){
-        const heading=[...layout.querySelectorAll('h1,h2,h3,strong')]
-          .find(el=>{
-            const t=el.textContent.trim();
-            return t && !/^(Profile|Account|Change Password|Logout)$/i.test(t)
-              && !/^(Email Address|Contact Number|Assigned Shelter|Assigned Space)$/i.test(t);
-          });
-        if(heading) setScanSafeText(heading,name);
-
-        const statusEl=layout.querySelector('.muted');
-        if(statusEl) setScanSafeText(statusEl,`Evacuee • ${status}`);
-
-        layout.querySelectorAll('.info-line').forEach(row=>{
-          const label=row.querySelector('b,strong,label');
-          const value=row.querySelector('span');
-          if(!label || !value) return;
-          const key=label.textContent.trim().toLowerCase();
-          if(key.includes('email')) setScanSafeText(value,email || 'Not provided');
-          else if(key.includes('contact')) setScanSafeText(value,contact);
-          else if(key.includes('assigned shelter')) setScanSafeText(value,shelter);
-          else if(key.includes('assigned space')) setScanSafeText(value,space);
-          else if(key==='address' || key.includes('home address')) setScanSafeText(value,address);
-        });
-      }
+    if(typeof window.currentState==='function'){
+      const state=window.currentState();
+      state.user={requestId:null,id:null,authUserId:ownerId,name:'Evacuee',email:'',age:null,gender:'',group:null,needs:'',registrationStatus:'Loading',qrIssued:false,qrCode:null,assignment:null,checkedIn:false,submitted:''};
+      state.requests=[];
+      state.activity=[];
+      state.demoGroups=[];
+      state.demoAssignments={};
+      window.saveScanSafeState(state);
     }
+    mapDbCache.spaces.clear();
+    mapDbCache.ready=false;
+    const thread=document.getElementById('thread');
+    if(thread) thread.innerHTML='<div class="space-placeholder">Loading your messages...</div>';
+    const input=document.getElementById('messageInput');
+    if(input) input.value='';
+    document.querySelectorAll('.msg-col .folder .muted').forEach(el=>setScanSafeText(el,'Loading your conversation...'));
+    document.querySelectorAll('.notify-grid .tab').forEach((el,index)=>setScanSafeText(el,['All (--)', 'Unread (--)', 'Emergency (--)'][index]||'--'));
+    document.querySelectorAll('.notif-item,.p78-empty-notif').forEach(el=>el.remove());
+    const notification=document.getElementById('notifDetail');
+    if(notification) notification.innerHTML='<div class="space-placeholder">Loading your notifications...</div>';
+    const announcements=document.querySelector('.announcement-grid');
+    if(announcements) announcements.innerHTML='<div class="space-placeholder">Loading announcements...</div>';
+    document.querySelectorAll('.user-top .notif').forEach(el=>el.removeAttribute('data-unread-count'));
+  }
 
-    // My Information page: map known label/value rows to live DB values.
-    if(mapPage()==='my-information.html'){
-      document.querySelectorAll('.info-line,.detail-line,.profile-info-row').forEach(row=>{
-        const label=row.querySelector('b,strong,label,small');
-        const value=row.querySelector('span,p');
-        if(!label || !value) return;
-        const key=label.textContent.trim().toLowerCase();
-        if(key.includes('full name') || key==='name') setScanSafeText(value,name);
-        else if(key.includes('email')) setScanSafeText(value,email || 'Not provided');
-        else if(key.includes('contact')) setScanSafeText(value,contact);
-        else if(key==='address' || key.includes('home address')) setScanSafeText(value,address);
-        else if(key.includes('gender')) setScanSafeText(value,ev?.gender || userState?.gender || 'Not provided');
-        else if(key.includes('age')) setScanSafeText(value,ev?.age ?? userState?.age ?? 'Not provided');
-        else if(key.includes('group')) setScanSafeText(value,ev?.group_size || userState?.group || 1);
-        else if(key.includes('need')) setScanSafeText(value,ev?.needs_summary || userState?.needs || 'None');
-      });
+  function renderLiveEvacueeAssignment(){
+    const box=document.getElementById('userAssignmentSummary');
+    if(!box) return;
+    const {loaded,assignment,space,shelter,assignmentError}=evacueeLiveCache;
+    if(!loaded || assignmentError && !assignment){
+      box.innerHTML='<div class="space-placeholder">'+(!loaded?'Loading accommodation...':'Accommodation could not be loaded. Use Refresh to try again.')+'</div>';
+    }else if(!assignment){
+      box.innerHTML='<div class="space-placeholder"><b>No accommodation assignment yet</b><br>Authorized staff will assign a space after approval and barcode issuance.</div>';
+    }else if(!space){
+      box.innerHTML='<div class="space-placeholder">An accommodation has been assigned. Its details are currently unavailable.</div>';
+    }else{
+      const cap=Number(space.capacity||0),occ=Number(space.current_occupancy||0);
+      box.innerHTML='<div class="assignment-state-grid"><div class="assignment-state-cell"><small>Your Assigned Space</small><strong>'+esc(space.space_name||space.space_code)+'</strong><span>'+esc(shelter?.shelter_name||'Assigned shelter')+'</span></div>'+[['Capacity',cap],['Occupied',occ],['Available',Math.max(0,cap-occ)]].map(([label,value])=>'<div class="assignment-state-cell"><small>'+label+'</small><strong>'+value+'</strong></div>').join('')+'</div>';
     }
   }
 
-  async function loadCurrentEvacueeIntoPrototype(){
-    const sb=readyClient();
-    if(!sb || typeof window.currentState!=='function' || typeof window.saveScanSafeState!=='function') return;
-    const session=window.ScanSafeDB.session;
-    if(!session?.user) return;
-    const profile=window.ScanSafeDB.profile || await getProfile(session.user.id);
-    if(profile?.role!=='evacuee') return;
+  function renderLiveEvacueeSpaces(){
+    const box=document.getElementById('userSpaceList');
+    if(!box) return;
+    const rows=[...mapDbCache.spaces.values()].filter(row=>row.status!=='inactive');
+    box.innerHTML=rows.length?rows.map(row=>'<div class="mobile-space-row"><div><b>'+esc(row.space_name||row.space_code)+'</b><small>'+Number(row.current_occupancy||0)+' / '+Number(row.capacity||0)+' occupied</small></div>'+statusPill(normalizeDbSpaceStatus(row))+'</div>').join(''):'<div class="space-placeholder">Accommodation space data is unavailable.</div>';
+  }
 
-    const {data:ev,error}=await sb.from('evacuees')
-      .select('evacuee_id,auth_user_id,group_id,registration_code,full_name,email,age,gender,contact_number,address,birth_date,group_size,needs_summary,approval_status,current_status')
-      .eq('auth_user_id',session.user.id)
-      .maybeSingle();
-    if(error || !ev){
-      if(error) console.warn('Evacuee portal sync:',error.message);
-
-      // Never leave prototype Juan Dela Cruz data visible for a real authenticated user.
-      const s=window.currentState();
-      s.user={
-        ...s.user,
-        name:profile?.full_name || session.user.email || 'Evacuee',
-        email:session.user.email || '',
-        registrationStatus:'Pending Approval',
-        qrIssued:false,
-        qrCode:null,
-        assignment:null
-      };
-      window.saveScanSafeState(s);
-      if(typeof window.renderUserPrototype==='function') window.renderUserPrototype();
-      syncRealEvacueeDom(null,s.user,session);
+  function selectLiveEvacueeSpace(id){
+    const box=document.getElementById('spaceDetail');
+    if(!box) return;
+    document.querySelectorAll('[data-space]').forEach(el=>el.classList.toggle('selected',el.dataset.space===id));
+    const row=mapDbCache.spaces.get(id);
+    if(!evacueeLiveCache.loaded || !row){
+      box.innerHTML='<div class="space-placeholder">'+(!evacueeLiveCache.loaded?'Loading accommodation details...':'This space has no available database record.')+'</div>';
       return;
     }
+    const cap=Number(row.capacity||0),occ=Number(row.current_occupancy||0);
+    box.innerHTML='<div class="room-banner"><div><h2>'+esc(row.space_name||row.space_code)+'</h2>'+statusPill(normalizeDbSpaceStatus(row))+'</div></div><div class="detail-list">'+[
+      ['Space Type',row.space_type||'Accommodation'],['Capacity',cap],['Occupied',occ],['Available',Math.max(0,cap-occ)]
+    ].map(([label,value])=>'<div class="detail-line"><b>'+label+'</b><span>'+esc(value)+'</span></div>').join('')+'</div>';
+  }
 
-    const [{data:qr},{data:asg}]=await Promise.all([
-      sb.from('barcodes').select('barcode_value,status').eq('evacuee_id',ev.evacuee_id).eq('status','active').maybeSingle(),
-      sb.from('accommodation_assignments').select('space_id,assigned_at').eq('group_id',ev.group_id).eq('assignment_status','active').order('assigned_at',{ascending:false}).limit(1).maybeSingle()
-    ]);
-
-    let assignment=null;
-    if(asg?.space_id){
-      const {data:sp}=await sb.from('accommodation_spaces').select('space_code').eq('space_id',asg.space_id).maybeSingle();
-      assignment=sp?.space_code||null;
-    }
-
-    const s=window.currentState();
-    s.user={...s.user,
-      requestId:ev.registration_code || s.user.requestId,
-      id:'EV-'+String(ev.evacuee_id).padStart(3,'0'),
-      dbId:ev.evacuee_id,
-      dbGroupId:ev.group_id,
-      name:ev.full_name,
-      email:ev.email||session.user.email||'',
-      age:Number(ev.age||0),
-      gender:ev.gender||'',
-      group:Number(ev.group_size||1),
-      needs:ev.needs_summary||'None',
-      registrationStatus:ev.approval_status==='approved'?'Approved':ev.approval_status==='rejected'?'Rejected':'Pending Approval',
-      qrIssued:!!qr?.barcode_value,
-      qrCode:qr?.barcode_value||null,
-      assignment
+  function renderLiveEvacueeAccount(){
+    if(!isEvacueeAppPage()) return;
+    const cache=evacueeLiveCache,ev=cache.evacuee;
+    const user=window.currentState?.().user||{};
+    const loaded=cache.loaded,approved=loaded && ev?.approval_status==='approved';
+    const rejected=loaded && ev?.approval_status==='rejected';
+    const hasBarcode=approved && !!cache.barcode?.barcode_value;
+    const status=loaded?(approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
+    const name=loaded?ev.full_name||'Evacuee':window.ScanSafeDB.profile?.full_name||'Evacuee';
+    const display=(value,fallback='Not provided')=>value==null||value===''?fallback:value;
+    const assigned=loaded && !!cache.assignment;
+    const fields={
+      name,email:loaded?display(ev.email||window.ScanSafeDB.session?.user?.email):'--',
+      age:loaded?display(ev.age):'--',gender:loaded?display(ev.gender):'--',
+      group:loaded?display(ev.group_size):'--',needs:loaded?display(ev.needs_summary,'None'):'--',
+      contact:loaded?display(ev.contact_number):'--',address:loaded?display(ev.address):'--',
+      'emergency-contact':loaded?display(ev.emergency_contact):'--',
+      status,'current-status':loaded?display(ev.current_status):'--',
+      'registration-code':loaded?display(ev.registration_code):'--',id:loaded?user.id||'--':'--',
+      initial:name.trim().charAt(0).toUpperCase()||'E',
+      shelter:!loaded?'--':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.shelter?.shelter_name||'Assigned shelter details unavailable':'Waiting for assignment',
+      space:!loaded?'--':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.space?.space_name||cache.space?.space_code||'Assigned space details unavailable':'Not assigned yet',
+      capacity:cache.space?Number(cache.space.capacity||0):'--',
+      occupied:cache.space?Number(cache.space.current_occupancy||0):'--',
+      available:cache.space?Math.max(0,Number(cache.space.capacity||0)-Number(cache.space.current_occupancy||0)):'--',
+      submitted:loaded?evacueeDate(ev.registered_at):'--',
+      'approved-at':loaded?evacueeDate(ev.approved_at):'--'
     };
-    window.saveScanSafeState(s);
-    if(typeof window.renderUserPrototype==='function') window.renderUserPrototype();
-    syncRealEvacueeDom(ev,s.user,session);
+    for(const [key,value] of Object.entries(fields)){
+      document.querySelectorAll('[data-user-'+key+']').forEach(el=>setScanSafeText(el,value));
+    }
+    setScanSafeText(document.querySelector('.user-top .identity strong'),name);
+    document.querySelectorAll('.user-top .avatar,.mobile-avatar,.profile-avatar,.avatar-circle,.identity-avatar').forEach(el=>{
+      if(el.children.length===0) setScanSafeText(el,fields.initial);
+    });
+    const hero=document.getElementById('userStatusHero');
+    if(hero){
+      const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
+      const text=!loaded?'Your registration status is being retrieved from the database.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Please contact shelter staff.'):rejected?'Please contact shelter staff to correct your registration.':'Your registration is waiting for administrator review.';
+      hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>Registration Status</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
+    }
+    const barcodeBody=hasBarcode?'<div class="prototype-qr-wrap">'+qrMarkup(cache.barcode.barcode_value)+'</div><p>Present this barcode to authorized shelter staff for verification.</p>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
+    const qr=document.getElementById('userQrCard');
+    if(qr) qr.innerHTML='<div class="app-status-icon">&#9638;</div><h3>My Barcode</h3>'+barcodeBody;
+    const barcodeCard=document.querySelector('.barcode-card');
+    if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcodeBody+(hasBarcode?'<button class="btn out full" onclick="window.print()">Print ID</button>':'');
+    const acc=document.getElementById('userAccommodationCard');
+    if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
+    const latest=document.getElementById('userLatestCard');
+    if(latest){
+      const title=!loaded?'Loading updates...':user.checkedIn?'Check-in confirmed':assigned?'Accommodation assigned':hasBarcode?'Barcode issued':approved?'Registration approved':rejected?'Registration needs correction':'Registration submitted';
+      latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">'+esc(title)+'</div><p>'+esc(cache.error?'Refresh failed. Showing the last confirmed account data.':loaded?evacueeDate(ev.approved_at||ev.registered_at):'Retrieving your registration.')+'</p>';
+    }
+    const progress=document.getElementById('userProgressSteps');
+    if(progress){
+      const steps=[['Submitted',loaded],['Admin Review',approved||rejected],['Barcode Issued',hasBarcode],['Assigned',assigned],['Checked-In',!!user.checkedIn]];
+      let firstPending=false;
+      progress.innerHTML=steps.map(([label,done],index)=>{
+        const active=loaded&&!done&&!firstPending; if(active) firstPending=true;
+        return '<div class="progress-step '+(done?'done':active?'active':'')+'"><i>'+(done?'&#10003;':index+1)+'</i><b>'+label+'</b><small>'+(!loaded?'Loading':done?'Completed':rejected?'Not completed':'Pending')+'</small></div>';
+      }).join('');
+    }
+    const members=document.getElementById('userGroupMembersBody');
+    if(members) members.innerHTML=loaded?'<tr><td>1</td><td>'+esc(name)+'</td><td>'+esc(fields.age)+'</td><td>'+esc(fields.gender)+'</td><td>Registrant</td><td>'+esc(status)+'</td><td>--</td></tr>'+(Number(ev.group_size)>1?'<tr><td colspan="7">Individual details for the other group members have not been recorded.</td></tr>':''):'<tr><td colspan="7">Loading registration details...</td></tr>';
+    const timeline=document.getElementById('userRegistrationTimeline');
+    if(timeline){
+      const events=loaded?[['Information Submitted',ev.registered_at],['Registration Approved',approved?ev.approved_at:null],['Barcode Issued',hasBarcode?cache.barcode.issued_at||cache.barcode.created_at:null],['Accommodation Assigned',cache.assignment?.assigned_at]]:[];
+      const recorded=events.filter(([,date])=>date);
+      timeline.innerHTML=recorded.length?recorded.map(([label,date])=>'<div class="timeline-row"><span class="timeline-dot">&#10003;</span><div><b>'+esc(label)+'</b><div class="muted">'+esc(evacueeDate(date))+'</div></div></div>').join(''):'<div class="muted">'+(loaded?'No dated registration events have been recorded.':'Loading registration history...')+'</div>';
+    }
+    renderLiveEvacueeAssignment();
+    renderLiveEvacueeSpaces();
+    const selectedSpace=document.querySelector('[data-space].selected')?.dataset.space;
+    if(selectedSpace) selectLiveEvacueeSpace(selectedSpace);
+    const dataStatus=document.getElementById('evacueeDataStatus');
+    if(dataStatus){
+      const message=cache.error?(loaded?'Refresh failed. Showing the last confirmed data. ':'Could not load your registration. ')+cache.error:loaded?'Live database - Updated '+new Date(cache.updatedAt).toLocaleTimeString()+(cache.warnings.length?' - '+cache.warnings.join(' '):''):'Loading your account from the database...';
+      dataStatus.setAttribute('role',cache.error?'alert':'status');
+      dataStatus.innerHTML='<span>'+esc(message)+'</span> <button class="btn out" type="button" onclick="ScanSafeRealUser.refresh()">Refresh</button>';
+    }
+    if(hasBarcode && window.ScanSafeBarcode?.render) window.ScanSafeBarcode.render();
+  }
+
+  async function readOwnEvacueeSnapshot(sb,ownerId){
+    if(!evacueeSnapshotRpcUnavailable){
+      const {data,error}=await sb.rpc('get_my_scansafe_account');
+      if(error){
+        if(error.code==='PGRST202'||error.code==='42883'||/could not find.*function|function.*does not exist/i.test(error.message||'')) evacueeSnapshotRpcUnavailable=true;
+        else throw error;
+      }else{
+        if(!data || !Object.prototype.hasOwnProperty.call(data,'evacuee')) throw new Error('Invalid account response.');
+        return {...data,warnings:[],barcodeError:false,assignmentError:false};
+      }
+    }
+    const {data:ev,error}=await sb.from('evacuees').select('*').eq('auth_user_id',ownerId).maybeSingle();
+    if(error) throw error;
+    if(!ev) return {evacuee:null};
+    const warnings=[];
+    const [barcodeResult,assignmentResult]=await Promise.allSettled([
+      ev.approval_status==='approved'?sb.from('barcodes').select('barcode_value,status,evacuee_id').eq('evacuee_id',ev.evacuee_id).eq('status','active').limit(1).maybeSingle():Promise.resolve({data:null,error:null}),
+      ev.group_id?sb.from('accommodation_assignments').select('space_id,assigned_at,group_id,assignment_status').eq('group_id',ev.group_id).eq('assignment_status','active').order('assigned_at',{ascending:false}).limit(1).maybeSingle():Promise.resolve({data:null,error:null})
+    ]);
+    const unwrap=(result,label)=>{
+      if(result.status==='rejected'||result.value.error){
+        warnings.push(label+' could not be loaded.');
+        return {data:null,error:true};
+      }
+      return {data:result.value.data,error:false};
+    };
+    const barcode=unwrap(barcodeResult,'Barcode'),assignment=unwrap(assignmentResult,'Accommodation');
+    let space=null,shelter=null;
+    if(assignment.data?.space_id){
+      try{
+        const result=await sb.from('accommodation_spaces').select('*').eq('space_id',assignment.data.space_id).maybeSingle();
+        if(result.error) throw result.error;
+        space=result.data;
+      }catch(error){ warnings.push('Assigned space details could not be loaded.'); }
+      if(space?.shelter_id){
+        try{
+          const result=await sb.from('shelters').select('*').eq('shelter_id',space.shelter_id).maybeSingle();
+          if(result.error) throw result.error;
+          shelter=result.data;
+        }catch(error){ warnings.push('Assigned shelter details could not be loaded.'); }
+      }
+    }
+    return {evacuee:ev,barcode:barcode.data,assignment:assignment.data,space,shelter,warnings,barcodeError:barcode.error,assignmentError:assignment.error};
+  }
+
+  async function performEvacueeLiveRefresh(){
+    const sb=readyClient();
+    let ownerId=evacueeLiveCache.ownerId;
+    try{
+      if(!sb) throw new Error('The database connection is unavailable. Reload and try again.');
+      const {data,error}=await sb.auth.getSession();
+      if(error) throw error;
+      const session=data?.session;
+      ownerId=session?.user?.id||null;
+      if(evacueeLiveCache.ownerId!==ownerId){
+        if(window.ScanSafeDB.profile?.id!==ownerId) window.ScanSafeDB.profile=null;
+        resetEvacueeLiveAccount(ownerId);
+        renderLiveEvacueeAccount();
+      }
+      window.ScanSafeDB.session=session||null;
+      if(!ownerId) throw new Error('Sign in to view your evacuee registration.');
+      const profile=window.ScanSafeDB.profile?.id===ownerId?window.ScanSafeDB.profile:await getProfile(ownerId);
+      if(profile?.role!=='evacuee') throw new Error('An evacuee account is required.');
+      const snapshot=await readOwnEvacueeSnapshot(sb,ownerId);
+      if(window.ScanSafeDB.session?.user?.id!==ownerId || evacueeLiveCache.ownerId!==ownerId) return null;
+      const ev=snapshot.evacuee;
+      if(!ev){
+        resetEvacueeLiveAccount(ownerId);
+        throw new Error('No registration was found for this account. Please contact shelter staff.');
+      }
+      if(ev.auth_user_id!==ownerId){
+        resetEvacueeLiveAccount(ownerId);
+        throw new Error('The registration does not belong to the signed-in account.');
+      }
+      const approved=ev.approval_status==='approved';
+      const barcode=approved && snapshot.barcode?.status==='active' &&
+        (snapshot.barcode.evacuee_id==null || String(snapshot.barcode.evacuee_id)===String(ev.evacuee_id))?snapshot.barcode:null;
+      Object.assign(evacueeLiveCache,{...snapshot,barcode,loaded:true,ownerId,error:null,updatedAt:new Date().toISOString()});
+      const state=window.currentState();
+      state.user={
+        authUserId:ownerId,requestId:ev.registration_code||null,id:'EV-'+String(ev.evacuee_id).padStart(3,'0'),dbId:ev.evacuee_id,dbGroupId:ev.group_id,
+        name:ev.full_name||profile.full_name||'Evacuee',email:ev.email||session.user.email||'',age:ev.age??null,gender:ev.gender||'',group:Number(ev.group_size||1),needs:ev.needs_summary||'None',
+        registrationStatus:approved?'Approved':ev.approval_status==='rejected'?'Rejected':'Pending Approval',qrIssued:!!barcode?.barcode_value,qrCode:barcode?.barcode_value||null,
+        assignment:snapshot.space?.space_code||null,checkedIn:ev.current_status==='checked_in'||!!ev.checked_in_at,submitted:ev.registered_at||''
+      };
+      state.requests=[];state.activity=[];state.demoGroups=[];state.demoAssignments={};
+      window.saveScanSafeState(state);
+      if(snapshot.space?.space_code){mapDbCache.spaces.set(snapshot.space.space_code,snapshot.space);syncSpaceIntoExistingMap(snapshot.space);mapDbCache.ready=true;}
+      renderLiveEvacueeAccount();
+      setupEvacueeLiveChannel(sb,ev);
+      if(typeof window.CustomEvent==='function') document.dispatchEvent(new CustomEvent('scansafe:evacuee-updated'));
+      return state.user;
+    }catch(error){
+      console.warn('ScanSafe evacuee account:',error);
+      if(evacueeLiveCache.ownerId===ownerId){
+        evacueeLiveCache.error=error.message||'Check your connection and account permissions.';
+        renderLiveEvacueeAccount();
+      }
+      return null;
+    }
+  }
+
+  function loadCurrentEvacueeIntoPrototype(){
+    if(!isEvacueeAppPage()) return Promise.resolve(null);
+    if(!evacueeRefreshPromise){
+      evacueeRefreshPromise=(async()=>{
+        const result=await performEvacueeLiveRefresh();
+        if(result && mapPage()==='user-room.html'){
+          try{
+            if(!(await loadAccommodationState())) throw new Error('Map refresh failed');
+          }catch(error){
+            evacueeLiveCache.warnings.push('Map availability could not be refreshed.');
+            renderLiveEvacueeAccount();
+          }
+        }
+        return result;
+      })().finally(()=>{evacueeRefreshPromise=null;});
+    }
+    return evacueeRefreshPromise;
+  }
+
+  function setupEvacueeLiveChannel(sb,ev){
+    if(typeof sb.channel!=='function'||evacueeLiveChannelOwner===ev.auth_user_id) return;
+    if(evacueeLiveChannel && typeof sb.removeChannel==='function') sb.removeChannel(evacueeLiveChannel);
+    evacueeLiveChannelOwner=ev.auth_user_id;
+    evacueeLiveChannel=sb.channel('scansafe-own-account-'+ev.auth_user_id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'evacuees',filter:'auth_user_id=eq.'+ev.auth_user_id},()=>loadCurrentEvacueeIntoPrototype())
+      .on('postgres_changes',{event:'*',schema:'public',table:'barcodes',filter:'evacuee_id=eq.'+ev.evacuee_id},()=>loadCurrentEvacueeIntoPrototype());
+    if(ev.group_id) evacueeLiveChannel.on('postgres_changes',{event:'*',schema:'public',table:'accommodation_assignments',filter:'group_id=eq.'+ev.group_id},()=>loadCurrentEvacueeIntoPrototype());
+    evacueeLiveChannel.subscribe();
   }
 
   document.addEventListener('DOMContentLoaded', async function(){
@@ -1241,8 +1405,9 @@
     await bootstrapSession();
     if(!(await phase9AccessGuard())) return;
     await loadPendingIntoPrototype();
-    await loadAccommodationState();
     await loadCurrentEvacueeIntoPrototype();
+    if(!isEvacueeAppPage()) await loadAccommodationState();
+    if(isEvacueeAppPage()) renderLiveEvacueeAccount();
   });
 
   // =========================================================
@@ -1613,7 +1778,9 @@
     const sb=readyClient();
     if(!sb || mapPage()!=='user-notifications.html') return;
 
+    const ownerId=window.ScanSafeDB.session?.user?.id;
     const {data,error}=await sb.rpc('get_my_scansafe_notifications');
+    if(window.ScanSafeDB.session?.user?.id!==ownerId) return;
     if(error){ console.warn('Notifications:',error.message); return; }
 
     phase78NotifCache=Array.isArray(data)?data:[];
@@ -1623,6 +1790,7 @@
     list.querySelectorAll('.notif-item,.p78-empty-notif').forEach(el=>el.remove());
 
     const unread=phase78NotifCache.filter(n=>!n.is_read).length;
+    document.querySelectorAll('.user-top .notif').forEach(el=>el.setAttribute('data-unread-count',String(unread)));
     const emergency=phase78NotifCache.filter(n=>n.category==='emergency' || n.notification_level==='urgent').length;
     const tabs=list.querySelectorAll('.tab');
     if(tabs[0]) tabs[0].textContent=`All (${phase78NotifCache.length})`;
@@ -1750,7 +1918,9 @@
   async function p78LoadUserMessages(){
     const sb=readyClient();
     if(!sb || mapPage()!=='user-messages.html') return;
+    const ownerId=window.ScanSafeDB.session?.user?.id;
     const {data,error}=await sb.rpc('get_my_admin_thread');
+    if(window.ScanSafeDB.session?.user?.id!==ownerId) return;
     if(error){ console.warn('User messages:',error.message); return; }
 
     const session=window.ScanSafeDB.session || (await sb.auth.getSession()).data.session;
@@ -2281,17 +2451,36 @@
     const sb=readyClient();
     if(!sb) return;
     phase9AuthListenerReady=true;
-    sb.auth.onAuthStateChange(async(event,session)=>{
+    sb.auth.onAuthStateChange((event,session)=>{
       window.ScanSafeDB.session=session||null;
       if(event==='SIGNED_OUT'){
         window.ScanSafeDB.profile=null;
         localStorage.removeItem('scanSafeLoginRole');
         localStorage.removeItem('scansafePrototypeStateV4');
+        localStorage.removeItem('scansafeLiveStateV1');
+        if(isEvacueeAppPage()){
+          resetEvacueeLiveAccount();
+          renderLiveEvacueeAccount();
+        }
         sessionStorage.removeItem('scansafePrototypeStateV4');
         const page=mapPage();
         if(phase9StaffPages.has(page)||phase9EvacueePages.has(page)) location.replace('index.html');
       }else if(session?.user){
-        await getProfile(session.user.id);
+        if(isEvacueeAppPage() && evacueeLiveCache.ownerId!==session.user.id){
+          window.ScanSafeDB.profile=null;
+          resetEvacueeLiveAccount(session.user.id);
+          renderLiveEvacueeAccount();
+        }
+        // Auth callbacks must finish before another Supabase request starts.
+        setTimeout(async()=>{
+          await getProfile(session.user.id);
+          if(isEvacueeAppPage()){
+            if(evacueeRefreshPromise) await evacueeRefreshPromise;
+            loadCurrentEvacueeIntoPrototype();
+            p78LoadUserNotifications();
+            p78LoadUserMessages();
+          }
+        },0);
       }
     });
   }
@@ -2823,34 +3012,51 @@
 
 
   window.ScanSafeRealUser={
-    refresh:async function(){
-      await bootstrapSession();
-      await loadCurrentEvacueeIntoPrototype();
-      return window.currentState?.().user || null;
-    },
+    refresh:loadCurrentEvacueeIntoPrototype,
     inspect:async function(){
-      const sb=readyClient();
-      if(!sb) return {configured:false};
-      const {data:sd}=await sb.auth.getSession();
-      const session=sd?.session||null;
-      if(!session?.user) return {configured:true,authenticated:false};
-
-      const {data:ev,error}=await sb.from('evacuees')
-        .select('evacuee_id,auth_user_id,registration_code,full_name,email,contact_number,address,approval_status,current_status')
-        .eq('auth_user_id',session.user.id)
-        .maybeSingle();
-
-      return {
-        configured:true,
-        authenticated:true,
-        authUserId:session.user.id,
-        authEmail:session.user.email,
-        evacuee:ev||null,
-        error:error?.message||null,
-        localUser:window.currentState?.().user||null
-      };
+      return {configured,authenticated:!!window.ScanSafeDB.session?.user,
+        authUserId:window.ScanSafeDB.session?.user?.id||null,
+        ...evacueeLiveCache,localUser:window.currentState?.().user||null};
     }
   };
+  window.ScanSafeEvacueeLive={
+    get loaded(){return evacueeLiveCache.loaded;},
+    inspect:()=>({...evacueeLiveCache}),
+    spaces:()=>[...mapDbCache.spaces.values()].filter(row=>row.status!=='inactive')
+  };
+
+  if(isEvacueeAppPage()){
+    window.renderUserPrototype=renderLiveEvacueeAccount;
+    window.selectSpace=selectLiveEvacueeSpace;
+    window.renderUserAssignmentSummary=renderLiveEvacueeAssignment;
+    window.renderUserSpaceList=renderLiveEvacueeSpaces;
+    window.sendMessage=p78SendMessage;
+    window.getDynamicOccupancy=id=>Number(mapDbCache.spaces.get(id)?.current_occupancy||0);
+    window.getSpaceStatus=id=>{
+      const row=mapDbCache.spaces.get(id);
+      return row?normalizeDbSpaceStatus(row):'full';
+    };
+    window.getAvailableSlots=id=>{
+      const row=mapDbCache.spaces.get(id);
+      return row?Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0)):0;
+    };
+    resetEvacueeLiveAccount();
+    renderLiveEvacueeAccount();
+    document.addEventListener('DOMContentLoaded',()=>{
+      const refresh=()=>{if(document.visibilityState==='visible') loadCurrentEvacueeIntoPrototype();};
+      const startTimer=()=>{if(!evacueeLiveTimer) evacueeLiveTimer=setInterval(refresh,10000);};
+      startTimer();
+      window.addEventListener('focus',refresh);
+      document.addEventListener('visibilitychange',refresh);
+      window.addEventListener('pageshow',()=>{startTimer();refresh();});
+      window.addEventListener('pagehide',()=>{
+        clearInterval(evacueeLiveTimer);evacueeLiveTimer=null;
+        const sb=readyClient();
+        if(evacueeLiveChannel && sb?.removeChannel) sb.removeChannel(evacueeLiveChannel);
+        evacueeLiveChannel=null;evacueeLiveChannelOwner=null;
+      });
+    });
+  }
 
 
   if(adminLivePages.has(adminLivePage())){

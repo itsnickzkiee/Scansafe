@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ScanSafe User</title>
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/style.css?v=evacuee-live-v15">
 </head>
 
 <body class="user-shell">
@@ -14,8 +14,8 @@
             <div class="notif"><svg class="icon ">
                     <use href="assets/icons.svg#bell"></use>
                 </svg></div>
-            <div class="avatar">J</div>
-            <div class="identity"><strong>Juan Dela Cruz</strong>Evacuee</div><button class="btn red"
+            <div class="avatar" data-user-initial>...</div>
+            <div class="identity"><strong data-user-name>Loading...</strong>Evacuee</div><button class="btn red"
                 onclick="logout()"><svg class="icon sm">
                     <use href="assets/icons.svg#logout"></use>
                 </svg> Logout</button>
@@ -36,59 +36,15 @@
                 <use href="assets/icons.svg#settings"></use>
             </svg><span>Profile</span></a></aside>
     <main class="user-main">
-        <section class="user-hero">
-            <h1>Messages</h1>
-            <p>Contact shelter staff and review important conversations.</p>
-            <div class="date-card"><svg class="icon lg">
-                    <use href="assets/icons.svg#calendar"></use>
-                </svg>
-                <div><b>Aug 6, 2026</b><br><span style="font-size:11px">10:24 AM</span></div>
-            </div>
-        </section>
-        <div class="messages-grid" style="grid-template-columns:330px 1fr;height:650px">
-            <section class="card card-pad msg-col">
-                <div class="searchbar"><svg class="icon sm">
-                        <use href="assets/icons.svg#search"></use>
-                    </svg><input placeholder="Search messages..."></div>
-                <h3 class="section-h" style="margin-top:15px">Recent Conversations</h3>
-                <div class="folder active"><span class="folder-left"><span
-                            class="avatar">A</span><span><b>Admin</b><br><span class="muted"
-                                style="font-size:9px">Welcome to ScanSafe</span></span></span><span
-                        class="count red">1</span></div>
-                <div class="folder"><span class="folder-left"><span class="avatar">SS</span><span><b>Shelter
-                                Staff</b><br><span class="muted" style="font-size:9px">Hallway A1 is
-                                ready</span></span></span></div>
-            </section>
-            <section class="card conversation">
-                <header class="conv-head">
-                    <div style="display:flex;gap:10px;align-items:center"><span class="avatar">A</span>
-                        <div><b>Admin</b>
-                            <div class="muted" style="font-size:9px">ScanSafe Administrator</div>
-                        </div>
-                    </div>
-                </header>
-                <div class="thread" id="thread">
-                    <div class="bubble-row"><span class="avatar">A</span>
-                        <div class="bubble">Welcome to ScanSafe. Your registration has been verified. Please remain in
-                            your assigned accommodation space and follow official shelter announcements.</div>
-                    </div>
-                    <div class="bubble-row mine">
-                        <div class="bubble">Thank you. We are already in Hallway A1.</div><span class="avatar">J</span>
-                    </div>
-                </div>
-                <div class="msg-input"><input id="messageInput" placeholder="Type a message..."
-                        onkeydown="if(event.key==='Enter')sendMessage()"><button class="btn red"
-                        onclick="sendMessage()"><svg class="icon ">
-                            <use href="assets/icons.svg#send"></use>
-                        </svg></button></div>
-            </section>
-        </div>
-    </main>
+<div id="evacueeDataStatus" class="card card-pad" role="status" aria-live="polite" style="margin-bottom:12px">Loading your registration from the database...</div>
+<section class="user-hero"><h1>Messages</h1><p>Contact shelter staff and review your conversation.</p><div class="date-card"><svg class="icon"><use href="assets/icons.svg#calendar"></use></svg><div><b data-now>Loading date...</b></div></div></section>
+<div class="messages-grid" style="grid-template-columns:330px 1fr;height:650px"><section class="card card-pad msg-col"><h3 class="section-h">Recent Conversations</h3><div class="folder active"><span class="folder-left"><span class="avatar">A</span><span><b>ScanSafe Admin</b><br><span class="muted" style="font-size:9px">Loading your conversation...</span></span></span></div></section><section class="card conversation"><header class="conv-head"><div style="display:flex;gap:10px;align-items:center"><span class="avatar">A</span><div><b>ScanSafe Admin</b><div class="muted" style="font-size:9px">Authorized shelter personnel</div></div></div></header><div class="thread" id="thread"><div class="space-placeholder">Loading messages...</div></div><div class="msg-input"><input id="messageInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()"><button class="btn red" onclick="sendMessage()"><svg class="icon"><use href="assets/icons.svg#send"></use></svg></button></div></section></div>
+</main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js"></script>
-<script src="assets/supabase-bridge.js"></script>
+<script src="assets/app.js?v=evacuee-live-v15"></script>
+<script src="assets/supabase-bridge.js?v=evacuee-live-v15"></script>
 </body>
 
 </html>

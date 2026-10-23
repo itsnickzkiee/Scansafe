@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ScanSafe Accommodation</title>
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=evacuee-live-v15">
 
 <style id="singleFileMobileMapFix">
 /* ScanSafe one-file mobile map fix.
@@ -274,9 +274,9 @@
 </use>
 </svg>
 </div>
-<div class="avatar">J</div>
+<div class="avatar" data-user-initial>...</div>
 <div class="identity">
-<strong data-user-name>Juan Dela Cruz</strong>Evacuee</div>
+<strong data-user-name>Loading...</strong>Evacuee</div>
 <button class="btn red user-logout" onclick="logout()">
 <svg class="icon sm">
 <use href="assets/icons.svg#logout">
@@ -329,6 +329,7 @@
 </a>
 </aside>
 <main class="user-main app-user-main">
+<div id="evacueeDataStatus" class="card card-pad" role="status" aria-live="polite" style="margin-bottom:12px">Loading your registration from the database...</div>
 <section class="mobile-page-head">
 <div>
 <small>ScanSafe Accommodation</small>
@@ -337,6 +338,7 @@
 </div>
 </section>
 <section class="card assignment-state-card" id="userAssignmentSummary">
+<div class="space-placeholder">Loading accommodation assignment...</div>
 </section>
 <section class="card user-map-control">
 <div>
@@ -355,7 +357,7 @@
 <div class="user-room-grid prototype-user-room-grid">
 <section class="card floor-card user-map-panel" id="userMapPanel">
 <div class="floor-title">Ground Floor – Floor Plan</div>
-<div class="floor-sub">Original approved floor-plan image from your project.</div>
+<div class="floor-sub">Ground-floor accommodation areas.</div>
 <div class="floor-wrap exact-floor-wrap" style="margin-top:8px">
 <div class="floor-image-stage user-floor-stage">
 <img src="assets/floor-plan-light.png" class="floor-plan-image" alt="Ground Floor Room Layout">
@@ -384,7 +386,7 @@
 </use>
 </svg> Space Details</h3>
 <div id="spaceDetail">
-<div class="space-placeholder">Your assigned accommodation details will appear here after admin assignment.</div>
+<div class="space-placeholder">Select a map area to view its live details.</div>
 </div>
 </section>
 <section class="card card-pad">
@@ -393,13 +395,14 @@
 <span>Reference only</span>
 </div>
 <div id="userSpaceList" class="mobile-space-list">
+<div class="space-placeholder">Loading accommodation data...</div>
 </div>
 </section>
 <section class="card card-pad">
 <h3 class="section-h">Quick Actions</h3>
 <div class="prototype-action-row">
-<button class="btn out" onclick="toast('Shelter staff contact request sent.')">Contact Staff</button>
-<button class="btn red" onclick="toast('Issue reporting form opened.')">Report an Issue</button>
+<button class="btn out" onclick="go('user-messages.html')">Contact Staff</button>
+<button class="btn red" onclick="go('user-messages.html')">Report an Issue</button>
 </div>
 </section>
 </aside>
@@ -441,13 +444,15 @@
   </div>
 </div>
 
-<script src="assets/app.js">
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/app.js?v=evacuee-live-v15"></script>
+<script src="assets/supabase-bridge.js?v=evacuee-live-v15"></script>
 
 <script id="singleFileMobileMapScript">
 (function () {
   const S = {
-    scale: 1, x: 0, y: 0, minScale: .35, maxScale: 3,
+    scale: 1, x: 0, y: 0, minScale: .35, maxScale: 3, selectedSpace: null,
     pointers: new Map(), panLast: null,
     pinchDistance: 0, pinchScale: 1, pinchWorldX: 0, pinchWorldY: 0
   };
@@ -455,43 +460,31 @@
   function qs(sel) { return document.querySelector(sel); }
 
   function assignmentId() {
+    const live = window.ScanSafeEvacueeLive;
+    if (!live || !live.loaded) return null;
+    const snapshot = typeof live.inspect === 'function' ? live.inspect() : null;
+    if (snapshot && snapshot.space && snapshot.space.space_code) return snapshot.space.space_code;
     try {
-      if (typeof currentState === 'function') {
-        const s = currentState();
-        if (s && s.user && s.user.assignment) return s.user.assignment;
-      }
-    } catch (e) {}
-    try {
-      const raw = localStorage.getItem('scansafePrototypeStateV4');
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (s && s.user && s.user.assignment) return s.user.assignment;
-      }
+      if (typeof currentState === 'function') return currentState().user.assignment || null;
     } catch (e) {}
     return null;
   }
 
   function mapData(id) {
-    try {
-      if (typeof getSpaceBase === 'function') {
-        const d = getSpaceBase(id);
-        if (d) return d;
-      }
-    } catch (e) {}
-    try {
-      if (typeof HALLWAY_SPACES !== 'undefined' && HALLWAY_SPACES[id]) return HALLWAY_SPACES[id];
-    } catch (e) {}
-    if (id === 'ML') return {
-      name:'Main Lobby', side:'Main Lobby - Ground Floor',
-      cap:30, occ:18, status:'available'
+    const live = window.ScanSafeEvacueeLive;
+    if (!live || !live.loaded || typeof live.spaces !== 'function') return null;
+    const row = live.spaces().find(function (space) { return String(space.space_code) === String(id); });
+    if (!row) return null;
+    const capacity = Number(row.capacity || 0);
+    const occupied = Number(row.current_occupancy || 0);
+    return {
+      name: row.space_name || row.space_code,
+      side: 'Ground Floor', cap: capacity, occ: occupied,
+      status: row.status === 'inactive' || capacity <= 0 || occupied >= capacity ? 'full' : occupied / capacity > .70 ? 'near' : 'available'
     };
-    return {name:'Hallway ' + id, side:'Ground Floor', cap:6, occ:0, status:'available'};
   }
 
   function occupancy(id, d) {
-    try {
-      if (typeof getDynamicOccupancy === 'function') return getDynamicOccupancy(id);
-    } catch (e) {}
     return Number(d.occ || 0);
   }
 
@@ -557,7 +550,19 @@
       );
     });
 
+    S.selectedSpace = id;
     const d = mapData(id);
+    if (!d) {
+      qs('#singleMapEyebrow').textContent = 'Accommodation Map';
+      qs('#singleMapTitle').textContent = id === 'ML' ? 'Main Lobby' : 'Hallway ' + id;
+      qs('#singleMapMeta').textContent = window.ScanSafeEvacueeLive && window.ScanSafeEvacueeLive.loaded
+        ? 'Live capacity is unavailable for this area.' : 'Loading accommodation data...';
+      const unavailableBadge = qs('#singleMapStatus');
+      unavailableBadge.className = '';
+      unavailableBadge.textContent = 'Unavailable';
+      if (center) centerSingleMapOnSpace(id);
+      return;
+    }
     const occ = occupancy(id, d);
     const cap = Number(d.cap || 0);
     const avail = Math.max(0, cap - occ);
@@ -786,6 +791,13 @@
       ) closeSingleUserMapViewer();
     });
   }
+
+  document.addEventListener('scansafe:evacuee-updated', function () {
+    const viewer = qs('#singleUserMapViewer');
+    if (!viewer || !viewer.classList.contains('is-open')) return;
+    const selected = S.selectedSpace || assignmentId();
+    if (selected) showSingleMapSpace(selected, false);
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     initGestures();
