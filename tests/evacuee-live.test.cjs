@@ -92,7 +92,7 @@ function harness(options = {}) {
   };
   const tables = options.tables || fixtures();
   const errors = options.errors || {};
-  const calls = { rpc: [], table: [], auth: 0 };
+  const calls = { rpc: [], table: [], auth: 0, viewerAccounts: [] };
   const session = options.authenticated === false ? null : { user: { id: 'nick-id', email: 'nick@example.test' } };
   const profile = { id: 'nick-id', full_name: 'Nick Reyes', role: options.role || 'evacuee' };
   const client = {
@@ -154,7 +154,8 @@ function harness(options = {}) {
     setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
     addEventListener() {},
     SCANSafeSupabaseConfig: { url: 'https://example.test', anonKey: 'local-test-key' },
-    supabase: { createClient: () => client }
+    supabase: { createClient: () => client },
+    ScanSafeBarcodeViewer: { setAccount: account => calls.viewerAccounts.push(copy(account)), open: async () => true, close() {} }
   };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
@@ -195,7 +196,10 @@ test('approved Nick gets the actual active barcode through schema-compatible own
   await h.refresh();
   assert.equal(h.context.currentState().user.registrationStatus, 'Approved');
   assert.equal(h.context.currentState().user.qrCode, 'NICK-ACTUAL-50');
-  assert.match(h.nodes.get('userQrCard').innerHTML, /data-barcode-value="NICK-ACTUAL-50"/);
+  assert.match(h.nodes.get('userQrCard').innerHTML, /Show Barcode/);
+  assert.doesNotMatch(h.nodes.get('userQrCard').innerHTML, /data-barcode-value|NICK-ACTUAL-50/);
+  assert.equal(h.calls.viewerAccounts.at(-1).ownerId, 'nick-id');
+  assert.equal(h.calls.viewerAccounts.at(-1).value, 'NICK-ACTUAL-50');
   assert.equal(h.kpi('data-user-name'), 'Nick Reyes');
   const base = h.calls.table.find(call => call.table === 'evacuees');
   assert.equal(base.columns, '*');
@@ -232,6 +236,8 @@ test('pending, rejected, and revoked snapshots never display stray barcodes', as
     const h = harness({ accountSnapshot: async () => ({ data: ownSnapshot(tables), error: null }) });
     await h.refresh();
     assert.equal(h.context.currentState().user.qrIssued, false);
+    assert.ok(h.calls.viewerAccounts.length, 'viewer must receive the barcode gate');
+    assert.equal(h.calls.viewerAccounts.at(-1)?.value ?? null, null);
     assert.doesNotMatch(h.nodes.get('userQrCard').innerHTML, /NICK-ACTUAL-50/);
   }
 });
@@ -251,6 +257,8 @@ test('barcode lookup errors do not reset an approved registration to pending', a
   await h.refresh();
   assert.equal(h.context.currentState().user.registrationStatus, 'Approved');
   assert.equal(h.context.currentState().user.qrIssued, false);
+  assert.ok(h.calls.viewerAccounts.length, 'viewer must receive the barcode gate');
+  assert.equal(h.calls.viewerAccounts.at(-1)?.value ?? null, null);
   assert.ok(h.inspect().warnings.includes('Barcode could not be loaded.'));
   assert.match(h.nodes.get('userQrCard').innerHTML, /temporarily unavailable/);
 });

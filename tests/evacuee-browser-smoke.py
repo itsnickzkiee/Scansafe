@@ -13,7 +13,12 @@ PAGES = ('user-portal.html','my-information.html','profile.html','user-room.html
 MOCK = r"""<script>
 window.SCANSafeSupabaseConfig={url:'https://fixture.invalid',anonKey:'fixture'};
 Object.defineProperty(navigator,'serviceWorker',{value:{register:async()=>({})},configurable:true});
-window.JsBarcode=(svg,value)=>svg.setAttribute('data-test-barcode-value',value);
+window.JsBarcode=(svg,value)=>{
+ svg.setAttribute('data-test-barcode-value',value);
+ svg.setAttribute('width','240');svg.setAttribute('height','80');svg.setAttribute('viewBox','0 0 240 80');
+ svg.replaceChildren();
+ for(let x=12;x<228;x+=6){const bar=document.createElementNS('http://www.w3.org/2000/svg','rect');bar.setAttribute('x',x);bar.setAttribute('y','4');bar.setAttribute('width','2');bar.setAttribute('height','72');bar.setAttribute('fill','#111');svg.append(bar);}
+};
 const fixture={
  evacuees:[{evacuee_id:42,auth_user_id:'fixture-nick',group_id:42,registration_code:'REQ-NICK',full_name:'Nick',email:'nick@example.test',age:23,gender:'Male',group_size:2,needs_summary:'None',address:'Actual registered address',barangay:'Abangan Norte',city:'Marilao',approval_status:'approved',current_status:'accommodated',registered_at:'2026-10-23T14:00:00Z',approved_at:'2026-10-23T14:05:00Z'}],
  barcodes:[{evacuee_id:42,barcode_value:'NICK-LIVE-42',status:'active',issued_at:'2026-10-23T14:05:00Z'}],
@@ -44,6 +49,12 @@ window.addEventListener('unhandledrejection',event=>document.documentElement.set
 </script>"""
 CHECK = r"""<script>
 setTimeout(()=>{
+ if(['user-portal.html','my-information.html'].some(page=>location.pathname.endsWith(page))){
+  const card=document.querySelector(location.pathname.endsWith('my-information.html')?'.barcode-card':'#userQrCard');
+  if(!card||card.querySelector('[data-barcode-value]')) document.documentElement.setAttribute('data-test-script-error','Barcode remains inline in its account card');
+  const button=card?.querySelector('[data-show-barcode]');
+  if(button) button.click();else document.documentElement.setAttribute('data-test-script-error','Show Barcode card action missing');
+ }
  if(location.pathname.endsWith('user-room.html')){
   window.selectSpace('ML');
   window.openSingleUserMapViewer();
@@ -94,7 +105,8 @@ def main():
     assert 'Live database - Updated' in visible, page+': account did not finish loading'
     assert 'Juan Dela Cruz' not in visible and 'Maria Santos' not in visible and 'Pedro Reyes' not in visible and 'Ana Cruz' not in visible, page+': mock people remain'
     if page in ('user-portal.html','my-information.html'):
-     assert 'data-barcode-value="NICK-LIVE-42"' in visible, page+': actual barcode value missing'
+     assert 'Show Barcode' in visible, page+': Show Barcode action missing'
+     assert 'data-barcode-value="NICK-LIVE-42"' in visible, page+': popup actual barcode value missing'
      assert 'data-test-barcode-value="NICK-LIVE-42"' in visible, page+': barcode renderer did not receive actual value'
      assert 'Pending Admin Approval' not in visible, page+': approved account rendered pending'
      assert 'Check-in confirmed' not in visible, page+': assignment fabricated a check-in'

@@ -4,8 +4,15 @@ ScanSafe evacuee account and approval synchronization
 Prepared files are local only. This migration has NOT been applied to Supabase.
 
 Apply SUPABASE_EVACUEE_LIVE_SYNC_FIX.sql as one complete script in the connected
-project's Supabase SQL Editor, after the existing Phase 9 security/audit setup.
+project's Supabase SQL Editor. The full Phase 9 migration is not required.
+The script installs its audit table and private logger when missing, preserving
+any existing logger and audit records. Its leading ROLLBACK clears a previous
+failed SQL Editor transaction before starting the migration's own transaction.
 Deploy the accompanying frontend changes and refresh the evacuee page.
+
+If an earlier copy failed with "Apply the ScanSafe Phase 9 security/audit setup
+before this migration", replace all text in SQL Editor with this updated file
+and run the entire script again; do not rerun the old pasted copy.
 
 The migration adds get_my_scansafe_account(), callable only by authenticated
 users. It uses auth.uid() and the existing auth_user_id link, never an email or
@@ -31,7 +38,10 @@ the known evacuee_id, barcode_value, and status columns, relying on table defaul
 for the rest. If the real table has extra required fields, custom code-format
 constraints, or incompatible legacy triggers, the SQL may fail. The surrounding
 transaction rolls back every change; inspect the reported schema error before
-adapting the migration. No live execution or database verification was performed.
+adapting the migration. The migration was tested locally against PostgreSQL
+fixtures, including a database without Phase 9, existing audit helpers, owner
+access, repeated runs, legacy triggers, and recovery after a failed transaction.
+It has not been executed or verified against the live Supabase database.
 
 Verification after application: approve a test pending registration as an admin;
 then log in as that same evacuee. get_my_scansafe_account() should return the

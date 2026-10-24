@@ -4458,3 +4458,283 @@ body {
 .scansafe-qr-logo{display:block;width:46px;height:46px;object-fit:contain;border-radius:50%}
 .qr-load-error{font-size:10px;line-height:1.35;color:#b42318;text-align:center;padding:12px;max-width:180px}
 @media(max-width:480px){.scansafe-real-qr,.scansafe-real-qr img,.scansafe-real-qr canvas{width:190px!important;height:190px!important}.scansafe-real-qr{width:190px;height:190px}.scansafe-qr-logo-bg{width:44px;height:44px}.scansafe-qr-logo{width:40px;height:40px}}
+
+/* Evacuee barcode viewer: screen controls and an isolated barcode print slip. */
+body.barcode-viewer-open {
+  overflow: hidden;
+}
+
+#evacueeBarcodeViewer {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  isolation: isolate;
+}
+
+#evacueeBarcodeViewer[hidden] {
+  display: none !important;
+}
+
+#evacueeBarcodeViewer .barcode-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(15, 23, 42, .68);
+}
+
+#evacueeBarcodeViewer .barcode-viewer-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, 640px);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+  box-sizing: border-box;
+  overflow: auto;
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  background: #fff;
+  color: #101828;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, .28);
+  -webkit-overflow-scrolling: touch;
+}
+
+#evacueeBarcodeViewer .barcode-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+#evacueeBarcodeViewer .barcode-viewer-header h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+#evacueeBarcodeViewer .barcode-viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+#evacueeBarcodeViewer .barcode-viewer-header button,
+#evacueeBarcodeViewer .barcode-viewer-actions button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+  touch-action: manipulation;
+}
+
+#evacueeBarcodeViewer button:focus-visible {
+  outline: 3px solid #175cd3;
+  outline-offset: 3px;
+}
+
+#evacueeBarcodeViewer button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodePaper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #fff;
+  color: #000;
+  text-align: center;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodePaper figure {
+  width: 100%;
+  margin: 0;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodeSvg {
+  display: block;
+  width: 100%;
+  max-width: 580px;
+  height: auto;
+  margin: 0 auto;
+  background: #fff;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodeValue {
+  max-width: 100%;
+  margin: 0;
+  color: #000;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodeMessage {
+  margin: 0;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodeMessage:empty {
+  display: none;
+}
+
+#evacueeBarcodeViewer #evacueeBarcodeMessage[role="alert"] {
+  color: #b42318;
+}
+
+#evacueeBarcodeViewer.is-expanded,
+#evacueeBarcodeViewer:fullscreen {
+  padding: 0;
+  background: #fff;
+}
+
+#evacueeBarcodeViewer.is-expanded .barcode-viewer-dialog,
+#evacueeBarcodeViewer:fullscreen .barcode-viewer-dialog,
+#evacueeBarcodeViewer .barcode-viewer-dialog:fullscreen {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#evacueeBarcodeViewer.is-expanded #evacueeBarcodePaper,
+#evacueeBarcodeViewer:fullscreen #evacueeBarcodePaper {
+  width: min(100%, 900px);
+  margin: auto;
+}
+
+@media (max-width: 480px) {
+  #evacueeBarcodeViewer {
+    padding: 12px;
+  }
+
+  #evacueeBarcodeViewer .barcode-viewer-dialog {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    gap: 12px;
+  }
+
+  #evacueeBarcodeViewer .barcode-viewer-header h2 {
+    font-size: 18px;
+  }
+
+  #evacueeBarcodeViewer .barcode-viewer-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #evacueeBarcodeViewer .barcode-viewer-actions button {
+    width: 100%;
+  }
+
+  #evacueeBarcodeViewer #evacueeBarcodeValue {
+    font-size: 14px;
+  }
+}
+
+@page barcode-slip {
+  size: 148mm 105mm;
+  margin: 10mm;
+}
+
+@media print {
+  body.barcode-printing {
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.barcode-printing > :not(#evacueeBarcodeViewer) {
+    display: none !important;
+  }
+
+  body.barcode-printing > #evacueeBarcodeViewer {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body.barcode-printing #evacueeBarcodeViewer .barcode-viewer-backdrop,
+  body.barcode-printing #evacueeBarcodeViewer .barcode-viewer-header,
+  body.barcode-printing #evacueeBarcodeViewer .barcode-viewer-actions,
+  body.barcode-printing #evacueeBarcodeMessage {
+    display: none !important;
+  }
+
+  body.barcode-printing #evacueeBarcodeViewer .barcode-viewer-dialog {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  body.barcode-printing #evacueeBarcodePaper {
+    page: barcode-slip;
+    width: 128mm !important;
+    max-width: 100% !important;
+    min-height: 70mm;
+    margin: 0 auto !important;
+    padding: 8mm 5mm !important;
+    break-inside: avoid;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.barcode-printing #evacueeBarcodeSvg {
+    width: 100% !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+
+  body.barcode-printing #evacueeBarcodeValue {
+    color: #000 !important;
+    font-size: 12pt;
+  }
+}

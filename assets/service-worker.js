@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v15-live-evacuee';
+const CACHE_NAME='scansafe-pwa-v16-barcode-viewer';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -8,6 +8,7 @@ const APP_SHELL=[
   './profile.html',
   './assets/style.css',
   './assets/app.js',
+  './assets/barcode-viewer.js',
   './assets/supabase-bridge.js',
   './assets/logo.svg',
   './assets/icons.svg',

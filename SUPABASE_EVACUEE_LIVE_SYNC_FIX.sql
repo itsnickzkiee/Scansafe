@@ -1,20 +1,71 @@
 -- ScanSafe: authenticated evacuee account synchronization and real barcodes.
--- Run this entire file in Supabase SQL Editor after the existing Phase 9 setup.
+-- Run this entire file in Supabase SQL Editor against the existing ScanSafe DB.
+-- The required private audit helper is included; the full Phase 9 is not required.
 -- This file does not sign in users, guess account links, or match by email.
 -- All statements, including backfill, roll back together if a schema constraint
 -- fails. The original Phase 1 table definitions are not included in this repo.
 
+-- Recover the SQL Editor session if an earlier attempt left a failed transaction.
+rollback;
 begin;
 
--- Keep the existing approval audit behavior. Fail before changing anything when
--- the expected Phase 9 audit helper has not been installed.
-do $preflight$
+-- Install only the audit dependency that approval needs. Preserve an existing
+-- helper, its audit records, and the rest of the project's Phase 9 configuration.
+create table if not exists public.audit_events (
+  audit_id bigint generated always as identity primary key,
+  event_type text not null,
+  actor_id uuid references public.profiles(id) on delete set null,
+  target_type text,
+  target_id text,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.audit_events enable row level security;
+drop policy if exists scansafe_admin_read_audit_events on public.audit_events;
+create policy scansafe_admin_read_audit_events
+on public.audit_events for select to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'admin'
+  )
+);
+grant select on public.audit_events to authenticated;
+
+do $audit_bootstrap$
 begin
   if to_regprocedure('public.log_scansafe_audit(text,text,text,jsonb)') is null then
-    raise exception 'Apply the ScanSafe Phase 9 security/audit setup before this migration';
+    execute $audit_definition$
+      create function public.log_scansafe_audit(
+        p_event_type text,
+        p_target_type text,
+        p_target_id text,
+        p_details jsonb default '{}'::jsonb
+      )
+      returns void
+      language plpgsql
+      security definer
+      set search_path = pg_catalog, public
+      as $audit_body$
+      begin
+        insert into public.audit_events(
+          event_type, actor_id, target_type, target_id, details
+        )
+        values (
+          p_event_type, auth.uid(), p_target_type, p_target_id,
+          coalesce(p_details, '{}'::jsonb)
+        );
+      end;
+      $audit_body$;
+    $audit_definition$;
   end if;
 end;
-$preflight$;
+$audit_bootstrap$;
+
+-- Only the server-side approval function may invoke this audit writer.
+revoke all on function public.log_scansafe_audit(text,text,text,jsonb)
+from public, anon, authenticated;
 
 -- The account RPC is read-only and derives ownership exclusively from auth.uid().
 -- to_jsonb(table_row) tolerates optional fields such as birth_date being absent.

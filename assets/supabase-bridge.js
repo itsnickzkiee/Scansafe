@@ -1099,6 +1099,7 @@
   }
 
   function resetEvacueeLiveAccount(ownerId=null){
+    window.ScanSafeBarcodeViewer?.setAccount(null);
     phase78NotifCache=[];
     localStorage.removeItem('scansafePrototypeStateV4');
     sessionStorage.removeItem('scansafePrototypeStateV4');
@@ -1177,6 +1178,9 @@
     const loaded=cache.loaded,approved=loaded && ev?.approval_status==='approved';
     const rejected=loaded && ev?.approval_status==='rejected';
     const hasBarcode=approved && !!cache.barcode?.barcode_value;
+    window.ScanSafeBarcodeViewer?.setAccount(hasBarcode?{
+      ownerId:cache.ownerId,value:cache.barcode.barcode_value
+    }:null);
     const status=loaded?(approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
     const name=loaded?ev.full_name||'Evacuee':window.ScanSafeDB.profile?.full_name||'Evacuee';
     const display=(value,fallback='Not provided')=>value==null||value===''?fallback:value;
@@ -1211,11 +1215,11 @@
       const text=!loaded?'Your registration status is being retrieved from the database.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Please contact shelter staff.'):rejected?'Please contact shelter staff to correct your registration.':'Your registration is waiting for administrator review.';
       hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>Registration Status</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
     }
-    const barcodeBody=hasBarcode?'<div class="prototype-qr-wrap">'+qrMarkup(cache.barcode.barcode_value)+'</div><p>Present this barcode to authorized shelter staff for verification.</p>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
+    const barcodeBody=hasBarcode?'<p>Your issued barcode is ready for scanning or printing.</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
     const qr=document.getElementById('userQrCard');
     if(qr) qr.innerHTML='<div class="app-status-icon">&#9638;</div><h3>My Barcode</h3>'+barcodeBody;
     const barcodeCard=document.querySelector('.barcode-card');
-    if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcodeBody+(hasBarcode?'<button class="btn out full" onclick="window.print()">Print ID</button>':'');
+    if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcodeBody;
     const acc=document.getElementById('userAccommodationCard');
     if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
     const latest=document.getElementById('userLatestCard');
@@ -1250,7 +1254,15 @@
       dataStatus.setAttribute('role',cache.error?'alert':'status');
       dataStatus.innerHTML='<span>'+esc(message)+'</span> <button class="btn out" type="button" onclick="ScanSafeRealUser.refresh()">Refresh</button>';
     }
-    if(hasBarcode && window.ScanSafeBarcode?.render) window.ScanSafeBarcode.render();
+  }
+
+  async function openLiveEvacueeBarcode(){
+    if(!evacueeLiveCache.loaded) await loadCurrentEvacueeIntoPrototype();
+    if(!evacueeLiveCache.loaded){
+      if(typeof toast==='function') toast('Your barcode could not be loaded. Use Refresh to try again.');
+      return false;
+    }
+    return window.ScanSafeBarcodeViewer?window.ScanSafeBarcodeViewer.open():false;
   }
 
   async function readOwnEvacueeSnapshot(sb,ownerId){
@@ -2891,7 +2903,7 @@
       s.async=true;
       s.dataset.scansafeJsbarcode='1';
       s.onload=()=>resolve(!!window.JsBarcode);
-      s.onerror=()=>resolve(false);
+      s.onerror=()=>{s.remove();scanSafeJsBarcodePromise=null;resolve(false);};
       document.head.appendChild(s);
     });
 
@@ -3002,6 +3014,7 @@
 
   window.ScanSafeBarcode={
     render:()=>renderScanSafeBarcodes(document),
+    ensureLibrary:ensureScanSafeBarcodeLibrary,
     value:()=>window.currentState?.().user?.qrCode||null
   };
 
@@ -3026,6 +3039,7 @@
   };
 
   if(isEvacueeAppPage()){
+    window.scrollToUserQR=openLiveEvacueeBarcode;
     window.renderUserPrototype=renderLiveEvacueeAccount;
     window.selectSpace=selectLiveEvacueeSpace;
     window.renderUserAssignmentSummary=renderLiveEvacueeAssignment;
@@ -3043,6 +3057,15 @@
     resetEvacueeLiveAccount();
     renderLiveEvacueeAccount();
     document.addEventListener('DOMContentLoaded',()=>{
+      document.addEventListener('click',event=>{
+        const link=event.target.closest?.('.mobile-bottom-nav a');
+        if(link && link.getAttribute('href')?.endsWith('#qr')){
+          event.preventDefault();openLiveEvacueeBarcode();
+        }
+      });
+      window.addEventListener('hashchange',()=>{
+        if(location.hash==='#qr') openLiveEvacueeBarcode();
+      });
       const refresh=()=>{if(document.visibilityState==='visible') loadCurrentEvacueeIntoPrototype();};
       const startTimer=()=>{if(!evacueeLiveTimer) evacueeLiveTimer=setInterval(refresh,10000);};
       startTimer();
