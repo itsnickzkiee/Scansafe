@@ -5,10 +5,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ScanSafe</title>
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/style.css?v=scanner-v17">
 </head>
 
-<body>
+<body class="scanner-page">
     <div class="admin-app">
         <header class="admin-top"><img class="logo-img" src="assets/logo.svg">
             <div class="top-actions">
@@ -42,7 +42,7 @@
                 <div class="page-title">
                     <div>
                         <h1>Barcode Scanner</h1>
-                        <p>Scan an evacuee barcode to retrieve information, verify status, and manage shelter records.</p>
+                        <p>Scan an approved evacuee barcode to verify their information and assign accommodation through GBEAA.</p>
                     </div>
                     <div class="date-line"><svg class="icon sm">
                             <use href="assets/icons.svg#calendar"></use>
@@ -55,38 +55,40 @@
                             <h2><svg class="icon ">
                                     <use href="assets/icons.svg#barcode"></use>
                                 </svg> Scan Barcode</h2>
-                            <p>Point the camera at the barcode or enter the code manually.</p>
+                            <p>The camera reads the barcode automatically. Keep the full barcode and its white edges visible.</p>
                         </div>
                         <div class="scan-body">
-                            <div class="scan-frame" style="height:230px">
-                                <div>
+                            <label class="scanner-camera-label" for="scannerCameraSelect">Camera</label>
+                            <select id="scannerCameraSelect" class="scanner-camera-select" aria-label="Select camera"><option value="">Automatic camera selection</option></select>
+                            <div class="scan-frame">
+                                <div id="scanSafeQrReader">
                                     <div class="barcode" style="width:140px;height:70px"></div>
                                     <h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3>
                                     <div class="muted" style="font-size:10px">Center the full barcode inside the frame.
                                     </div>
                                 </div>
-                            </div><button class="btn red full" style="margin-top:10px" onclick="scanNow()">Start
+                            </div><p id="scannerStatus" class="scanner-status" role="status" aria-live="polite">Loading scanner...</p><button id="scannerStartButton" type="button" class="btn red full" style="margin-top:10px" disabled>Start
                                 Scanning</button>
                             <div style="text-align:center;font-size:9px;color:#667085;margin:20px 0">OR ENTER CODE
                                 MANUALLY</div>
                             <div class="manual">
                                 <div class="searchbar"><svg class="icon sm">
                                         <use href="assets/icons.svg#barcode"></use>
-                                    </svg><input id="manualBarcode" placeholder="Enter evacuee barcode value..."></div>
-                                <button class="btn red" onclick="manualScan()"><svg class="icon sm">
+                                    </svg><input id="manualBarcode" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Evacuee barcode value" placeholder="Enter evacuee barcode value..."></div>
+                                <button id="manualScanButton" type="button" class="btn red" disabled><svg class="icon sm">
                                         <use href="assets/icons.svg#search"></use>
                                     </svg> Search</button>
                             </div>
                         </div>
                     </section>
-                    <section class="card card-pad">
+                    <section id="lastScannedEvacuee" class="card card-pad" aria-live="polite">
                         <h3 class="section-h">Last Scanned Evacuee</h3>
                         <div class="space-placeholder">Scan a barcode to view the evacuee's database record.</div>
                     </section>
                     <section class="card scan-panel">
                         <div class="verify-head">
                             <h3 style="margin:0;font-size:14px"><svg class="icon"><use href="assets/icons.svg#check"></use></svg> Verification Result</h3>
-                            <div style="font-size:10px">Scan a barcode to verify its database record.</div>
+                            <div style="font-size:10px">Verified barcodes are assigned automatically. Check-in is handled separately.</div>
                         </div>
                         <div class="scan-body">
                             <div id="scanResult" class="verify-box hidden"></div>
@@ -96,9 +98,9 @@
                 <div class="scanner-bottom">
                     <section class="card card-pad">
                         <div style="display:flex;justify-content:space-between">
-                            <h3 class="section-h">Scan History</h3><a style="font-size:10px;color:#d00">View All</a>
+                            <h3 class="section-h">Scan History</h3>
                         </div>
-                        <table class="table">
+                        <table id="scannerHistory" class="table">
                             <tr>
                                 <th>#</th>
                                 <th>Name</th>
@@ -135,8 +137,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js?v=admin-live-v14"></script>
-<script src="assets/supabase-bridge.js?v=admin-live-v14"></script>
+<script src="assets/app.js?v=scanner-v17"></script>
+<script src="assets/scanner-camera.js?v=scanner-v17"></script>
+<script src="assets/scanner.js?v=scanner-v17"></script>
+<script src="assets/supabase-bridge.js?v=scanner-v17"></script>
 </body>
 
 </html>

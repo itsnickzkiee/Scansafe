@@ -245,7 +245,7 @@ function getAvailableSlots(id){const d=getSpaceBase(id);return d?Math.max(0,d.ca
 function formatSpaceName(id){return id==='ML'?'Main Lobby':`Hallway ${id}`}
 function statusPill(s){
   const norm=String(s||'');
-  const good=['Verified','Approved','Barcode Issued','Checked-In','available','Active'].includes(norm);
+  const good=['Verified','Approved','Assigned','Barcode Issued','Checked-In','available','Active'].includes(norm);
   const warn=['Pending','Pending Approval','near','Waiting for Assignment'].includes(norm);
   const c=good?'green':warn?'yellow':'red';
   const labels={available:'Available',near:'Near Full',full:'Full'};
@@ -368,11 +368,13 @@ function toggleUserMap(show){const panel=q('#userMapPanel');if(!panel)return;pan
 function initUserMapToggle(){const toggle=q('#userMapToggle');if(!toggle)return;const saved=localStorage.getItem('scanSafeUserMapVisible');const show=saved!==null?saved==='1':window.innerWidth>720;toggle.checked=show;toggleUserMap(show)}
 
 function scanNow(){
-  const s=currentState(),u=s.user,box=q('#scanResult');if(!box)return;
-  if(!u.qrIssued){box.classList.remove('hidden');box.innerHTML=`<div class="verified-mark" style="background:#fff4db;color:#b77700">!</div><h2 style="color:#b77700;text-align:center">PENDING APPROVAL</h2><p style="text-align:center;font-size:10px;color:#667085">No valid barcode has been issued for this registration yet.</p>`;toast('QR unavailable: registration is still pending approval.');return}
-  s.user.checkedIn=true;s.activity.unshift({title:`${u.name} scanned`,desc:'QR verified at shelter check-in.',time:'Now',icon:'↘'});saveScanSafeState(s);box.classList.remove('hidden');box.innerHTML=`<div class="verified-mark">${ico('check','xl')}</div><h2 style="color:#0a9637;text-align:center;margin:10px 0 4px">VERIFIED</h2><p style="text-align:center;font-size:10px;color:#667085">Approved evacuee Barcode found in system.</p><div class="detail-list"><div class="detail-line"><b>Barcode Number</b><span>${esc(u.qrCode)}</span></div><div class="detail-line"><b>Name</b><span>${esc(u.name)}</span></div><div class="detail-line"><b>Group</b><span>${u.group}</span></div><div class="detail-line"><b>Accommodation</b><span>${u.assignment?formatSpaceName(u.assignment):'Waiting for assignment'}</span></div><div class="detail-line"><b>Status</b><span>${statusPill('Checked-In')}</span></div><div class="detail-line"><b>Scanned By</b><span>Admin</span></div></div>`;toast('QR verified and check-in confirmed.');renderUserPrototype();renderDashboardPrototype();
+  if(window.ScanSafeScanner) return window.ScanSafeScanner.toggle();
+  toast('The live scanner is unavailable. Reload the scanner page and try again.');
 }
-function manualScan(){let v=q('#manualBarcode')?.value.trim();if(!v){toast('Enter a Barcode number.');return}scanNow()}
+function manualScan(){
+  if(window.ScanSafeScanner) return window.ScanSafeScanner.manual();
+  toast('The live scanner is unavailable. Reload the scanner page and try again.');
+}
 
 function syncLegacyUserPages(){
   if(!document.body.classList.contains('user-shell'))return;const u=currentState().user;

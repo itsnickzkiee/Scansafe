@@ -1,0 +1,42 @@
+ScanSafe scanner: automatic capture, verification, and GBEAA assignment
+
+Apply to the existing ScanSafe Supabase project:
+1. The earlier SUPABASE_EVACUEE_LIVE_SYNC_FIX.sql must already be installed.
+2. Open Supabase > SQL Editor > New query.
+3. Copy ALL of SUPABASE_SCANNER_GBEAA_FIX.sql and click Run.
+   This includes the corrected GBEAA allocator. It adds no sample people/spaces.
+   The old SUPABASE_GBEAA_ALGORITHM.sql is not required for this scanner fix.
+   Missing legacy scanner dependencies or duplicate active assignments abort the
+   migration; copy the exact error for diagnosis. Do not delete real records.
+4. Deploy the updated project to Vercel and reload the scanner page (Ctrl+F5).
+
+Use while signed in as Admin or Staff:
+- Click Start Scanning and allow camera permission. Select the right camera if
+  the browser has more than one. On phones the rear camera is preferred.
+- Show the ENTIRE horizontal barcode, including the white margins. Use the
+  evacuee account's Full Screen display or printed/PDF barcode; avoid glare,
+  motion, or holding the barcode so close that the camera cannot focus.
+- Capture is automatic. The camera stops when a code is captured, verifies it
+  against Supabase, shows actual evacuee information, and assigns via GBEAA.
+- Click Scan Next Barcode for another person. The manual Search/Enter option
+  uses the same database verification and assignment transaction.
+
+Results:
+- Assigned: whole group placed using primary-first, accessibility-aware best-fit.
+- Already assigned: existing active assignment retained, occupancy not added again.
+- Verified / Waiting for assignment: barcode is valid but no suitable space fits.
+- Invalid, revoked, or unapproved: no new accommodation assignment.
+- Verification unavailable: database/setup problem; no successful scan is invented.
+
+Assignment uses the existing database status 'accommodated'. The UI displays
+Assigned. Scanning does not create a check-in or checked_in_at value. A genuine
+existing check-in is preserved. The evacuee account reads the saved assignment
+on its normal live refresh (or immediately after a page refresh).
+
+Verification performed locally:
+- PostgreSQL migration tests: authorization, real verification/logging, GBEAA,
+  accessibility, overflow, capacity, repeat scans, and transactional rollback.
+- Browser tests: actual CODE128 image decoding with the local renderer/decoder,
+  scanner results/errors, actual page/bridge integration, and account isolation.
+Physical webcam and printer hardware must still be checked on the deployed site.
+Live Supabase changes and Vercel deployment are not applied by editing these files.

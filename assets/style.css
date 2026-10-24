@@ -4632,6 +4632,11 @@ body.barcode-viewer-open {
   margin: auto;
 }
 
+#evacueeBarcodeViewer.is-expanded #evacueeBarcodeSvg,
+#evacueeBarcodeViewer:fullscreen #evacueeBarcodeSvg {
+  max-width: none;
+}
+
 @media (max-width: 480px) {
   #evacueeBarcodeViewer {
     padding: 12px;
@@ -4738,3 +4743,34 @@ body.barcode-viewer-open {
     font-size: 12pt;
   }
 }
+
+/* The whole camera preview is decoded; the border is a visual guide only. */
+.scanner-page .scanner-page-grid > section { min-width: 0; }
+.scanner-page .scan-frame {
+  height: 230px;
+  min-height: 150px;
+  padding: 0;
+  overflow: hidden;
+  background: #101828;
+  color: #fff;
+}
+.scanner-page .scan-frame .muted { color: #e2e8f0; }
+.scanner-page .scan-frame::before,
+.scanner-page .scan-frame::after { z-index: 2; }
+.scanner-page #scanSafeQrReader { width: 100%; }
+.scanner-page .scanner-camera-label { display: block; font-size: 11px; margin-bottom: 5px; font-weight: 600; }
+.scanner-page .scanner-camera-select { width: 100%; min-height: 38px; margin-bottom: 10px; padding: 6px 8px; border: 1px solid #d0d5dd; border-radius: 6px; background: #fff; color: #101828; }
+.scanner-page .scanner-status { min-height: 40px; margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #475467; overflow-wrap: anywhere; }
+.scanner-page .scanner-status[data-state="error"] { color: #b42318; }
+.scanner-page .scanner-status[data-state="success"] { color: #067647; }
+.scanner-page .scanner-status[data-state="warning"] { color: #93370d; }
+.scanner-page .scanner-result-title { margin: 12px 0 8px; font-size: 19px; color: #101828; }
+.scanner-page .scanner-result-badge { display: inline-block; padding: 7px 12px; background: #dcfae6; color: #067647; border-radius: 6px; font-weight: 700; }
+.scanner-page .scanner-result-error { background: #fee4e2; color: #b42318; }
+.scanner-page .scanner-evacuee-name { font-size: 20px; overflow-wrap: anywhere; }
+.scanner-page #scanResult p { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.scanner-page .detail-line { align-items: start; gap: 10px; }
+.scanner-page .detail-line span { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.scanner-page #scannerHistory { table-layout: fixed; }
+.scanner-page #scannerHistory td { overflow-wrap: anywhere; }
+.scanner-page button:disabled { cursor: wait; opacity: .65; }

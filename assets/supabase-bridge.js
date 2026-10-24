@@ -401,7 +401,7 @@
 
   function adminLiveStatus(row){
     if(row.approval_status==='approved'){
-      return ['accommodated','checked_in'].includes(row.current_status)?'Checked-In':'Approved';
+      return row.current_status==='checked_in'?'Checked-In':row.current_status==='accommodated'?'Assigned':'Approved';
     }
     if(row.approval_status==='rejected') return 'Rejected';
     return 'Pending Approval';
@@ -1422,228 +1422,34 @@
     if(isEvacueeAppPage()) renderLiveEvacueeAccount();
   });
 
-  // =========================================================
-  // Phase 5: Real QR Camera Scanner + Supabase Verification
-  // =========================================================
-  let scanSafeCamera = null;
-  let scanSafeCameraActive = false;
-  let scanSafeLastDecoded = null;
-
-  function scanEsc(value){
-    return String(value ?? '')
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'",'&#039;');
-  }
-
-  function scannerPageActive(){
-    return mapPage()==='barcode-scanner.html';
-  }
-
-  function scannerStartButton(){
-    return document.querySelector('.scanner-page-grid .scan-panel .btn.red.full');
-  }
-
-  async function ensureQrScannerLibrary(){
-    if(window.Html5Qrcode) return true;
-    return await new Promise((resolve)=>{
-      const existing=document.querySelector('script[data-scansafe-html5qr]');
-      if(existing){
-        existing.addEventListener('load',()=>resolve(!!window.Html5Qrcode),{once:true});
-        existing.addEventListener('error',()=>resolve(false),{once:true});
-        return;
-      }
-      const s=document.createElement('script');
-      s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-      s.async=true;
-      s.dataset.scansafeHtml5qr='1';
-      s.onload=()=>resolve(!!window.Html5Qrcode);
-      s.onerror=()=>resolve(false);
-      document.head.appendChild(s);
-    });
-  }
-
-  function setScannerButton(active){
-    const btn=scannerStartButton();
-    if(!btn) return;
-    btn.textContent=active?'Stop Scanning':'Start Scanning';
-  }
-
-  async function stopScanSafeCamera(){
-    if(scanSafeCamera && scanSafeCameraActive){
-      try{ await scanSafeCamera.stop(); }catch(_){}
-      try{ await scanSafeCamera.clear(); }catch(_){}
-    }
-    scanSafeCameraActive=false;
-    scanSafeCamera=null;
-    setScannerButton(false);
-    const frame=document.querySelector('.scan-frame');
-    if(frame && !frame.querySelector('#scanSafeQrReader')){
-      frame.innerHTML='<div><div class="barcode" style="width:140px;height:70px"></div><h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3><div class="muted" style="font-size:10px">Center the full 1D barcode inside the frame.</div></div>';
-    }
-  }
-
-  function renderQrVerificationResult(data){
-    const box=document.getElementById('scanResult');
-    if(!box) return;
-    box.classList.remove('hidden');
-
-    const ok=!!data?.valid;
-    const status=ok?'VERIFIED':String(data?.result||'INVALID').toUpperCase();
-    const statusClass=ok?'green':'red';
-    const color=ok?'#0a9637':'#b42318';
-    const message=ok?'Evacuee record found and verified in ScanSafe.':scanEsc(data?.message||'barcode could not be verified.');
-    const assignment=data?.space_name || data?.space_code || 'Not assigned';
-    const now=data?.scanned_at ? new Date(data.scanned_at) : new Date();
-
-    box.innerHTML=`
-      <div class="verified-mark">${ok?'✓':'!'}</div>
-      <h2 style="color:${color};text-align:center;margin:10px 0 4px">${scanEsc(status)}</h2>
-      <p style="text-align:center;font-size:10px;color:#667085">${message}</p>
-      <div class="detail-list">
-        <div class="detail-line"><b>Barcode Value</b><span>${scanEsc(data?.qr_value||'')}</span></div>
-        <div class="detail-line"><b>Name</b><span>${scanEsc(data?.full_name||'—')}</span></div>
-        <div class="detail-line"><b>Group</b><span>${scanEsc(data?.group_size||'—')}</span></div>
-        <div class="detail-line"><b>Space</b><span>${scanEsc(assignment)}</span></div>
-        <div class="detail-line"><b>Status</b><span><span class="pill ${statusClass}">${scanEsc(status)}</span></span></div>
-        <div class="detail-line"><b>Date & Time</b><span>${scanEsc(now.toLocaleString())}</span></div>
-        <div class="detail-line"><b>Scanned By</b><span>${scanEsc(window.ScanSafeDB.profile?.full_name||'Authorized Staff')}</span></div>
-      </div>`;
-
-    const lastCard=document.querySelector('.scanner-page-grid > section:nth-child(2)');
-    if(lastCard && ok){
-      lastCard.innerHTML=`
-        <div style="display:flex;justify-content:space-between">
-          <h3 class="section-h">Last Scanned Evacuee</h3><span class="muted" style="font-size:10px">Just now</span>
-        </div>
-        <div style="display:flex;gap:16px;align-items:center">
-          <div class="person-round"><svg class="icon xl"><use href="assets/icons.svg#user"></use></svg></div>
-          <div>
-            <h2 style="font-size:17px;margin:0">${scanEsc(data.full_name||'Evacuee')}</h2>
-            <div class="muted" style="font-size:10px;line-height:1.7">
-              Age: ${scanEsc(data.age ?? '—')} &nbsp; | &nbsp; ${scanEsc(data.gender||'—')}<br>
-              Group: <b>${scanEsc(data.group_size||1)}</b><br>
-              Space: <b>${scanEsc(data.space_code||'Not assigned')}</b><br>
-              Status: <span class="pill green">Verified</span>
-            </div>
-          </div>
-        </div>
-        <div class="detail-list" style="margin-top:20px">
-          <div class="detail-line"><b>Shelter</b><span>${scanEsc(data.shelter_name||'Main School Building')}</span></div>
-          <div class="detail-line"><b>Accommodation Assignment</b><span>${scanEsc(assignment)}</span></div>
-          <div class="detail-line"><b>Group Size</b><span>${scanEsc(data.group_size||1)} members</span></div>
-        </div>
-        <button class="btn out full" onclick="go('evacuees.html')">View Full Evacuee Details →</button>`;
-    }
-  }
-
+  // Scanner verification and GBEAA allocation use one staff-only server RPC.
+  function scannerPageActive(){return mapPage()==='barcode-scanner.html';}
+  function scanEsc(value){return adminLiveEsc(value);}
   async function loadRecentScanHistory(){
     const sb=readyClient();
-    if(!sb || !scannerPageActive()) return;
-    const table=document.querySelector('.scanner-bottom section:first-child table.table');
-    if(!table) return;
-    const head=table.querySelector('tr')?.outerHTML || '<tr><th>#</th><th>Name</th><th>Barcode</th><th>Room</th><th>Time</th><th>Status</th></tr>';
-    const {data,error}=await sb.rpc('get_recent_scan_history',{p_limit:10});
-    if(error){
-      console.warn('Scan history:',error.message);
-      table.innerHTML=head+'<tr><td colspan="6">Scan history could not be loaded. Reload to try again.</td></tr>';
-      return;
-    }
-    const rows=(data||[]).map((r,i)=>`
-      <tr>
-        <td>${i+1}</td>
-        <td>${scanEsc(r.full_name||'Unknown')}</td>
-        <td>${scanEsc(r.qr_value||'')}</td>
-        <td>${scanEsc(r.space_code||'—')}</td>
-        <td>${scanEsc(new Date(r.scanned_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))}</td>
-        <td><span class="pill ${r.scan_result==='verified'?'green':'yellow'}">${scanEsc(r.scan_result||'')}</span></td>
-      </tr>`).join('');
-    table.innerHTML=head+(rows||'<tr><td colspan="6" style="text-align:center">No scans yet.</td></tr>');
-  }
-
-  async function verifyScanSafeQr(qrValue){
-    const sb=readyClient();
-    const value=String(qrValue||'').trim();
-    if(!value){ if(typeof toast==='function') toast('Enter or scan a barcode.'); return null; }
-    if(!sb){
-      if(typeof toast==='function') toast('Supabase is not configured yet.');
-      return null;
-    }
-
-    const {data,error}=await sb.rpc('verify_qr_code',{p_qr_value:value});
-    if(error){
-      console.error('Barcode verification:',error);
-      renderQrVerificationResult({valid:false,result:'invalid',qr_value:value,message:error.message});
-      return null;
-    }
-    renderQrVerificationResult(data||{valid:false,result:'invalid',qr_value:value,message:'No record returned.'});
-    await loadRecentScanHistory();
-    return data;
-  }
-
-  async function scanNowDatabase(){
-    if(!scannerPageActive()) return;
-    if(scanSafeCameraActive){
-      await stopScanSafeCamera();
-      return;
-    }
-
-    const loaded=await ensureQrScannerLibrary();
-    if(!loaded){
-      if(typeof toast==='function') toast('barcode scanner library could not load. Use manual QR search.');
-      return;
-    }
-
-    const frame=document.querySelector('.scan-frame');
-    if(!frame) return;
-    frame.innerHTML='<div id="scanSafeQrReader" style="width:100%;height:100%"></div>';
-
+    const table=document.querySelector('#scannerHistory');
+    if(!sb || !scannerPageActive() || !table) return;
+    const ownerId=window.ScanSafeDB.session?.user?.id,role=window.ScanSafeDB.profile?.role;
+    const revision=window.ScanSafeScanner?.inspect().revision;
+    const current=()=>window.ScanSafeDB.session?.user?.id===ownerId && window.ScanSafeDB.profile?.role===role && window.ScanSafeScanner?.inspect().revision===revision;
+    if(!ownerId || !['admin','staff'].includes(role)) return;
+    const head='<tr><th>#</th><th>Name</th><th>Barcode</th><th>Space</th><th>Time</th><th>Verification</th></tr>';
     try{
-      const formats=window.Html5QrcodeSupportedFormats
-        ? [
-            window.Html5QrcodeSupportedFormats.CODE_128,
-            window.Html5QrcodeSupportedFormats.CODE_39,
-            window.Html5QrcodeSupportedFormats.EAN_13,
-            window.Html5QrcodeSupportedFormats.EAN_8,
-            window.Html5QrcodeSupportedFormats.UPC_A,
-            window.Html5QrcodeSupportedFormats.UPC_E,
-            window.Html5QrcodeSupportedFormats.ITF,
-            window.Html5QrcodeSupportedFormats.CODABAR
-          ].filter(Boolean)
-        : undefined;
-      scanSafeCamera=new window.Html5Qrcode(
-        'scanSafeQrReader',
-        formats ? {formatsToSupport:formats, verbose:false} : {verbose:false}
-      );
-      scanSafeCameraActive=true;
-      setScannerButton(true);
-
-      await scanSafeCamera.start(
-        {facingMode:'environment'},
-        {fps:10, qrbox:{width:250,height:100}, aspectRatio:1.777},
-        async(decodedText)=>{
-          if(!decodedText || decodedText===scanSafeLastDecoded) return;
-          scanSafeLastDecoded=decodedText;
-          await stopScanSafeCamera();
-          await verifyScanSafeQr(decodedText);
-          setTimeout(()=>{ scanSafeLastDecoded=null; },1500);
-        },
-        ()=>{}
-      );
-    }catch(err){
-      console.error(err);
-      await stopScanSafeCamera();
-      if(typeof toast==='function'){
-        toast('Camera could not start. Allow camera permission and use HTTPS/localhost, or enter the barcode manually.');
-      }
-    }
+      const {data,error}=await sb.rpc('get_recent_scan_history',{p_limit:10});
+      if(!current()) return;
+      if(error) throw error;
+      table.innerHTML=head+((data||[]).map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+scanEsc(r.full_name||'Unknown')+'</td><td>'+scanEsc(r.qr_value||'')+'</td><td>'+scanEsc(r.space_code||'Not assigned')+'</td><td>'+scanEsc(r.scanned_at?new Date(r.scanned_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'</td><td>'+scanEsc(r.scan_result||'')+'</td></tr>').join('')||'<tr><td colspan="6">No scans yet.</td></tr>');
+    }catch(error){if(current()) table.innerHTML=head+'<tr><td colspan="6">Scan history is unavailable. '+scanEsc(error.message||'Try again.')+'</td></tr>';}
   }
-
-  async function manualScanDatabase(){
-    const value=document.getElementById('manualBarcode')?.value||'';
-    await verifyScanSafeQr(value);
+  function initScanSafeScanner(){
+    if(!window.ScanSafeScanner) return;
+    window.ScanSafeScanner.init({
+      getClient:readyClient,
+      getContext:()=>({userId:window.ScanSafeDB.session?.user?.id,role:window.ScanSafeDB.profile?.role}),
+      refresh:()=>Promise.allSettled([loadRecentScanHistory(),loadAccommodationState(),loadAdminLiveSnapshot()])
+    });
+    window.scanNow=()=>window.ScanSafeScanner.toggle();
+    window.manualScan=()=>window.ScanSafeScanner.manual();
   }
 
   // =========================================================
@@ -1690,8 +1496,8 @@
   // Run after the Phase 4 bootstrap handler so the overrides remain last.
   document.addEventListener('DOMContentLoaded', async function(){
     if(scannerPageActive()){
-      window.scanNow=scanNowDatabase;
-      window.manualScan=manualScanDatabase;
+      await bootstrapSession();
+      initScanSafeScanner();
       await loadRecentScanHistory();
     }
     setupEvacueePwa();
@@ -2486,6 +2292,7 @@
         // Auth callbacks must finish before another Supabase request starts.
         setTimeout(async()=>{
           await getProfile(session.user.id);
+          if(scannerPageActive() && !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) window.ScanSafeScanner?.reset();
           if(isEvacueeAppPage()){
             if(evacueeRefreshPromise) await evacueeRefreshPromise;
             loadCurrentEvacueeIntoPrototype();
@@ -2899,7 +2706,7 @@
       }
 
       const s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js';
+      s.src='assets/vendor/JsBarcode.all.min.js';
       s.async=true;
       s.dataset.scansafeJsbarcode='1';
       s.onload=()=>resolve(!!window.JsBarcode);

@@ -295,194 +295,121 @@ create or replace function public.assign_group_gbeaa(p_group_id bigint)
 returns jsonb
 language plpgsql
 security definer
-set search_path=public
-as $$
+set search_path = pg_catalog, public
+as $gbeaa$
 declare
   v_group_size integer;
   v_needs_access boolean := false;
-  v_space record;
+  v_space public.accommodation_spaces%rowtype;
   v_assignment_id bigint;
   v_new_occupancy integer;
-  v_reason text;
+  v_overflow boolean;
 begin
-  if not public.is_staff() then
-    raise exception 'Not authorized';
+  if auth.uid() is null or not coalesce(public.is_staff(), false) then
+    raise exception using errcode = '42501', message = 'Staff access is required';
   end if;
 
-  select g.group_size
-    into v_group_size
-  from public.evacuee_groups g
-  where g.group_id=p_group_id
+  select g.group_size into v_group_size
+  from public.evacuee_groups g where g.group_id = p_group_id
   for update;
+  if not found then raise exception 'Evacuee group not found'; end if;
+  if coalesce(v_group_size, 0) < 1 then raise exception 'The group size must be positive'; end if;
 
-  if not found then
-    raise exception 'Evacuee group not found';
-  end if;
-
-  if not exists(
-    select 1
-    from public.evacuees e
-    join public.barcodes b
-      on b.evacuee_id=e.evacuee_id
-     and b.status='active'
-    where e.group_id=p_group_id
-      and e.approval_status='approved'
-  ) then
-    raise exception 'Group is not eligible: admin approval and an active QR are required';
-  end if;
-
-  if exists(
-    select 1
-    from public.accommodation_assignments a
-    where a.group_id=p_group_id
-      and a.assignment_status='active'
+  if exists (
+    select 1 from public.accommodation_assignments a
+    where a.group_id = p_group_id and a.assignment_status = 'active'
   ) then
     raise exception 'This group already has an active accommodation assignment';
   end if;
 
-  select
-    coalesce(bool_or(e.accessibility_required),false)
-    or coalesce(bool_or(
-      lower(coalesce(e.needs_summary,'')) ~
-      '(wheelchair|mobility|accessible|accessibility|pwd|disab)'
-    ),false)
-    or exists(
-      select 1
-      from public.evacuee_needs n
-      join public.evacuees en on en.evacuee_id=n.evacuee_id
-      where en.group_id=p_group_id
-        and (
-          lower(coalesce(n.need_type,'')) ~
-            '(wheelchair|mobility|accessible|accessibility|pwd|disab)'
-          or lower(coalesce(n.description,'')) ~
-            '(wheelchair|mobility|accessible|accessibility|pwd|disab)'
-        )
-    )
-  into v_needs_access
-  from public.evacuees e
-  where e.group_id=p_group_id;
-
-  select *
-  into v_space
-  from (
-    select
-      s.space_id,
-      s.space_code,
-      s.space_name,
-      s.space_type,
-      s.capacity,
-      coalesce(s.current_occupancy,0) as current_occupancy,
-      s.accessible,
-      s.is_primary,
-      s.capacity-coalesce(s.current_occupancy,0)-v_group_size as remaining_after,
-      case
-        when s.is_primary=true
-         and s.space_type in ('hallway','corridor','other') then 0
-        when s.is_primary=false
-         and s.space_type='overflow_room' then 1
-        else 9
-      end as tier
-    from public.accommodation_spaces s
-    where s.status<>'inactive'
-      and s.capacity-coalesce(s.current_occupancy,0) >= v_group_size
-      and (
-        (s.is_primary=true and s.space_type in ('hallway','corridor','other'))
-        or
-        (s.is_primary=false and s.space_type='overflow_room')
-      )
-      and (not v_needs_access or s.accessible=true)
-  ) ranked
-  where ranked.tier in (0,1)
-  order by
-    ranked.tier asc,
-    ranked.remaining_after asc,
-    case
-      when v_needs_access then 0
-      when ranked.accessible then 1
-      else 0
-    end asc,
-    ranked.current_occupancy desc,
-    ranked.space_code asc
-  limit 1
-  for update;
-
-  if not found then
-    if v_needs_access then
-      raise exception 'GBEAA found no accessible accommodation space with enough capacity';
-    else
-      raise exception 'GBEAA found no accommodation space with enough capacity';
-    end if;
+  if not exists (
+    select 1 from public.evacuees e
+    join public.barcodes b on b.evacuee_id = e.evacuee_id and b.status = 'active'
+    where e.group_id = p_group_id and e.approval_status = 'approved'
+      and coalesce(e.current_status, '') <> 'released'
+  ) then
+    raise exception 'Group is not eligible: admin approval and an active barcode are required';
   end if;
 
-  -- Recheck after the selected space has been locked.
-  if v_space.current_occupancy + v_group_size > v_space.capacity then
-    raise exception 'Selected space capacity changed. Run GBEAA again.';
+  select coalesce(bool_or(e.accessibility_required), false)
+    or coalesce(bool_or(lower(coalesce(e.needs_summary, '')) ~
+      '(wheelchair|mobility|accessible|accessibility|pwd|disab)'), false)
+    or exists (
+      select 1 from public.evacuee_needs n
+      join public.evacuees en on en.evacuee_id = n.evacuee_id
+      where en.group_id = p_group_id and (
+        lower(coalesce(n.need_type, '')) ~ '(wheelchair|mobility|accessible|accessibility|pwd|disab)'
+        or lower(coalesce(n.description, '')) ~ '(wheelchair|mobility|accessible|accessibility|pwd|disab)'
+      )
+    ) into v_needs_access
+  from public.evacuees e where e.group_id = p_group_id;
+
+  select s.* into v_space
+  from public.accommodation_spaces s
+  where s.status <> 'inactive'
+    and s.capacity - coalesce(s.current_occupancy, 0) >= v_group_size
+    and (
+      (s.is_primary = true and s.space_type in ('hallway', 'corridor', 'other'))
+      or (s.is_primary = false and s.space_type = 'overflow_room')
+    )
+    and (not v_needs_access or s.accessible = true)
+  order by
+    case when s.is_primary then 0 else 1 end,
+    s.capacity - coalesce(s.current_occupancy, 0) - v_group_size,
+    case when v_needs_access or not s.accessible then 0 else 1 end,
+    coalesce(s.current_occupancy, 0) desc,
+    s.space_code, s.space_id
+  limit 1
+  for update of s;
+
+  if not found then
+    -- A dedicated code distinguishes no capacity from unexpected audit/schema
+    -- failures, including helpers that happen to raise no_data_found.
+    raise exception using errcode = 'P5501', message = case when v_needs_access then
+      'No available accessible space can fit the whole group.' else
+      'No available primary or approved overflow space can fit the whole group.' end;
+  end if;
+
+  update public.accommodation_spaces s
+  set current_occupancy = coalesce(s.current_occupancy, 0) + v_group_size
+  where s.space_id = v_space.space_id
+    and s.status <> 'inactive'
+    and s.capacity - coalesce(s.current_occupancy, 0) >= v_group_size
+  returning s.current_occupancy into v_new_occupancy;
+  if not found then
+    raise exception using errcode = '40001', message = 'Space capacity changed. Scan again to retry GBEAA.';
   end if;
 
   insert into public.accommodation_assignments(
-    group_id,space_id,assigned_by,assignment_status,override_flag
-  )
-  values(
-    p_group_id,v_space.space_id,auth.uid(),'active',false
-  )
+    group_id, space_id, assigned_by, assignment_status, override_flag
+  ) values (p_group_id, v_space.space_id, auth.uid(), 'active', false)
   returning assignment_id into v_assignment_id;
 
-  v_new_occupancy:=v_space.current_occupancy+v_group_size;
+  -- 'accommodated' is the existing database value for an assigned group.
+  -- Preserve genuine check-in/release states; scanning never creates check-in.
+  update public.evacuees set current_status = 'accommodated'
+  where group_id = p_group_id
+    and coalesce(lower(replace(current_status, '-', '_')), '')
+      not in ('released', 'checked_in', 'checkedin');
 
-  update public.accommodation_spaces
-  set current_occupancy=v_new_occupancy
-  where space_id=v_space.space_id;
+  v_overflow := not v_space.is_primary;
+  perform public.log_scansafe_audit('gbeaa_assignment', 'group', p_group_id::text,
+    jsonb_build_object('algorithm', 'GBEAA', 'space_code', v_space.space_code,
+      'space_type', v_space.space_type, 'overflow_used', v_overflow,
+      'group_size', v_group_size, 'requires_accessibility', v_needs_access,
+      'remaining_after', v_space.capacity - v_new_occupancy));
 
-  update public.evacuees
-  set current_status='accommodated'
-  where group_id=p_group_id
-    and current_status<>'released';
-
-  v_reason :=
-    case
-      when v_space.tier=0 then
-        'Primary-first greedy best-fit assignment.'
-      else
-        'Primary spaces could not fit the group; approved overflow-room greedy best-fit assignment.'
-    end;
-
-  perform public.log_scansafe_audit(
-    'gbeaa_assignment',
-    'group',
-    p_group_id::text,
-    jsonb_build_object(
-      'algorithm','GBEAA',
-      'rule','Primary-first + accessibility constraint + greedy best-fit',
-      'space_code',v_space.space_code,
-      'space_type',v_space.space_type,
-      'overflow_used',(v_space.tier=1),
-      'group_size',v_group_size,
-      'requires_accessibility',v_needs_access,
-      'remaining_after',v_space.capacity-v_new_occupancy
-    )
-  );
-
-  return jsonb_build_object(
-    'algorithm','GBEAA',
-    'assigned',true,
-    'assignment_id',v_assignment_id,
-    'group_id',p_group_id,
-    'group_size',v_group_size,
-    'requires_accessibility',v_needs_access,
-    'space_id',v_space.space_id,
-    'space_code',v_space.space_code,
-    'space_name',coalesce(v_space.space_name,v_space.space_code),
-    'space_type',v_space.space_type,
-    'is_primary',v_space.is_primary,
-    'overflow_used',(v_space.tier=1),
-    'accessible',v_space.accessible,
-    'capacity',v_space.capacity,
-    'current_occupancy',v_new_occupancy,
-    'remaining_after',v_space.capacity-v_new_occupancy,
-    'reason',v_reason
-  );
+  return jsonb_build_object('algorithm', 'GBEAA', 'assigned', true,
+    'assignment_id', v_assignment_id, 'group_id', p_group_id, 'group_size', v_group_size,
+    'requires_accessibility', v_needs_access, 'space_id', v_space.space_id,
+    'space_code', v_space.space_code, 'space_name', coalesce(v_space.space_name, v_space.space_code),
+    'space_type', v_space.space_type, 'is_primary', v_space.is_primary,
+    'overflow_used', v_overflow, 'accessible', v_space.accessible,
+    'capacity', v_space.capacity, 'current_occupancy', v_new_occupancy,
+    'remaining_after', v_space.capacity - v_new_occupancy,
+    'reason', 'Primary-first, accessibility-aware greedy best-fit assignment.');
 end;
-$$;
+$gbeaa$;
 
 revoke all on function public.assign_group_gbeaa(bigint) from public;
 revoke all on function public.assign_group_gbeaa(bigint) from anon;
