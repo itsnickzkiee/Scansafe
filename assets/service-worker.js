@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v19-needs-requests';
+const CACHE_NAME='scansafe-pwa-v20-app-promo';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -11,6 +11,10 @@ const APP_SHELL=[
   './assets/app.js',
   './assets/barcode-viewer.js',
   './assets/needs-requests.js',
+  './assets/app-promo.js',
+  './assets/app-promo.css',
+  './assets/scansafe-app-promo-portrait.png',
+  './assets/scansafe-app-promo-landscape.png',
   './assets/scanner-camera.js',
   './assets/scanner.js',
   './assets/vendor/html5-qrcode.min.js',

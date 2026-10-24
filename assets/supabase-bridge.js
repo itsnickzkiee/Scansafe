@@ -259,6 +259,7 @@
   }
 
   async function supabaseLogout(){
+    window.ScanSafeAppPromo?.reset();
     const sb=readyClient();
     if(sb) await sb.auth.signOut();
     localStorage.removeItem('scanSafeLoginRole');
@@ -1426,6 +1427,15 @@
     await loadCurrentEvacueeIntoPrototype();
     if(!isEvacueeAppPage()) await loadAccommodationState();
     if(isEvacueeAppPage()) renderLiveEvacueeAccount();
+    if(mapPage()==='user-portal.html' && window.ScanSafeAppPromo){
+      window.ScanSafeAppPromo.init({
+        getContext:()=>{
+          const ownerId=window.ScanSafeDB.session?.user?.id;
+          const profile=window.ScanSafeDB.profile;
+          return {ownerId,role:ownerId && profile?.id===ownerId?profile.role:null};
+        }
+      });
+    }
   });
 
   // Scanner verification and GBEAA allocation use one staff-only server RPC.
@@ -2278,6 +2288,7 @@
     sb.auth.onAuthStateChange((event,session)=>{
       window.ScanSafeDB.session=session||null;
       if(event==='SIGNED_OUT'){
+        window.ScanSafeAppPromo?.reset();
         window.ScanSafeDB.profile=null;
         localStorage.removeItem('scanSafeLoginRole');
         localStorage.removeItem('scansafePrototypeStateV4');
