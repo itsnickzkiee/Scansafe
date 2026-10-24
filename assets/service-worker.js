@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v20-app-promo';
+const CACHE_NAME='scansafe-pwa-v21-ui-polish';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
