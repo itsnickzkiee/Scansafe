@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ScanSafe</title>
-    <link rel="stylesheet" href="assets/style.css?v=scanner-v17">
+    <link rel="stylesheet" href="assets/style.css?v=barcode-scan-v18">
 </head>
 
 <body class="scanner-page">
@@ -66,6 +66,11 @@
                                     <h3 style="font-size:13px;margin:12px 0 4px">Point the camera at the barcode</h3>
                                     <div class="muted" style="font-size:10px">Center the full barcode inside the frame.
                                     </div>
+                                </div>
+                                <div class="scanner-detection-layer" aria-hidden="true">
+                                    <div id="scannerDetectionGuide" class="scanner-detection-guide"><span></span></div>
+                                    <svg id="scannerDetectionOverlay" viewBox="0 0 1280 720" preserveAspectRatio="none"><polygon id="scannerDetectionBox" points=""></polygon></svg>
+                                    <span id="scannerDetectionHint" class="scanner-detection-hint">Place the barcode inside the guide</span>
                                 </div>
                             </div><p id="scannerStatus" class="scanner-status" role="status" aria-live="polite">Loading scanner...</p><button id="scannerStartButton" type="button" class="btn red full" style="margin-top:10px" disabled>Start
                                 Scanning</button>
@@ -137,10 +142,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js?v=scanner-v17"></script>
-<script src="assets/scanner-camera.js?v=scanner-v17"></script>
-<script src="assets/scanner.js?v=scanner-v17"></script>
-<script src="assets/supabase-bridge.js?v=scanner-v17"></script>
+<script src="assets/app.js?v=barcode-scan-v18"></script>
+<script src="assets/scanner-camera.js?v=barcode-scan-v18"></script>
+<script src="assets/scanner.js?v=barcode-scan-v18"></script>
+<script src="assets/supabase-bridge.js?v=barcode-scan-v18"></script>
 </body>
 
 </html>

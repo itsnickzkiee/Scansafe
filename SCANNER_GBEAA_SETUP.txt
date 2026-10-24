@@ -8,7 +8,15 @@ Apply to the existing ScanSafe Supabase project:
    The old SUPABASE_GBEAA_ALGORITHM.sql is not required for this scanner fix.
    Missing legacy scanner dependencies or duplicate active assignments abort the
    migration; copy the exact error for diagnosis. Do not delete real records.
-4. Deploy the updated project to Vercel and reload the scanner page (Ctrl+F5).
+4. Run ALL of SUPABASE_SHORT_BARCODE_FIX.sql next. Existing approved active
+   barcodes become 12 random digits, with wider bars for camera readability.
+   Old printed codes remain linked privately to the same barcode record and
+   still pass the normal staff verification/revocation checks.
+   If the earlier two fixes are already installed, run only this new short-code
+   fix. When reapplying older migrations, apply the short-code fix LAST.
+5. Deploy the updated project to Vercel and reload both the scanner and the
+   evacuee account (Ctrl+F5). Reopen Show Barcode to see the actual short code.
+   Download/print the refreshed barcode when using a paper copy.
 
 Use while signed in as Admin or Staff:
 - Click Start Scanning and allow camera permission. Select the right camera if
@@ -16,6 +24,11 @@ Use while signed in as Admin or Staff:
 - Show the ENTIRE horizontal barcode, including the white margins. Use the
   evacuee account's Full Screen display or printed/PDF barcode; avoid glare,
   motion, or holding the barcode so close that the camera cannot focus.
+- The white guide shows where to hold the barcode. An amber polygon follows a
+  located barcode pattern; green means its code was read. Database verification
+  is separate: only the Verification Result panel can report VERIFIED.
+- The locator also reads tilted barcodes. Hold the code flat and steady for the
+  clearest image; a camera cannot recover detail that is severely out of focus.
 - Capture is automatic. The camera stops when a code is captured, verifies it
   against Supabase, shows actual evacuee information, and assigns via GBEAA.
 - Click Scan Next Barcode for another person. The manual Search/Enter option

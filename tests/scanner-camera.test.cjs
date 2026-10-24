@@ -12,24 +12,27 @@ const root = path.resolve(__dirname, '..');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fixture = `<!doctype html><html><head><meta charset="utf-8"></head><body>
 <div id="scannerStatus" role="status"></div><button id="scannerStartButton">Start Scanning</button>
-<select id="scannerCameraSelect"></select><div class="scan-frame" style="width:400px;height:230px"><div id="scanSafeQrReader" style="width:100%"></div></div>
+<select id="scannerCameraSelect"></select><div class="scan-frame" style="width:400px;height:230px"><div id="scanSafeQrReader" style="width:100%"></div><svg id="scannerDetectionOverlay"><polygon id="scannerDetectionBox"></polygon></svg><span id="scannerDetectionHint"></span></div>
 <input id="manualBarcode"><button id="manualScanButton">Search</button><div id="lastScannedEvacuee"></div><div id="scanResult" class="hidden"></div>
 <svg id="sourceBarcode"></svg>
 <script src="/assets/vendor/JsBarcode.all.min.js"></script><script src="/assets/vendor/html5-qrcode.min.js"></script>
+<script src="/assets/vendor/quagga2.min.js"></script>
 <script src="/assets/scanner-camera.js"></script><script src="/assets/scanner.js"></script>
 <script>
 (async()=>{
- const results=[],rpcCalls=[],geometry=[];const code='EVAC-0123456789abcdef0123456789abcdef';
+ const params=new URL(location.href).searchParams,legacy=params.get('code')==='legacy',angle=Number(params.get('angle')||0);
+ const results=[],rpcCalls=[],geometry=[],detections=[];const code=legacy?'EVAC-0123456789abcdef0123456789abcdef':'240100123456';
  function check(value,message){if(!value)throw new Error(message);}
  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  async function until(test,message,timeout=12000){const start=performance.now();while(!test()){if(performance.now()-start>timeout){const v=document.querySelector('#scanSafeQrReader video'),c=document.querySelector('#scanSafeQrReader canvas');throw new Error(message+'; camera='+JSON.stringify(ScanSafeScannerCamera.inspect())+'; status='+document.getElementById('scannerStatus').textContent+'; video='+JSON.stringify(v&&[v.videoWidth,v.videoHeight,v.clientWidth,v.clientHeight,v.currentTime,v.paused])+'; canvas='+JSON.stringify(c&&[c.width,c.height]));}await wait(60);}}
  async function scenario(name,body){try{await body();results.push({name,ok:true});}catch(error){results.push({name,ok:false,error:error.stack||String(error)});throw error;}}
- const svg=document.getElementById('sourceBarcode');JsBarcode(svg,code,{format:'CODE128',displayValue:false,width:2,height:112,margin:24});
+ const svg=document.getElementById('sourceBarcode');JsBarcode(svg,code,{format:'CODE128',displayValue:false,width:legacy?2:3,height:legacy?112:140,margin:legacy?24:32});
  const sw=parseFloat(svg.getAttribute('width')),sh=parseFloat(svg.getAttribute('height'));check(sw>0&&sh>0,'renderer produced no barcode geometry');svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
  const sourceUrl=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'}));
  const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=sourceUrl;});
  const canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;const ctx=canvas.getContext('2d');
- function paint(){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,1280,720);ctx.drawImage(image,Math.round((1280-sw)/2),Math.round((720-sh)/2),sw,sh);}
+ let showBarcode=false;
+ function paint(){ctx.save();ctx.fillStyle='#ffffff';ctx.fillRect(0,0,1280,720);if(showBarcode){ctx.translate(640,360);ctx.rotate(angle*Math.PI/180);ctx.drawImage(image,-sw/2,-sh/2,sw,sh);}ctx.restore();}
  paint();const painter=setInterval(paint,40);const streams=[];
  Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,value:async()=>{
   const reader=document.getElementById('scanSafeQrReader');geometry.push({width:reader.clientWidth,scale:reader.style.transform,visibleWidth:reader.getBoundingClientRect().width});
@@ -39,11 +42,16 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"></head><body>
  window.ScanSafeDB={session:{user:{id:'staff-test'}},profile:{role:'staff',full_name:'Test Staff'},client:{rpc:async(name,args)=>{
   rpcCalls.push({name,args});return{error:null,data:{valid:true,result:'valid',qr_value:code,evacuee_id:50,group_id:12,full_name:'Nick Reyes',group_size:3,approval_status:'approved',needs_summary:'Wheelchair access',assignment_state:rpcCalls.length===1?'assigned':'already_assigned',space_code:'A2',space_name:'Hallway A2',shelter_name:'Main School Building'}};
  }}};
- const pixels=ctx.getImageData(0,360,1280,1).data;let darkPixels=0;for(let x=0;x<1280;x++)if(pixels[x*4]<128)darkPixels++;check(darkPixels>100,'synthetic video source is blank rather than a real barcode');
+ const cameraInit=ScanSafeScannerCamera.init;
+ ScanSafeScannerCamera.init=function(configuration){const previous=configuration.onDetection;return cameraInit({...configuration,onDetection:event=>{if(previous)previous(event);if(event){const overlay=document.getElementById('scannerDetectionOverlay');detections.push({...event,drawnPoints:document.getElementById('scannerDetectionBox').getAttribute('points'),drawnViewBox:overlay.getAttribute('viewBox'),drawnState:overlay.closest('.scan-frame').dataset.detection});}}});};
  ScanSafeScanner.init();
  try{
+  await scenario('blank camera frames never verify an identity or create an assignment',async()=>{
+   await ScanSafeScanner.toggle();await wait(600);check(rpcCalls.length===0,'blank camera frames caused a verification or assignment');check(!/Nick Reyes|Verified/i.test(document.getElementById('lastScannedEvacuee').textContent),'blank camera fabricated a verified evacuee');
+   showBarcode=true;paint();const pixels=ctx.getImageData(0,360,1280,1).data;let darkPixels=0;for(let x=0;x<1280;x++)if(pixels[x*4]<128)darkPixels++;check(darkPixels>70,'synthetic video source is blank rather than a real barcode');
+  });
   await scenario('live video automatically reads a complete issued CODE128 and calls the atomic scanner RPC once',async()=>{
-   check(code.length===37,'test value is not the full issued length');await ScanSafeScanner.toggle();
+   check(code.length===(legacy?37:12),'test value is not the full issued length');
    await until(()=>rpcCalls.length===1&&!ScanSafeScanner.inspect().busy,'The live camera did not automatically decode and verify the barcode');
    check(rpcCalls[0].name==='scan_and_assign_evacuee','camera did not use the atomic verify-and-assign RPC');check(rpcCalls[0].args.p_barcode_value===code,'camera truncated or changed the actual issued code');
    check(document.getElementById('lastScannedEvacuee').textContent.includes('Nick Reyes'),'verified evacuee info did not appear');check(document.getElementById('lastScannedEvacuee').textContent.includes('Wheelchair access'),'special needs did not appear');
@@ -60,6 +68,17 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"></head><body>
    await until(()=>rpcCalls.length===2&&!ScanSafeScanner.inspect().busy,'Scan Next did not restart camera decoding');
    check(document.getElementById('scanResult').textContent.includes('Already assigned'),'second scan did not display the existing assignment');check(rpcCalls[1].args.p_barcode_value===code,'second scan changed the barcode');
    await wait(350);check(rpcCalls.length===2,'second capture made duplicate RPC calls');
+  });
+  await scenario('camera detection geometry is meaningful and never substitutes for database verification',async()=>{
+   const located=detections.filter(event=>Array.isArray(event.box)&&event.box.length>=4);
+   if(angle)check(located.length>0,'tilted live barcode produced no actual detected polygon');
+   for(const event of located){
+    check(event.width===1280&&event.height===720,'detection did not preserve original source video dimensions');check(event.box.every(point=>point.length===2&&point.every(Number.isFinite)),'detection coordinates are invalid');
+    const xs=event.box.map(point=>point[0]),ys=event.box.map(point=>point[1]);check(Math.max(...xs)-Math.min(...xs)>50,'detected box is too small to represent the barcode');check(Math.max(...ys)-Math.min(...ys)>5,'detected box has no height');
+    check(Math.abs((Math.max(...xs)+Math.min(...xs))/2-640)<90&&Math.abs((Math.max(...ys)+Math.min(...ys))/2-360)<70,'sampled locator box was not scaled back to the actual centered barcode');
+    check(event.drawnViewBox==='0 0 1280 720','tracking overlay uses the wrong source coordinate system');check(event.drawnPoints&&event.drawnPoints.split(' ').length===4,'tracking overlay omitted the actual detected polygon');check(event.drawnState===(event.decoded?'decoded':'located'),'tracking UI confused a located pattern with decoded data');
+   }
+   check(rpcCalls.length===2,'locator event bypassed the single capture/verification flow');
   });
  }finally{await ScanSafeScannerCamera.stop();clearInterval(painter);streams.forEach(stream=>stream.getTracks().forEach(track=>track.stop()));URL.revokeObjectURL(sourceUrl);window.scannerCameraTestResults=results;}
 })().catch(error=>{window.scannerCameraTestFailure=error.stack||String(error);});
@@ -83,11 +102,11 @@ async function devtools(port, pageUrl) {
   return { call, close: () => socket.close() };
 }
 
-test('real camera controller automatically decodes live CODE128 frames and verifies/assigns without a capture button', { timeout: 60000 }, async t => {
+test('real camera controller automatically decodes short, legacy and tilted CODE128 video frames', { timeout: 120000 }, async t => {
   const chrome = process.env.SCANSafe_CHROME || path.join(process.env.PROGRAMFILES || 'C:/Program Files', 'Google/Chrome/Application/chrome.exe');
   if (!fs.existsSync(chrome)) return t.skip('Chrome is required for the live camera pipeline check');
   assert.equal(typeof WebSocket, 'function', 'Node with a built-in WebSocket client is required');
-  const allowed = ['/assets/vendor/JsBarcode.all.min.js', '/assets/vendor/html5-qrcode.min.js', '/assets/scanner-camera.js', '/assets/scanner.js'];
+  const allowed = ['/assets/vendor/JsBarcode.all.min.js', '/assets/vendor/html5-qrcode.min.js', '/assets/vendor/quagga2.min.js', '/assets/scanner-camera.js', '/assets/scanner.js'];
   const server = http.createServer((request, response) => {
     const filename = new URL(request.url, 'http://127.0.0.1').pathname;
     if (filename === '/') { response.setHeader('Content-Type', 'text/html; charset=utf-8'); return response.end(fixture); }
@@ -100,23 +119,32 @@ test('real camera controller automatically decodes live CODE128 frames and verif
   let stderr = ''; browser.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-2000); });
   let connection;
   try {
-    const portFile = path.join(profile, 'DevToolsActivePort'); const startup = Date.now();
-    while (!fs.existsSync(portFile)) { assert.ok(Date.now() - startup < 12000, 'Chrome did not start: ' + stderr); await delay(50); }
-    const port = Number(fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0]);
-    connection = await devtools(port, 'http://127.0.0.1:' + server.address().port + '/');
-    let results, failure; const started = Date.now();
-    while (!results && !failure) {
-      const evaluation = await connection.call('Runtime.evaluate', { expression: 'JSON.stringify({results:window.scannerCameraTestResults,failure:window.scannerCameraTestFailure})', returnByValue: true });
-      const value = JSON.parse(evaluation.result.value || '{}'); results = value.results; failure = value.failure;
-      assert.ok(Date.now() - started < 35000, 'Live camera integration did not finish: ' + stderr); if (!results && !failure) await delay(100);
+    const portFile = path.join(profile, 'DevToolsActivePort'); const startup = Date.now();let port=0;
+    while (!port) {
+      assert.ok(Date.now() - startup < 12000, 'Chrome did not start: ' + stderr);
+      try { port = Number(fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0]); } catch(error) { if(!['ENOENT','EBUSY','EPERM'].includes(error.code))throw error; }
+      if(!port)await delay(50);
     }
-    assert.ok(!failure, failure); assert.equal(results.length, 4);
-    for (const result of results) await t.test(result.name, () => assert.equal(result.ok, true, result.error));
+    for (const sample of [{name:'short numeric',query:'code=short'},{name:'legacy full value',query:'code=legacy'},{name:'short rotated 90 degrees',query:'code=short&angle=90'}]) {
+      if(connection)connection.close();connection = await devtools(port, 'http://127.0.0.1:' + server.address().port + '/?' + sample.query);
+      let results, failure; const started = Date.now();
+      while (!results && !failure) {
+        const evaluation = await connection.call('Runtime.evaluate', { expression: 'JSON.stringify({results:window.scannerCameraTestResults,failure:window.scannerCameraTestFailure})', returnByValue: true });
+        const value = JSON.parse(evaluation.result.value || '{}'); results = value.results; failure = value.failure;
+        assert.ok(Date.now() - started < 35000, 'Live camera integration did not finish: ' + sample.name + '; ' + stderr); if (!results && !failure) await delay(100);
+      }
+      assert.ok(!failure, sample.name + ': ' + failure); assert.equal(results.length, 6);
+      for (const result of results) await t.test(sample.name + ': ' + result.name, () => assert.equal(result.ok, true, result.error));
+    }
   } finally {
-    if (connection) connection.close(); browser.kill();
-    await Promise.race([new Promise(resolve => browser.once('exit', resolve)), delay(3000)]);
+    if (connection) {
+      await Promise.race([connection.call('Browser.close').catch(() => {}), delay(1000)]);
+      connection.close();
+    }
+    if(browser.exitCode===null)browser.kill();
+    if(browser.exitCode===null)await Promise.race([new Promise(resolve => browser.once('exit', resolve)), delay(3000)]);
     await new Promise(resolve => server.close(resolve));
     assert.equal(path.dirname(path.resolve(profile)), tempRoot); assert.ok(path.basename(profile).startsWith('scansafe-scanner-camera-test-'));
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
+    await fs.promises.rm(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
   }
 });

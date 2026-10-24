@@ -83,7 +83,8 @@
       if(!current(token)) return false;
       const svg=byId('evacueeBarcodeSvg'),value=account.value;
       svg.setAttribute('data-barcode-value',value);
-      window.JsBarcode(svg,value,{format:'CODE128',displayValue:false,lineColor:'#111111',background:'#ffffff',height:112,width:2,margin:24});
+      const compact=/^\d{12}$/.test(value);
+      window.JsBarcode(svg,value,{format:'CODE128',displayValue:false,lineColor:'#111111',background:'#ffffff',height:compact?140:112,width:compact?3:2,margin:compact?32:24});
       const width=Number.parseFloat(svg.getAttribute('width'));
       const height=Number.parseFloat(svg.getAttribute('height'));
       if(!width || !height || !svg.querySelector('rect')) throw new Error('No barcode image');
@@ -136,7 +137,7 @@
     if(!width||!height||!rootMatrix) throw new Error('Barcode is not visible');
     const inverse=rootMatrix.inverse();
     const pageWidth=148/25.4*72,pageHeight=105/25.4*72;
-    const scale=Math.min((pageWidth-48)/width,90/height);
+    const scale=Math.min((pageWidth-48)/width,150/height);
     const left=(pageWidth-width*scale)/2,top=(pageHeight-height*scale-24)/2;
     const n=value=>Number(value.toFixed(4));
     const paths=[];

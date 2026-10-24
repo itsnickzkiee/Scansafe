@@ -1,7 +1,7 @@
 /* Staff barcode verification and automatic accommodation assignment. */
 (function(){
   'use strict';
-  let options={},initialized=false,revision=0,pending=null,busy=false,hasResult=false,cameraState='idle',authenticatedOwner=null;
+  let options={},initialized=false,revision=0,pending=null,busy=false,hasResult=false,cameraState='idle',authenticatedOwner=null,detectionState='searching',decodedValue='';
   const el=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const context=()=>options.getContext?options.getContext():{userId:window.ScanSafeDB?.session?.user?.id,role:window.ScanSafeDB?.profile?.role};
@@ -10,6 +10,32 @@
   const authorized=ctx=>!!ctx?.userId&&['admin','staff'].includes(ctx.role);
   function status(message,state='idle'){
     const box=el('scannerStatus');if(box){box.textContent=message;box.dataset.state=state;}
+  }
+  function detection(packet,force=false){
+    const overlay=el('scannerDetectionOverlay'),polygon=el('scannerDetectionBox'),hint=el('scannerDetectionHint');
+    const frame=overlay?.closest('.scan-frame');
+    if(!frame) return;
+    if(!packet){
+      if(detectionState==='decoded'&&!force) return;
+      detectionState='searching';decodedValue='';frame.dataset.detection='searching';
+      polygon?.setAttribute('points','');
+      if(hint) hint.textContent='Place the whole barcode inside the guide';
+      return;
+    }
+    const width=Number(packet.width),height=Number(packet.height);
+    const points=Array.isArray(packet.box)?packet.box:[];
+    const tolerance=Math.max(width,height)*.02;
+    const valid=Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0&&points.length===4&&points.every(point=>Array.isArray(point)&&Number.isFinite(Number(point[0]))&&Number.isFinite(Number(point[1]))&&Number(point[0])>=-tolerance&&Number(point[0])<=width+tolerance&&Number(point[1])>=-tolerance&&Number(point[1])<=height+tolerance);
+    const safePoints=valid?points.map(point=>[Math.max(0,Math.min(width,Number(point[0]))),Math.max(0,Math.min(height,Number(point[1])))]):[];
+    const area=Math.abs(safePoints.reduce((sum,point,index)=>{const next=safePoints[(index+1)%4];return sum+point[0]*next[1]-next[0]*point[1];},0))/2;
+    const located=valid&&area>8;
+    if(!located&&!packet.decoded){detection(null);return;}
+    detectionState=packet.decoded?'decoded':'located';decodedValue=packet.decoded?String(packet.value||''):'';frame.dataset.detection=detectionState;
+    if(located){
+      overlay.setAttribute('viewBox','0 0 '+width+' '+height);
+      polygon?.setAttribute('points',safePoints.map(point=>point[0]+','+point[1]).join(' '));
+    }else polygon?.setAttribute('points','');
+    if(hint) hint.textContent=packet.decoded?'Barcode read':'Barcode pattern found — hold steady';
   }
   function controls(){
     const button=el('scannerStartButton');
@@ -23,6 +49,7 @@
   function reset(){
     revision++;pending=null;busy=false;hasResult=false;
     camera()?.stop?.();cameraState='idle';
+    detection(null,true);
     const result=el('scanResult');if(result){result.replaceChildren();result.classList.add('hidden');}
     const input=el('manualBarcode');if(input) input.value='';
     const history=el('scannerHistory');
@@ -59,6 +86,7 @@
     const value=String(rawValue??'').trim();
     if(!value){status('Enter or scan an evacuee barcode.','warning');return Promise.resolve(null);}
     if(pending) return pending.value===value?pending.promise:Promise.resolve(null);
+    if(detectionState==='decoded'&&decodedValue!==value) detection(null,true);
     const ctx=context();
     if(!authorized(ctx)){unavailable('Sign in with an administrator or staff account to scan barcodes.');controls();return Promise.resolve(null);}
     const sb=client();
@@ -98,12 +126,15 @@
     if(!authorized(context())){unavailable('Sign in with an administrator or staff account to use the scanner.');controls();return false;}
     const reader=camera();
     if(!reader){unavailable('The camera scanner could not load. Reload the page or enter the code manually.');return false;}
+    if(!reader.inspect?.().active) detection(null,true);
     return reader.toggle();
   }
   function init(next={}){
     options={...options,...next};
-    camera()?.init?.({elementId:'scanSafeQrReader',cameraSelectId:'scannerCameraSelect',onDecode:verify,onStatus:update=>{
+    camera()?.init?.({elementId:'scanSafeQrReader',cameraSelectId:'scannerCameraSelect',onDecode:verify,onDetection:detection,onStatus:update=>{
       cameraState=update.state;controls();
+      const frame=el('scannerDetectionOverlay')?.closest('.scan-frame');
+      if(frame) frame.dataset.cameraState=update.state;
       if(!busy) status(update.message||'Camera ready.',update.error?'error':update.state);
     }});
     if(!initialized){
@@ -118,8 +149,8 @@
         if(event==='SIGNED_OUT'||nextOwner!==authenticatedOwner){authenticatedOwner=nextOwner;reset();}
       });
     }
-    status('Start the camera and show the entire barcode, including its white edges.');controls();return window.ScanSafeScanner;
+    detection(null,true);status('Start the camera and show the entire barcode, including its white edges.');controls();return window.ScanSafeScanner;
   }
-  function manual(){return verify(el('manualBarcode')?.value||'');}
+  function manual(){if(!busy) detection(null,true);return verify(el('manualBarcode')?.value||'');}
   window.ScanSafeScanner={init,verify,manual,toggle,reset,inspect:()=>({busy,hasResult,cameraState,revision,pendingValue:pending?.value||null})};
 })();

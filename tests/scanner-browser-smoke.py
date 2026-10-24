@@ -27,15 +27,29 @@ window.addEventListener('error',event=>document.documentElement.setAttribute('da
 window.addEventListener('unhandledrejection',event=>document.documentElement.setAttribute('data-test-error',String(event.reason)));
 </script>"""
 CHECK = r"""<script>
+const originalCameraInit=ScanSafeScannerCamera.init;
+ScanSafeScannerCamera.init=configuration=>{window.scannerTestCameraHooks=configuration;return originalCameraInit(configuration);};
 setTimeout(async()=>{
  try{
   const check=(value,message)=>{if(!value)throw new Error(message);};
   check(!document.getElementById('manualScanButton').disabled,'Scanner did not initialize');
+  const hooks=window.scannerTestCameraHooks,polygon=document.getElementById('scannerDetectionBox'),frame=polygon.closest('.scan-frame');
+  hooks.onStatus({state:'scanning',message:'Camera ready'});
+  hooks.onDetection({box:[[200,200],[1000,200],[1000,500],[200,500]],width:1280,height:720,decoded:false});
+  check(frame.dataset.detection==='located'&&polygon.getAttribute('points').length>0,'Located barcode did not draw its actual polygon');
+  check(getComputedStyle(document.querySelector('.scanner-detection-layer')).opacity==='1','Detector overlay is not visible');
+  check(scanCalls.length===0&&!/VERIFIED/.test(document.getElementById('scanResult').textContent),'Pattern location falsely verified an evacuee');
+  hooks.onDetection({box:[[0,0],[1,0],[1,1],[0,1]],width:Infinity,height:720,decoded:false});
+  check(polygon.getAttribute('points')==='','Invalid detection geometry was drawn');
+  hooks.onDetection({box:[[200,200],[1000,200],[1000,500],[200,500]],width:1280,height:720,decoded:true,value:'CAMERA-OLD-CODE'});
+  check(frame.dataset.detection==='decoded'&&document.getElementById('scannerDetectionHint').textContent==='Barcode read','Read barcode feedback missing');
+  check(scanCalls.length===0,'Decoded overlay bypassed database verification');
   document.getElementById('manualBarcode').value='ACTUAL-NICK-CODE';
   document.getElementById('manualScanButton').click();
   for(let i=0;i<100&&ScanSafeScanner.inspect().busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
   const result=document.getElementById('scanResult');const identity=document.getElementById('lastScannedEvacuee');
   check(scanCalls.length===1&&scanCalls[0]==='ACTUAL-NICK-CODE','Real Search button did not call atomic RPC once');
+  check(polygon.getAttribute('points')===''&&frame.dataset.detection==='searching','Manual lookup retained the previous green barcode detector');
   check(identity.textContent.includes('Nick'),'Real evacuee details are missing');
   check(result.textContent.includes('VERIFIED')&&result.textContent.includes('Hallway A1'),'Verification or assigned space missing');
   check(!/check-in confirmed|checked-in/i.test(result.textContent),'Scanner falsely claimed check-in');

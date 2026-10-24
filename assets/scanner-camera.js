@@ -6,8 +6,10 @@
     elementId: 'scanSafeQrReader',
     cameraSelectId: 'scannerCameraSelect',
     libraryUrl: 'assets/vendor/html5-qrcode.min.js',
+    locatorLibraryUrl: 'assets/vendor/quagga2.min.js',
     onDecode: async function () {},
-    onStatus: function () {}
+    onStatus: function () {},
+    onDetection: function () {}
   };
   let state = 'idle';
   let generation = 0;
@@ -16,6 +18,11 @@
   let startPromise = null;
   let stopPromise = null;
   let libraryPromise = null;
+  let locatorLibraryPromise = null;
+  let locatorContext = null;
+  let locatorBusy = false;
+  let detection = null;
+  let lastDetectionAt = 0;
   let handlingDecode = false;
   let preferredDeviceId = '';
   let cameras = [];
@@ -34,6 +41,136 @@
 
   function current(token) {
     return desiredRunning && generation === token;
+  }
+
+  // A located pattern is distinct from a decoded value and from server
+  // verification. Never invent a tracking rectangle when no pattern was found.
+  function reportDetection(result) {
+    detection = result;
+    if (result && result.box) lastDetectionAt = Date.now();
+    try { options.onDetection(result); } catch (error) { console.error('Scanner detection callback:', error); }
+  }
+
+  function validBox(box) {
+    return Array.isArray(box) && box.length === 4 && box.every(function (point) {
+      return point && point.length >= 2 && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1]));
+    });
+  }
+
+  function boxArea(box) {
+    let twiceArea = 0;
+    for (let index = 0; index < box.length; index += 1) {
+      const next = box[(index + 1) % box.length];
+      twiceArea += box[index][0] * next[1] - next[0] * box[index][1];
+    }
+    return Math.abs(twiceArea) / 2;
+  }
+
+  function ensureLocatorLibrary() {
+    if (window.Quagga && typeof window.Quagga.decodeSingle === 'function') return Promise.resolve(true);
+    if (locatorLibraryPromise) return locatorLibraryPromise;
+    locatorLibraryPromise = new Promise(function (resolve, reject) {
+      const script = document.createElement('script');
+      let settled = false;
+      const timeout = setTimeout(function () { finish(new Error('Barcode locator could not load.')); }, 12000);
+      function finish(error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        script.onload = null;
+        script.onerror = null;
+        if (error) { script.remove(); reject(error); } else resolve(true);
+      }
+      script.src = new URL(options.locatorLibraryUrl, document.baseURI).href;
+      script.async = true;
+      script.dataset.scansafeLocatorLibrary = '1';
+      script.onload = function () { finish(window.Quagga && typeof window.Quagga.decodeSingle === 'function' ? null : new Error('Barcode locator is unavailable.')); };
+      script.onerror = function () { finish(new Error('Barcode locator could not load.')); };
+      document.head.appendChild(script);
+    }).catch(function (error) { locatorLibraryPromise = null; throw error; });
+    return locatorLibraryPromise;
+  }
+
+  function stopLocator(keepDetection) {
+    const previous = locatorContext;
+    locatorContext = null;
+    if (previous && previous.timer) clearTimeout(previous.timer);
+    if (!keepDetection) reportDetection(null);
+  }
+
+  function locatorIsCurrent(context) {
+    return locatorContext === context && current(context.token) && scanner === context.instance && !handlingDecode;
+  }
+
+  function scheduleLocator(context, delay) {
+    if (!locatorIsCurrent(context)) return;
+    context.timer = setTimeout(function () { void locateFrame(context); }, delay);
+  }
+
+  async function locateFrame(context) {
+    context.timer = null;
+    if (!locatorIsCurrent(context)) return;
+    // decodeSingle uses Quagga's event bus. Serialize sessions so a late image
+    // from a stopped camera cannot be delivered to a newly started session.
+    if (locatorBusy) { scheduleLocator(context, 100); return; }
+    const video = context.reader.querySelector('video');
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      scheduleLocator(context, 180);
+      return;
+    }
+    locatorBusy = true;
+    try {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      // A locator's patch size depends on the barcode's fraction of the frame.
+      // Alternate real image scales: smaller frames locate a compact label,
+      // while original pixels preserve the thin bars in older long values.
+      const profiles = [{ size: 960, patch: 'small' }, { size: 0, patch: 'medium' },
+        { size: 800, patch: 'medium' }, { size: 0, patch: 'small' }];
+      const profile = profiles[context.frameNumber++ % profiles.length];
+      const scale = profile.size ? Math.min(1, profile.size / Math.max(width, height)) : 1;
+      const frameWidth = Math.max(1, Math.round(width * scale));
+      const frameHeight = Math.max(1, Math.round(height * scale));
+      context.canvas.width = frameWidth;
+      context.canvas.height = frameHeight;
+      context.canvas.getContext('2d', { alpha: false }).drawImage(video, 0, 0, frameWidth, frameHeight);
+      // Locate=true deskews tilted labels. size:0 prevents another implicit
+      // resize, so detected coordinates map exactly to this sampled frame.
+      const result = await window.Quagga.decodeSingle({
+        src: context.canvas.toDataURL('image/jpeg', 0.94),
+        inputStream: { type: 'ImageStream', size: 0, sequence: false },
+        locate: true,
+        numOfWorkers: 0,
+        locator: { halfSample: false, patchSize: profile.patch },
+        decoder: { readers: ['code_128_reader'] }
+      });
+      if (!locatorIsCurrent(context)) return;
+      const value = String(result && result.codeResult && result.codeResult.code || '').trim();
+      const candidates = result && Array.isArray(result.boxes) ? result.boxes.filter(validBox) : [];
+      const box = result && validBox(result.box) ? result.box : candidates.sort(function (a, b) { return boxArea(b) - boxArea(a); })[0];
+      if (box || value) {
+        reportDetection({ box: box ? box.map(function (point) { return [Number(point[0]) * width / frameWidth, Number(point[1]) * height / frameHeight]; }) : null,
+          width: width, height: height, decoded: !!value, value: value || undefined, source: 'quagga', mirrored: false });
+      } else if (detection && Date.now() - lastDetectionAt > 650) reportDetection(null);
+      if (value) captured(value, context.token, context.instance);
+    } catch (_) {
+      // A single unreadable frame is normal. The independent full-frame reader
+      // remains running even if the supplemental locator cannot process it.
+      if (locatorIsCurrent(context) && detection && Date.now() - lastDetectionAt > 650) reportDetection(null);
+    } finally {
+      locatorBusy = false;
+      scheduleLocator(context, 300);
+    }
+  }
+
+  async function startLocator(token, instance, reader) {
+    try {
+      await ensureLocatorLibrary();
+      if (!current(token) || scanner !== instance || handlingDecode) return;
+      stopLocator(false);
+      locatorContext = { token: token, instance: instance, reader: reader, canvas: document.createElement('canvas'), frameNumber: 0, timer: null };
+      scheduleLocator(locatorContext, 0);
+    } catch (_) { /* The existing reader can still decode when optional localization is unavailable. */ }
   }
 
   function fitPreview() {
@@ -199,9 +336,21 @@
     } catch (_) { /* Fixed-focus webcams and unsupported browsers remain usable. */ }
   }
 
-  function captured(value, token, instance) {
+  function captured(value, token, instance, decodedResult) {
     const barcode = String(value || '').trim();
     if (!barcode || !current(token) || scanner !== instance || handlingDecode) return;
+    if (!detection || !detection.decoded || detection.value !== barcode) {
+      const bounds = decodedResult && decodedResult.result && decodedResult.result.bounds;
+      const reader = document.getElementById(options.elementId);
+      const canvas = reader && reader.querySelector('canvas');
+      const video = reader && reader.querySelector('video');
+      const width = canvas && canvas.width || video && video.videoWidth || 1280;
+      const height = canvas && canvas.height || video && video.videoHeight || 720;
+      const hasBounds = bounds && [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) && bounds.width > 0 && bounds.height > 0;
+      reportDetection({ box: hasBounds ? [[bounds.x, bounds.y], [bounds.x + bounds.width, bounds.y],
+        [bounds.x + bounds.width, bounds.y + bounds.height], [bounds.x, bounds.y + bounds.height]] : null,
+        width: width, height: height, decoded: true, value: barcode, source: 'html5', mirrored: false });
+    }
     handlingDecode = true;
     try { instance.pause(true); } catch (_) {}
     publish('processing', 'Barcode captured. Verifying the record and checking accommodation…');
@@ -259,7 +408,7 @@
           await instance.start(
             { facingMode: 'environment' },
             { fps: 15, disableFlip: false, videoConstraints: Object.assign({}, base, targets[index]) },
-            function (decoded) { captured(decoded, token, attempt); },
+            function (decoded, result) { captured(decoded, token, attempt, result); },
             function () { /* Frames without a barcode are normal; continue automatically. */ }
           );
           lastError = null;
@@ -276,8 +425,13 @@
         await dispose(instance);
         return false;
       }
+      // Show the same unmirrored pixels analyzed by both readers. Html5Qrcode
+      // may mirror front-camera previews; its decode flip retry stays enabled.
+      const video = reader.querySelector('video');
+      if (video) video.style.transform = 'none';
       fitPreview();
       publish('scanning', 'Camera ready. Fit the entire barcode in view; capture is automatic.');
+      void startLocator(token, instance, reader);
       void refreshCameras(token);
       void enableContinuousFocus(instance, token);
       return true;
@@ -302,6 +456,7 @@
     if (typeof cameraId === 'string') preferredDeviceId = cameraId;
     desiredRunning = true;
     const token = ++generation;
+    reportDetection(null);
     publish('loading', 'Preparing barcode reader…');
     const pending = runStart(token, preferredDeviceId);
     startPromise = pending;
@@ -312,6 +467,7 @@
   function stopCamera(keepProcessing) {
     desiredRunning = false;
     generation += 1;
+    stopLocator(keepProcessing);
     releaseVisibleTracks();
     if (!keepProcessing) publish('stopping', 'Stopping camera…');
     if (stopPromise) {
@@ -360,6 +516,8 @@
     stop: stop,
     toggle: toggle,
     ensureLibrary: ensureLibrary,
-    inspect: function () { return { state: state, active: desiredRunning, processing: handlingDecode, cameras: cameras.slice(), cameraId: preferredDeviceId }; }
+    ensureLocatorLibrary: ensureLocatorLibrary,
+    inspect: function () { return { state: state, active: desiredRunning, processing: handlingDecode, cameras: cameras.slice(), cameraId: preferredDeviceId,
+      locating: !!locatorContext, detection: detection }; }
   };
 })();
