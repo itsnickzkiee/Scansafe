@@ -1,0 +1,50 @@
+ScanSafe: Request Needs for assigned evacuees
+
+DATABASE
+Run the entire SUPABASE_NEEDS_REQUESTS.sql in Supabase SQL Editor > New query.
+The existing ScanSafe core setup, Phase 7 notifications (SUPABASE_PHASE7_8.sql),
+and SUPABASE_EVACUEE_LIVE_SYNC_FIX.sql must already be installed. The migration
+checks its prerequisites before making changes and can safely be run again.
+It creates no sample people, rooms, or requests. Existing scanner, barcode,
+map, and account data stay attached to their existing records.
+
+WEBSITE
+Deploy the updated project to Vercel, then refresh the website (Ctrl+F5).
+The installed evacuee PWA cache updates to v19.
+
+EVACUEE
+- Open Request Needs from the sidebar or Needs on the mobile bottom navigation.
+  Home also has a Request Needs shortcut.
+- The form is available only for an approved account with a current active map
+  assignment and an active accommodation space. Check-in is not required.
+- Before assignment, the form and Home shortcut remain disabled. Existing
+  request history can still be read if an assignment later ends.
+- Add up to 20 items: category, name, quantity, and unit. Add notes and select
+  normal/urgent. Name, group size, and assigned space come from the database.
+- Food, water, hygiene, bedding, baby supplies, medical assistance, and other
+  categories are available. A duplicate active item in the same group is blocked.
+- Request history includes status, staff replies, and status changes. Updates
+  also appear in the existing Notifications page.
+
+ADMIN / STAFF
+- Open Needs Requests from the admin sidebar. The badge counts pending requests.
+- Filter by name/item/request number, status, category, urgency, or assigned space.
+- Each request includes the actual group/space at submission and the current
+  assignment when it has changed, helping staff arrange delivery correctly.
+- Workflow: Pending > Preparing > Ready for Pickup OR For Delivery > Provided.
+  Unavailable requires a reason. Replies can also be added to the current status.
+- Provided records retain the staff member and time; changes remain in history.
+- A simultaneous update by another staff member requires reviewing the latest
+  status before retrying. The typed reply is preserved.
+- Submissions create a staff notification. Status/reply changes notify the owner.
+
+SYNC AND DATA
+The queue/history/badges refresh every 15 seconds while visible, and when the
+window regains focus. Refresh is also available on each request page. Failed
+loads show errors; no fake requests or statistics are substituted.
+Submissions are validated again in Supabase, including active assignment,
+ownership, duplicate items, allowed status changes, and concurrent updates.
+Retrying the same submission after a transport failure uses an idempotency token
+so an already saved request is returned without duplicating it.
+
+Local changes do not apply the SQL or redeploy Vercel automatically.

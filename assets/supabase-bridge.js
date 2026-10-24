@@ -1416,6 +1416,12 @@
 
     await bootstrapSession();
     if(!(await phase9AccessGuard())) return;
+    if(window.ScanSafeNeeds){
+      Promise.resolve(window.ScanSafeNeeds.init({
+        getClient:readyClient,
+        getContext:()=>({userId:window.ScanSafeDB.session?.user?.id,role:window.ScanSafeDB.profile?.role,profile:window.ScanSafeDB.profile})
+      })).catch(error=>console.warn('ScanSafe needs requests:',error.message));
+    }
     await loadPendingIntoPrototype();
     await loadCurrentEvacueeIntoPrototype();
     if(!isEvacueeAppPage()) await loadAccommodationState();
@@ -1459,7 +1465,7 @@
   function isEvacueeAppPage(){
     return [
       'user-portal.html','my-information.html','user-room.html',
-      'user-notifications.html','user-messages.html','profile.html'
+      'user-notifications.html','user-messages.html','profile.html','user-needs.html'
     ].includes(mapPage());
   }
 
@@ -2196,11 +2202,11 @@
   const phase9AdminOnlyPages=new Set(['user-management.html','settings.html']);
   const phase9StaffPages=new Set([
     'admin-dashboard.html','evacuees.html','shelter-room.html','barcode-scanner.html',
-    'messages.html','reports.html','user-management.html','settings.html'
+    'messages.html','reports.html','user-management.html','settings.html','needs-requests.html'
   ]);
   const phase9EvacueePages=new Set([
     'user-portal.html','my-information.html','user-room.html',
-    'user-notifications.html','user-messages.html','profile.html'
+    'user-notifications.html','user-messages.html','profile.html','user-needs.html'
   ]);
 
   let phase9AuthListenerReady=false;
@@ -2292,6 +2298,7 @@
         // Auth callbacks must finish before another Supabase request starts.
         setTimeout(async()=>{
           await getProfile(session.user.id);
+          window.ScanSafeNeeds?.refresh();
           if(scannerPageActive() && !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) window.ScanSafeScanner?.reset();
           if(isEvacueeAppPage()){
             if(evacueeRefreshPromise) await evacueeRefreshPromise;

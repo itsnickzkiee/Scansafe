@@ -1,14 +1,16 @@
-const CACHE_NAME='scansafe-pwa-v18-short-barcode';
+const CACHE_NAME='scansafe-pwa-v19-needs-requests';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
   './user-room.html',
+  './user-needs.html',
   './user-notifications.html',
   './user-messages.html',
   './profile.html',
   './assets/style.css',
   './assets/app.js',
   './assets/barcode-viewer.js',
+  './assets/needs-requests.js',
   './assets/scanner-camera.js',
   './assets/scanner.js',
   './assets/vendor/html5-qrcode.min.js',

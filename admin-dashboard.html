@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ScanSafe Admin Dashboard</title>
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=needs-v19">
 </head>
 <body>
 <div class="admin-app operations-shell">
@@ -27,7 +27,7 @@
 <a class="nav-item" href="shelter-room.html"><svg class="icon"><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a>
 <a class="nav-item" href="barcode-scanner.html"><svg class="icon"><use href="assets/icons.svg#barcode"></use></svg><span>QR / QR Scanner</span></a>
 <a class="nav-item" href="reports.html"><svg class="icon"><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a>
-<a class="nav-item" href="messages.html"><svg class="icon"><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a>
+<a class="nav-item" href="needs-requests.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Needs Requests</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item" href="messages.html"><svg class="icon"><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a>
 <a class="nav-item" href="settings.html"><svg class="icon"><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a>
 </aside>
 
@@ -101,7 +101,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="assets/app.js?v=admin-live-v14"></script>
-<script src="assets/supabase-bridge.js?v=admin-live-v14"></script>
+<script src="assets/app.js?v=needs-v19"></script>
+<script src="assets/needs-requests.js?v=needs-v19"></script>
+<script src="assets/supabase-bridge.js?v=needs-v19"></script>
 </body>
 </html>

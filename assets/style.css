@@ -4838,3 +4838,78 @@ body.barcode-viewer-open {
 .scan-frame[data-detection="located"] .scanner-detection-hint { background: #713f12; }
 .scan-frame[data-detection="decoded"] .scanner-detection-hint { background: #05603a; }
 @media (prefers-reduced-motion: reduce) { .scanner-detection-guide span { animation: none; } }
+
+/* Assigned evacuee supply requests and the staff queue. */
+[data-needs-count][hidden] { display: none !important; }
+.needs-page #needsApp { min-width: 0; }
+.needs-layout { display: grid; grid-template-columns: minmax(320px,.9fr) minmax(0,1.1fr); gap: 16px; align-items: start; }
+.needs-form, .needs-section { min-width: 0; }
+.needs-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.needs-form h2, .needs-section h2 { margin: 0 0 12px; font-size: 17px; }
+.needs-form h3, .needs-section h3 { font-size: 14px; }
+.needs-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin-bottom: 12px; }
+.needs-field label { font-size: 12px; font-weight: 600; color: #344054; }
+.needs-page label.needs-field { font-size: 12px; font-weight: 600; color: #344054; }
+.needs-field-grid, .needs-item-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.needs-page input, .needs-page select, .needs-page textarea {
+  width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #d0d5dd;
+  border-radius: 7px; background: #fff; color: #101828; padding: 10px; font: inherit; font-size: 13px;
+}
+.needs-page textarea { resize: vertical; min-height: 76px; }
+.needs-page input:focus-visible, .needs-page select:focus-visible, .needs-page textarea:focus-visible,
+.needs-page button:focus-visible { outline: 3px solid #fda29b; outline-offset: 2px; }
+.needs-page button { min-height: 38px; }
+.needs-page button:disabled, [data-needs-gated]:disabled { opacity: .58; cursor: not-allowed; }
+.needs-item-list { display: grid; gap: 10px; }
+.needs-item-row { border: 1px solid #eaecf0; background: #f9fafb; border-radius: 8px; padding: 12px; }
+.needs-item-row .needs-field { margin-bottom: 4px; }
+.needs-item-row > button { margin-top: 8px; }
+.needs-form-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 14px; }
+.needs-gate { margin-bottom: 14px; padding: 12px; border: 1px solid #fedf89; background: #fffaeb; border-radius: 8px; color: #854a0e; font-size: 13px; line-height: 1.6; }
+.needs-gate.is-eligible { border-color: #abefc6; background: #ecfdf3; color: #067647; }
+.needs-feedback { border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.needs-feedback.is-error { background: #fef3f2; color: #b42318; border: 1px solid #fecdca; }
+.needs-feedback.is-success { background: #ecfdf3; color: #067647; border: 1px solid #abefc6; }
+.needs-list { display: grid; gap: 14px; }
+.needs-request { padding: 16px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; min-width: 0; }
+.needs-request-head { display: flex; gap: 10px; justify-content: space-between; align-items: start; flex-wrap: wrap; margin-bottom: 8px; }
+.needs-request-head h3 { margin: 0 0 5px; }
+.needs-request-meta, .needs-request-location { color: #475467; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.needs-items-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; margin: 12px 0; }
+.needs-items-table th, .needs-items-table td { padding: 8px 6px; text-align: left; border-bottom: 1px solid #eaecf0; overflow-wrap: anywhere; }
+.needs-items-table th { background: #f9fafb; color: #475467; font-weight: 600; }
+.needs-note, .needs-response { font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0; }
+.needs-response { background: #f0f9ff; padding: 10px; border-radius: 6px; }
+.needs-event-list { list-style: none; margin: 12px 0 0; padding: 0 0 0 12px; border-left: 2px solid #e4e7ec; }
+.needs-event-list li { padding: 0 0 12px 10px; font-size: 12px; color: #475467; line-height: 1.6; overflow-wrap: anywhere; }
+.needs-event-list li:last-child { padding-bottom: 0; }
+.needs-request details > summary { cursor: pointer; font-size: 12px; color: #344054; padding: 5px 0; }
+.needs-empty { text-align: center; padding: 28px 16px; font-size: 13px; color: #667085; border: 1px dashed #d0d5dd; border-radius: 8px; }
+.needs-filters { display: grid; grid-template-columns: minmax(160px,2fr) repeat(4,minmax(110px,1fr)); gap: 10px; margin: 14px 0; }
+.needs-summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+.needs-stat { flex: 1 1 110px; min-width: 0; padding: 12px; border: 1px solid #eaecf0; border-radius: 8px; background: #f9fafb; font-size: 12px; color: #475467; }
+.needs-stat strong { display: block; font-size: 23px; color: #101828; margin-top: 4px; }
+.needs-stat > b { display: block; font-size: 23px; color: #101828; margin-bottom: 4px; }
+.needs-badge { display: inline-block; padding: 4px 8px; border-radius: 20px; background: #f2f4f7; color: #344054; font-size: 11px; font-weight: 600; line-height: 1.5; }
+.needs-status-pending { color: #93370d; background: #fffaeb; }
+.needs-status-preparing { color: #175cd3; background: #eff8ff; }
+.needs-status-ready_for_pickup { color: #3538cd; background: #eef4ff; }
+.needs-status-for_delivery { color: #6938ef; background: #f4f3ff; }
+.needs-status-provided { color: #067647; background: #ecfdf3; }
+.needs-status-unavailable, .needs-priority-urgent { color: #b42318; background: #fef3f2; }
+.needs-admin-update { border-top: 1px solid #eaecf0; padding-top: 12px; margin-top: 14px; }
+.needs-update-grid { display: grid; grid-template-columns: minmax(130px,1fr) minmax(0,2fr); gap: 10px; }
+.needs-mobile-badge { position: absolute; top: 4px; right: 7px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 12px; background: #d50000; color: #fff; font-size: 9px; line-height: 16px; }
+@media (max-width: 1100px) {
+  .needs-layout { grid-template-columns: minmax(0,1fr); }
+  .needs-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 720px) {
+  .mobile-bottom-nav { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .mobile-bottom-nav a { position: relative; min-width: 0; }
+  .mobile-bottom-nav a > span { font-size: 9px; }
+  .needs-update-grid { grid-template-columns: minmax(0,1fr); }
+  .needs-request { padding: 12px; }
+  .needs-page .user-hero { padding-bottom: 14px; }
+}
+@media (max-width: 380px) { .needs-field-grid, .needs-item-fields { grid-template-columns: minmax(0,1fr); } }

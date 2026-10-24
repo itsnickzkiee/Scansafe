@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ScanSafe Request Needs</title>
+    <link rel="stylesheet" href="assets/style.css?v=needs-v19">
+</head>
+
+<body class="user-shell needs-page">
+    <header class="user-top"><img class="logo-img" src="assets/logo.svg">
+        <div class="top-actions" style="color:#0f2744">
+            <div class="notif"><svg class="icon ">
+                    <use href="assets/icons.svg#bell"></use>
+                </svg></div>
+            <div class="avatar" data-user-initial>...</div>
+            <div class="identity"><strong data-user-name>Loading...</strong>Evacuee</div><button class="btn red"
+                onclick="logout()"><svg class="icon sm">
+                    <use href="assets/icons.svg#logout"></use>
+                </svg> Logout</button>
+        </div>
+    </header>
+    <aside class="user-side"><a class="nav-item " href="user-portal.html"><svg class="icon ">
+                <use href="assets/icons.svg#home"></use>
+            </svg><span>Home</span></a><a class="nav-item " href="my-information.html"><svg class="icon ">
+                <use href="assets/icons.svg#user"></use>
+            </svg><span>My Information</span></a><a class="nav-item " href="user-room.html"><svg class="icon ">
+                <use href="assets/icons.svg#bed"></use>
+            </svg><span>Accommodation Assignment</span></a><a class="nav-item " href="user-notifications.html"><svg
+                class="icon ">
+                <use href="assets/icons.svg#bell"></use>
+            </svg><span>Notifications</span></a><a class="nav-item active" href="user-needs.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Request Needs</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item" href="user-messages.html"><svg class="icon ">
+                <use href="assets/icons.svg#message"></use>
+            </svg><span>Messages</span></a><a class="nav-item " href="profile.html"><svg class="icon ">
+                <use href="assets/icons.svg#settings"></use>
+            </svg><span>Profile</span></a></aside>
+    <main class="user-main">
+<section class="user-hero"><h1>Request Needs</h1><p>Request supplies for your group after your accommodation has been assigned. Track responses and pickup or delivery updates here.</p></section>
+<div id="needsApp" aria-busy="true"><div class="card card-pad" role="status">Loading your needs requests...</div></div>
+</main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="assets/app.js?v=needs-v19"></script>
+<script src="assets/barcode-viewer.js?v=needs-v19"></script>
+<script src="assets/needs-requests.js?v=needs-v19"></script>
+<script src="assets/supabase-bridge.js?v=needs-v19"></script>
+</body>
+
+</html>

@@ -386,7 +386,12 @@ function syncLegacyUserPages(){
 function initUserBottomNav(){
   if(!document.body.classList.contains('user-shell'))return;
   q('#mobileMenuButton')?.remove();q('.mobile-nav-overlay')?.remove();document.body.classList.remove('mobile-nav-open');
-  if(q('.mobile-bottom-nav'))return;const path=location.pathname.split('/').pop();const nav=document.createElement('nav');nav.className='mobile-bottom-nav';const items=[['user-portal.html','home','Home'],['user-portal.html#qr','barcode','My Barcode'],['user-room.html','bed','My Space'],['user-notifications.html','bell','Alerts'],['profile.html','settings','Profile']];nav.innerHTML=items.map(([href,icon,label])=>`<a href="${href}" class="${(label==='Home'&&path==='user-portal.html')||(label==='My Space'&&path==='user-room.html')||(label==='Alerts'&&path==='user-notifications.html')||(label==='Profile'&&path==='profile.html')?'active':''}">${ico(icon)}<span>${label}</span></a>`).join('');document.body.appendChild(nav)
+  if(q('.mobile-bottom-nav'))return;
+  const path=location.pathname.split('/').pop(),nav=document.createElement('nav');
+  nav.className='mobile-bottom-nav';
+  const items=[['user-portal.html','home','Home'],['user-portal.html#qr','barcode','My Barcode'],['user-room.html','bed','My Space'],['user-needs.html','edit','Needs'],['user-notifications.html','bell','Alerts'],['profile.html','settings','Profile']];
+  nav.innerHTML=items.map(([href,icon,label])=>`<a href="${href}" class="${href===path?'active':''}">${ico(icon)}<span>${label}</span>${label==='Needs'?'<b class="needs-mobile-badge" data-needs-count hidden>0</b>':''}</a>`).join('');
+  document.body.appendChild(nav);
 }
 function enhanceAdminNavigation(){
   const side=q('.admin-side');if(!side)return;
