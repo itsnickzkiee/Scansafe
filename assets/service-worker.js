@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v21-ui-polish';
+const CACHE_NAME='scansafe-pwa-v22-evacuation-operations';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -11,6 +11,8 @@ const APP_SHELL=[
   './assets/app.js',
   './assets/barcode-viewer.js',
   './assets/needs-requests.js',
+  './assets/evacuation-operations.js',
+  './assets/evacuation-operations.css',
   './assets/app-promo.js',
   './assets/app-promo.css',
   './assets/scansafe-app-promo-portrait.png',

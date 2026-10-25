@@ -410,6 +410,49 @@ test('navigation badge shows pending requests for staff and active requests for 
   assert.equal(evacuee.document.querySelector('[data-needs-count]').textContent, '3'); assert.equal(evacuee.document.querySelector('[data-needs-count]').hidden, false);
 });
 
+test('cancelled requests remain in staff history and filters without an edit or delivery action', async () => {
+  const cancelled = sampleRequest({ status: 'cancelled', response: 'All families have returned home', current_assignment: null,
+    events: [{ from_status: 'pending', to_status: 'cancelled', actor_name: 'Actual Admin', response: 'All families have returned home', created_at: '2026-10-25T04:00:00Z' }] });
+  const h = harness({ mode: 'staff', snapshot: staffSnapshot([cancelled, sampleRequest({ request_id: 101 })], { pending: 1, active: 1, cancelled: 1, total: 2 }) });
+  await h.init();
+  assert.equal(h.document.querySelectorAll('[data-needs-request]')[0].dataset.needsRequest, '101', 'active requests come before closed requests');
+  h.node('needsStatusFilter').value = 'cancelled'; await h.node('needsStatusFilter').fire('input');
+  assert.equal(h.document.querySelectorAll('[data-needs-request]').length, 1);
+  assert.match(h.text, /Cancelled/); assert.match(h.text, /All families have returned home/);
+  assert.equal(h.document.querySelector('[data-needs-update-form]'), null);
+  assert.doesNotMatch(h.text, /Confirm the recipient location|arranging delivery/);
+  assert.equal(h.document.querySelector('[data-needs-count]').textContent, '1');
+});
+
+test('a stale staff form cannot edit a request cancelled by operation closure', async () => {
+  const h = harness({ mode: 'staff', snapshot: staffSnapshot() }); await h.init();
+  const staleForm = h.document.querySelector('[data-needs-update-form]');
+  staleForm.querySelector('[data-needs-update-response]').value = 'STALE REPLY';
+  h.setSnapshot(staffSnapshot([sampleRequest({ status: 'cancelled', response: 'Operation ended', version: 2 })], { pending: 0, active: 0, cancelled: 1, total: 1 }));
+  await h.refresh();
+  await staleForm.fire('submit');
+  assert.equal(updateCalls(h).length, 0);
+  assert.equal(h.document.querySelector('[data-needs-update-form]'), null);
+  assert.match(h.text, /Operation ended/);
+});
+
+test('cancelled historical items do not block a fresh request during a new assigned stay', async () => {
+  const h = harness({ snapshot: sampleSnapshot({ requests: [sampleRequest({ status: 'cancelled', response: 'Previous evacuation closed' })], stats: { pending: 0, active: 0, cancelled: 1, total: 1 } }) });
+  await h.init(); await fillItem(h);
+  h.respond(async name => name === 'submit_scansafe_need_request' ? { data: sampleRequest({ request_id: 102 }), error: null } : undefined);
+  await h.node('needsForm').fire('submit');
+  assert.equal(submitCalls(h).length, 1);
+});
+
+test('retrying a received request after closure reports its cancellation without claiming a new submission', async () => {
+  const h = harness(); await h.init(); await fillItem(h);
+  h.respond(async name => name === 'submit_scansafe_need_request' ? { data: sampleRequest({ status: 'cancelled', response: 'Evacuation ended' }), error: null } : undefined);
+  await h.node('needsForm').fire('submit');
+  assert.equal(submitCalls(h).length, 1);
+  assert.match(h.text, /earlier request.*cancelled.*operation ended/i);
+  assert.doesNotMatch(h.text, /Request submitted\. Shelter staff can now see/);
+});
+
 test('missing identity or eligibility metadata cannot unlock a request form', async () => {
   for (const missing of ['owner_id', 'eligible', 'requests', 'stats']) {
     const snapshot = sampleSnapshot(); delete snapshot[missing];

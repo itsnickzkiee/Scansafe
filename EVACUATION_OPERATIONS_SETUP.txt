@@ -1,0 +1,56 @@
+ScanSafe - End Evacuation and repeat stays
+
+Install
+1. Apply the existing live account sync, scanner/GBEAA, short-barcode and
+   needs-request migrations first.
+2. In Supabase SQL Editor, run the ENTIRE SUPABASE_EVACUATION_OPERATIONS.sql.
+   Run this migration last. Installing it does not end the current evacuation.
+   Existing active assignments are adopted into "Current evacuation" with
+   their real group counts. Existing people/rooms/barcodes are not inserted.
+   Earlier completed assignments remain legacy history; their event is not guessed.
+3. Redeploy the updated site files to Vercel and refresh the page.
+
+Use
+- Administrator: Settings > Evacuation Operations. Dashboard and Accommodation
+  Map also have a Manage Evacuation shortcut for administrators.
+- If there is no active operation, enter an operation name and Start Evacuation.
+- Review End Evacuation loads real assigned-group/people/request/map counts.
+  Enter a closure reason, confirm everyone has departed, and type CLOSE.
+- Resolve outstanding requests first, or explicitly check cancellation in the
+  review. Cancellation records the reason, retains items/events, and notifies
+  the requester. It never marks undelivered supplies Provided.
+- Confirm End Evacuation closes assignments, marks stays Released, recalculates
+  map occupancy, and records the closed operation and its archived stays.
+- Recalculate Occupancy repairs counters from active assignment count snapshots;
+  it does not release occupants, delete data or change room capacities.
+- Start a new operation for the next evacuation. Select returning released
+  groups under Returning evacuees, give a reason, and Readmit Group. Staff then
+  scan the existing approved barcode to assign a space. Readmission itself does
+  not reserve a space or check anybody in.
+- Individual release ends that group's current stay. Readmission is offered for
+  the next operation, not an automatic reversal within the same operation.
+
+Preserved records
+Accounts, approval/barcode identity, spaces/capacities, assignment/transfer history,
+request items/status events, operation stay snapshots and audit records remain.
+Cancelled requests are visible in request history and cannot be edited.
+Occupancy counts people in groups, not the number of registered account rows.
+
+Concurrency and retries
+The database checks administrator identity, typed confirmation and the reviewed
+revision. A scan, transfer or new request that changes the review requires a fresh
+review. Operation closure and its audit/notifications commit or roll back together.
+Operation start retry tokens and a repeated confirmed close do not create duplicate
+operations or repeat closure notifications.
+
+Migration order
+If an older scanner/GBEAA/needs migration is re-applied later, re-apply the operation
+migration last as well, then verify the scanner and close-review flow. These earlier
+files replace public functions and were written before operation lifecycle guards.
+
+Local checks
+node --test tests/operations-ui.test.cjs
+node --test tests/admin-live.test.cjs tests/evacuee-live.test.cjs tests/needs-requests.test.cjs
+SQL checks use the optional @electric-sql/pglite runtime. Set SCANSAFE_PGLITE_MODULE
+to that runtime path, then run node --test tests/operations-migration.test.cjs.
+Local fixtures do not connect to or change the production database.

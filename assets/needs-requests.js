@@ -3,9 +3,9 @@
   'use strict';
 
   const categories = { food: 'Food', water: 'Water', hygiene: 'Hygiene', bedding: 'Bedding', baby: 'Baby supplies', medical: 'Medical assistance', other: 'Other' };
-  const statuses = { pending: 'Pending', preparing: 'Preparing', ready_for_pickup: 'Ready for Pickup', for_delivery: 'For Delivery', provided: 'Provided', unavailable: 'Unavailable' };
-  const transitions = { pending: ['preparing', 'unavailable'], preparing: ['ready_for_pickup', 'for_delivery', 'unavailable'], ready_for_pickup: ['provided', 'unavailable'], for_delivery: ['provided', 'unavailable'], provided: [], unavailable: [] };
-  const terminal = new Set(['provided', 'unavailable']);
+  const statuses = { pending: 'Pending', preparing: 'Preparing', ready_for_pickup: 'Ready for Pickup', for_delivery: 'For Delivery', provided: 'Provided', unavailable: 'Unavailable', cancelled: 'Cancelled' };
+  const transitions = { pending: ['preparing', 'unavailable'], preparing: ['ready_for_pickup', 'for_delivery', 'unavailable'], ready_for_pickup: ['provided', 'unavailable'], for_delivery: ['provided', 'unavailable'], provided: [], unavailable: [], cancelled: [] };
+  const terminal = new Set(['provided', 'unavailable', 'cancelled']);
   const page = String(window.location?.pathname || '').split('/').pop();
   const pageMode = page === 'user-needs.html' ? 'evacuee' : page === 'needs-requests.html' ? 'staff' : null;
   let options = {};
@@ -217,7 +217,7 @@
     const counts = state.counts || {};
     const pending = number(counts.pending);
     const active = number(counts.active);
-    element.innerHTML = '<span class="needs-stat"><b>' + number(counts.total) + '</b> Total</span><span class="needs-stat"><b>' + pending + '</b> Pending</span><span class="needs-stat"><b>' + active + '</b> Active</span><span class="needs-stat"><b>' + number(counts.provided) + '</b> Provided</span>';
+    element.innerHTML = '<span class="needs-stat"><b>' + number(counts.total) + '</b> Total</span><span class="needs-stat"><b>' + pending + '</b> Pending</span><span class="needs-stat"><b>' + active + '</b> Active</span><span class="needs-stat"><b>' + number(counts.provided) + '</b> Provided</span>' + (number(counts.cancelled) ? '<span class="needs-stat"><b>' + number(counts.cancelled) + '</b> Cancelled</span>' : '');
   }
   function displayItems(record) {
     return '<table class="needs-items-table"><thead><tr><th scope="col">Item</th><th scope="col">Category</th><th scope="col">Quantity</th></tr></thead><tbody>' + (record.items || []).map(item => '<tr><td>' + esc(item.item_name) + '</td><td>' + esc(categories[item.category] || item.category) + '</td><td>' + esc(item.quantity) + ' ' + esc(item.unit) + '</td></tr>').join('') + '</tbody></table>';
@@ -237,6 +237,7 @@
     return '<p class="needs-request-meta">Provided by ' + esc(actor) + ' · ' + esc(date(record.provided_at || event?.created_at)) + '</p>';
   }
   function updateForm(record) {
+    if (record.status === 'cancelled') return '<p class="needs-request-meta">This request was closed when the evacuation operation ended.</p>';
     const id = String(record.request_id);
     const draft = drafts.get(id);
     const status = draft?.status || record.status;
@@ -252,7 +253,7 @@
     const status = Object.hasOwn(statuses, record.status) ? record.status : 'unknown';
     const urgent = record.priority === 'urgent';
     let currentLocation = '';
-    if (state.mode === 'staff') {
+    if (state.mode === 'staff' && record.status !== 'cancelled') {
       if (!record.current_assignment) currentLocation = '<p class="needs-request-location"><strong>Current location:</strong> No active assignment. Confirm the recipient location before arranging delivery.</p>';
       else if (String(record.current_assignment.assignment_id) !== String(record.assignment_id)) currentLocation = '<p class="needs-request-location"><strong>Current location:</strong> ' + esc(location(record.current_assignment)) + ' <span class="muted">(changed since this request)</span></p>';
     }
@@ -443,7 +444,7 @@
       const container = $('needsItems'); if (container) container.innerHTML = itemRow();
       if ($('needsNotes')) $('needsNotes').value = '';
       if ($('needsPriority')) $('needsPriority').value = 'normal';
-      feedback('Request submitted. Shelter staff can now see your items and assigned space.', 'success');
+      feedback(result.data.status === 'cancelled' ? 'Your earlier request was received and then cancelled when the evacuation operation ended. Check its history for the reason.' : 'Request submitted. Shelter staff can now see your items and assigned space.', 'success');
       await refresh({ force: true });
       return true;
     } catch (error) {
@@ -476,6 +477,11 @@
     if (!draft || !Object.hasOwn(statuses, draft.status) || !Number.isInteger(draft.version) || draft.version < 1) return false;
     const record = state.requests.find(entry => String(entry.request_id) === id);
     if (!record) return false;
+    if (record.status === 'cancelled') {
+      drafts.delete(id); updateErrors.delete(id);
+      feedback('This request was cancelled when the evacuation operation ended and can no longer be edited.', 'error');
+      renderList(true); return false;
+    }
     if (draft.status !== record.status && !(transitions[record.status] || []).includes(draft.status)) {
       updateErrors.set(id, 'This request has a newer status. Review it and select an available next step.');
       drafts.set(id, { ...draft, status: record.status, version: record.version }); renderList(true); return false;

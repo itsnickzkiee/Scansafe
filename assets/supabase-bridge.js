@@ -259,6 +259,7 @@
   }
 
   async function supabaseLogout(){
+    window.ScanSafeOperations?.reset();
     window.ScanSafeAppPromo?.reset();
     const sb=readyClient();
     if(sb) await sb.auth.signOut();
@@ -401,6 +402,7 @@
   }
 
   function adminLiveStatus(row){
+    if(String(row.current_status||'').trim().toLowerCase()==='released') return 'Released';
     if(row.approval_status==='approved'){
       return row.current_status==='checked_in'?'Checked-In':row.current_status==='accommodated'?'Assigned':'Approved';
     }
@@ -989,7 +991,7 @@
 
     const [evRes,asgRes]=await Promise.all([
       sb.from('evacuees')
-        .select('evacuee_id,group_id,registration_code,full_name,group_size,needs_summary,approval_status,barcodes(barcode_value,status)')
+        .select('evacuee_id,group_id,registration_code,full_name,group_size,needs_summary,approval_status,current_status,barcodes(barcode_value,status)')
         .eq('approval_status','approved')
         .order('registered_at',{ascending:true}),
       sb.from('accommodation_assignments')
@@ -1004,7 +1006,7 @@
     const groups=[];
     for(const row of evRes.data||[]){
       const qr=Array.isArray(row.barcodes)?row.barcodes.find(b=>b.status==='active'):row.barcodes;
-      if(!row.group_id || assigned.has(String(row.group_id)) || !qr || qr.status!=='active') continue;
+      if(!row.group_id || assigned.has(String(row.group_id)) || !qr || qr.status!=='active' || String(row.current_status||'').trim().toLowerCase()==='released') continue;
       const item={
         id:'DB:'+row.group_id,
         dbGroupId:Number(row.group_id),
@@ -1137,9 +1139,13 @@
   function renderLiveEvacueeAssignment(){
     const box=document.getElementById('userAssignmentSummary');
     if(!box) return;
-    const {loaded,assignment,space,shelter,assignmentError}=evacueeLiveCache;
-    if(!loaded || assignmentError && !assignment){
-      box.innerHTML='<div class="space-placeholder">'+(!loaded?'Loading accommodation...':'Accommodation could not be loaded. Use Refresh to try again.')+'</div>';
+    const {loaded,evacuee,assignment,space,shelter,assignmentError}=evacueeLiveCache;
+    if(!loaded){
+      box.innerHTML='<div class="space-placeholder">Loading accommodation...</div>';
+    }else if(String(evacuee?.current_status||'').trim().toLowerCase()==='released'){
+      box.innerHTML='<div class="space-placeholder"><b>Shelter stay ended</b><br>Your previous accommodation has been released. Contact shelter staff if you need a new shelter stay.</div>';
+    }else if(assignmentError && !assignment){
+      box.innerHTML='<div class="space-placeholder">Accommodation could not be loaded. Use Refresh to try again.</div>';
     }else if(!assignment){
       box.innerHTML='<div class="space-placeholder"><b>No accommodation assignment yet</b><br>Authorized staff will assign a space after approval and barcode issuance.</div>';
     }else if(!space){
@@ -1178,14 +1184,15 @@
     const user=window.currentState?.().user||{};
     const loaded=cache.loaded,approved=loaded && ev?.approval_status==='approved';
     const rejected=loaded && ev?.approval_status==='rejected';
+    const released=loaded && String(ev?.current_status||'').trim().toLowerCase()==='released';
     const hasBarcode=approved && !!cache.barcode?.barcode_value;
     window.ScanSafeBarcodeViewer?.setAccount(hasBarcode?{
       ownerId:cache.ownerId,value:cache.barcode.barcode_value
     }:null);
-    const status=loaded?(approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
+    const status=loaded?(released?'Released':approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
     const name=loaded?ev.full_name||'Evacuee':window.ScanSafeDB.profile?.full_name||'Evacuee';
     const display=(value,fallback='Not provided')=>value==null||value===''?fallback:value;
-    const assigned=loaded && !!cache.assignment;
+    const assigned=loaded && !released && !!cache.assignment;
     const fields={
       name,email:loaded?display(ev.email||window.ScanSafeDB.session?.user?.email):'--',
       age:loaded?display(ev.age):'--',gender:loaded?display(ev.gender):'--',
@@ -1195,11 +1202,11 @@
       status,'current-status':loaded?display(ev.current_status):'--',
       'registration-code':loaded?display(ev.registration_code):'--',id:loaded?user.id||'--':'--',
       initial:name.trim().charAt(0).toUpperCase()||'E',
-      shelter:!loaded?'--':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.shelter?.shelter_name||'Assigned shelter details unavailable':'Waiting for assignment',
-      space:!loaded?'--':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.space?.space_name||cache.space?.space_code||'Assigned space details unavailable':'Not assigned yet',
-      capacity:cache.space?Number(cache.space.capacity||0):'--',
-      occupied:cache.space?Number(cache.space.current_occupancy||0):'--',
-      available:cache.space?Math.max(0,Number(cache.space.capacity||0)-Number(cache.space.current_occupancy||0)):'--',
+      shelter:!loaded?'--':released?'Shelter stay ended':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.shelter?.shelter_name||'Assigned shelter details unavailable':'Waiting for assignment',
+      space:!loaded?'--':released?'Accommodation released':cache.assignmentError&&!assigned?'Unavailable':assigned?cache.space?.space_name||cache.space?.space_code||'Assigned space details unavailable':'Not assigned yet',
+      capacity:assigned&&cache.space?Number(cache.space.capacity||0):'--',
+      occupied:assigned&&cache.space?Number(cache.space.current_occupancy||0):'--',
+      available:assigned&&cache.space?Math.max(0,Number(cache.space.capacity||0)-Number(cache.space.current_occupancy||0)):'--',
       submitted:loaded?evacueeDate(ev.registered_at):'--',
       'approved-at':loaded?evacueeDate(ev.approved_at):'--'
     };
@@ -1212,29 +1219,29 @@
     });
     const hero=document.getElementById('userStatusHero');
     if(hero){
-      const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
-      const text=!loaded?'Your registration status is being retrieved from the database.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Please contact shelter staff.'):rejected?'Please contact shelter staff to correct your registration.':'Your registration is waiting for administrator review.';
-      hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>Registration Status</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
+      const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):released?'Shelter Stay Ended':approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
+      const text=!loaded?'Your registration status is being retrieved from the database.':released?'Your accommodation has been released. Your account is saved for future evacuation operations. Contact shelter staff if you need a new shelter stay.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Please contact shelter staff.'):rejected?'Please contact shelter staff to correct your registration.':'Your registration is waiting for administrator review.';
+      hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>'+(released?'Shelter Status':'Registration Status')+'</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
     }
-    const barcodeBody=hasBarcode?'<p>Your issued barcode is ready for scanning or printing.</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
+    const barcodeBody=hasBarcode?'<p>'+(released?'Your barcode remains linked to your account. Show it to staff when requesting a new shelter stay.':'Your issued barcode is ready for scanning or printing.')+'</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
     const qr=document.getElementById('userQrCard');
     if(qr) qr.innerHTML='<div class="app-status-icon">&#9638;</div><h3>My Barcode</h3>'+barcodeBody;
     const barcodeCard=document.querySelector('.barcode-card');
     if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcodeBody;
     const acc=document.getElementById('userAccommodationCard');
-    if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
+    if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(released?'Your previous shelter stay has ended. Contact staff for another stay.':assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
     const latest=document.getElementById('userLatestCard');
     if(latest){
-      const title=!loaded?'Loading updates...':user.checkedIn?'Check-in confirmed':assigned?'Accommodation assigned':hasBarcode?'Barcode issued':approved?'Registration approved':rejected?'Registration needs correction':'Registration submitted';
-      latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">'+esc(title)+'</div><p>'+esc(cache.error?'Refresh failed. Showing the last confirmed account data.':loaded?evacueeDate(ev.approved_at||ev.registered_at):'Retrieving your registration.')+'</p>';
+      const title=!loaded?'Loading updates...':released?'Shelter stay ended':user.checkedIn?'Check-in confirmed':assigned?'Accommodation assigned':hasBarcode?'Barcode issued':approved?'Registration approved':rejected?'Registration needs correction':'Registration submitted';
+      latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">'+esc(title)+'</div><p>'+esc(cache.error?'Refresh failed. Showing the last confirmed account data.':released?'Your previous accommodation is closed. Contact shelter staff for another stay.':loaded?evacueeDate(ev.approved_at||ev.registered_at):'Retrieving your registration.')+'</p>';
     }
     const progress=document.getElementById('userProgressSteps');
     if(progress){
-      const steps=[['Submitted',loaded],['Admin Review',approved||rejected],['Barcode Issued',hasBarcode],['Assigned',assigned],['Checked-In',!!user.checkedIn]];
+      const steps=[['Submitted',loaded],['Admin Review',approved||rejected],['Barcode Issued',hasBarcode],['Assigned',assigned||released],[released?'Released':'Checked-In',released||!!user.checkedIn]];
       let firstPending=false;
       progress.innerHTML=steps.map(([label,done],index)=>{
-        const active=loaded&&!done&&!firstPending; if(active) firstPending=true;
-        return '<div class="progress-step '+(done?'done':active?'active':'')+'"><i>'+(done?'&#10003;':index+1)+'</i><b>'+label+'</b><small>'+(!loaded?'Loading':done?'Completed':rejected?'Not completed':'Pending')+'</small></div>';
+        const active=loaded&&!released&&!done&&!firstPending; if(active) firstPending=true;
+        return '<div class="progress-step '+(done?'done':active?'active':'')+'"><i>'+(done?'&#10003;':index+1)+'</i><b>'+label+'</b><small>'+(!loaded?'Loading':done?'Completed':released?'Stay ended':rejected?'Not completed':'Pending')+'</small></div>';
       }).join('');
     }
     const members=document.getElementById('userGroupMembersBody');
@@ -1349,7 +1356,7 @@
         authUserId:ownerId,requestId:ev.registration_code||null,id:'EV-'+String(ev.evacuee_id).padStart(3,'0'),dbId:ev.evacuee_id,dbGroupId:ev.group_id,
         name:ev.full_name||profile.full_name||'Evacuee',email:ev.email||session.user.email||'',age:ev.age??null,gender:ev.gender||'',group:Number(ev.group_size||1),needs:ev.needs_summary||'None',
         registrationStatus:approved?'Approved':ev.approval_status==='rejected'?'Rejected':'Pending Approval',qrIssued:!!barcode?.barcode_value,qrCode:barcode?.barcode_value||null,
-        assignment:snapshot.space?.space_code||null,checkedIn:ev.current_status==='checked_in'||!!ev.checked_in_at,submitted:ev.registered_at||''
+        assignment:ev.current_status==='released'?null:snapshot.space?.space_code||null,checkedIn:ev.current_status==='checked_in',currentStatus:ev.current_status||'',submitted:ev.registered_at||''
       };
       state.requests=[];state.activity=[];state.demoGroups=[];state.demoAssignments={};
       window.saveScanSafeState(state);
@@ -1417,6 +1424,17 @@
 
     await bootstrapSession();
     if(!(await phase9AccessGuard())) return;
+    const operationsOwner=window.ScanSafeDB.session?.user?.id;
+    document.querySelectorAll('[data-operations-link]').forEach(link=>{
+      link.hidden=!(operationsOwner && window.ScanSafeDB.profile?.id===operationsOwner && window.ScanSafeDB.profile.role==='admin');
+    });
+    if(window.ScanSafeOperations){
+      Promise.resolve(window.ScanSafeOperations.init({
+        getClient:readyClient,
+        getContext:()=>({userId:window.ScanSafeDB.session?.user?.id,role:window.ScanSafeDB.profile?.role,profile:window.ScanSafeDB.profile}),
+        refresh:()=>Promise.allSettled([loadAccommodationState(),loadAdminLiveSnapshot(),window.ScanSafeNeeds?.refresh()])
+      })).catch(error=>console.warn('ScanSafe operations:',error.message));
+    }
     if(window.ScanSafeNeeds){
       Promise.resolve(window.ScanSafeNeeds.init({
         getClient:readyClient,
@@ -2288,6 +2306,8 @@
     sb.auth.onAuthStateChange((event,session)=>{
       window.ScanSafeDB.session=session||null;
       if(event==='SIGNED_OUT'){
+        window.ScanSafeOperations?.reset();
+        document.querySelectorAll('[data-operations-link]').forEach(link=>{link.hidden=true;});
         window.ScanSafeAppPromo?.reset();
         window.ScanSafeDB.profile=null;
         localStorage.removeItem('scanSafeLoginRole');
@@ -2309,7 +2329,11 @@
         // Auth callbacks must finish before another Supabase request starts.
         setTimeout(async()=>{
           await getProfile(session.user.id);
+          document.querySelectorAll('[data-operations-link]').forEach(link=>{
+            link.hidden=!(window.ScanSafeDB.profile?.id===window.ScanSafeDB.session?.user?.id && window.ScanSafeDB.profile?.role==='admin');
+          });
           window.ScanSafeNeeds?.refresh();
+          window.ScanSafeOperations?.refresh();
           if(scannerPageActive() && !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) window.ScanSafeScanner?.reset();
           if(isEvacueeAppPage()){
             if(evacueeRefreshPromise) await evacueeRefreshPromise;

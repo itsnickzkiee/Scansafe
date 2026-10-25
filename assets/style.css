@@ -4897,6 +4897,7 @@ body.barcode-viewer-open {
 .needs-status-for_delivery { color: #6938ef; background: #f4f3ff; }
 .needs-status-provided { color: #067647; background: #ecfdf3; }
 .needs-status-unavailable, .needs-priority-urgent { color: #b42318; background: #fef3f2; }
+.needs-status-cancelled { color: #475467; background: #f2f4f7; }
 .needs-admin-update { border-top: 1px solid #eaecf0; padding-top: 12px; margin-top: 14px; }
 .needs-update-grid { display: grid; grid-template-columns: minmax(130px,1fr) minmax(0,2fr); gap: 10px; }
 .needs-mobile-badge { position: absolute; top: 4px; right: 7px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 12px; background: #d50000; color: #fff; font-size: 9px; line-height: 16px; }
@@ -4915,6 +4916,7 @@ body.barcode-viewer-open {
 @media (max-width: 380px) { .needs-field-grid, .needs-item-fields { grid-template-columns: minmax(0,1fr); } }
 
 /* Shared visual polish. Screen-only rules preserve barcode print output. */
+.btn[data-operations-link][hidden] { display: none !important; }
 @media screen {
   :root {
     --ui-text: #172b43;

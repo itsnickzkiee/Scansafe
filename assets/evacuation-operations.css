@@ -1,0 +1,60 @@
+/* Scoped operation controls. Existing dashboard and map layouts stay intact. */
+#evacuationOperationsApp { --ops-border: #e4e7ec; --ops-muted: #667085; margin-top: 24px; padding: clamp(16px, 2.2vw, 26px); border: 1px solid var(--ops-border); border-radius: 14px; background: #fff; color: #101828; box-shadow: 0 2px 8px rgba(16, 24, 40, .04); }
+#evacuationOperationsApp[hidden], #evacuationOperationsApp [hidden] { display: none !important; }
+#evacuationOperationsApp *, #evacuationOperationsApp *::before, #evacuationOperationsApp *::after { box-sizing: border-box; }
+#evacuationOperationsApp .evac-ops-header, #evacuationOperationsApp .evac-ops-review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+#evacuationOperationsApp h2 { margin: 4px 0 8px; font-size: 21px; line-height: 1.3; letter-spacing: -.4px; }
+#evacuationOperationsApp h3 { margin: 0 0 12px; font-size: 16px; line-height: 1.4; letter-spacing: -.2px; }
+#evacuationOperationsApp p { margin: 8px 0; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+#evacuationOperationsApp .evac-ops-header p, #evacuationOperationsApp .evac-ops-muted, #evacuationOperationsApp .evac-ops-help { color: var(--ops-muted); }
+#evacuationOperationsApp .evac-ops-eyebrow { color: #b42318; font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+#evacuationOperationsApp .evac-ops-header > .btn { flex: 0 0 auto; }
+#evacuationOperationsApp .evac-ops-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+#evacuationOperationsApp .evac-ops-stat { padding: 16px; border: 1px solid var(--ops-border); border-radius: 10px; background: #f9fafb; }
+#evacuationOperationsApp .evac-ops-stat span { display: block; color: #475467; font-size: 12px; line-height: 1.5; }
+#evacuationOperationsApp .evac-ops-stat strong { display: block; margin-top: 7px; font-size: 26px; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+#evacuationOperationsApp .evac-ops-capacity { margin: 12px 0 20px; color: var(--ops-muted); font-size: 12px; }
+#evacuationOperationsApp .evac-ops-discrepancy { display: inline-block; margin-left: 8px; color: #b54708; font-weight: 600; }
+#evacuationOperationsApp .evac-ops-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+#evacuationOperationsApp .evac-ops-panel { padding: 20px; margin: 0; border: 1px solid var(--ops-border); border-radius: 11px; background: #fff; }
+#evacuationOperationsApp .evac-ops-operation-name { font-size: 18px; font-weight: 700; color: #101828; }
+#evacuationOperationsApp .evac-ops-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+#evacuationOperationsApp .btn { min-height: 42px; padding: 10px 15px; font-size: 13px; line-height: 1.4; border-radius: 8px; cursor: pointer; }
+#evacuationOperationsApp .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+#evacuationOperationsApp .btn:focus-visible, #evacuationOperationsApp input:focus-visible, #evacuationOperationsApp select:focus-visible, #evacuationOperationsApp textarea:focus-visible, #evacuationOperationsApp a:focus-visible, #evacuationOperationsApp summary:focus-visible { outline: 3px solid rgba(213, 0, 0, .22); outline-offset: 3px; }
+#evacuationOperationsApp label:not(.evac-ops-check) { display: block; margin: 16px 0 7px; color: #344054; font-size: 13px; font-weight: 600; }
+#evacuationOperationsApp input:not([type="checkbox"]), #evacuationOperationsApp select, #evacuationOperationsApp textarea { display: block; width: 100%; min-height: 42px; border: 1px solid #d0d5dd; border-radius: 8px; padding: 10px 12px; background: #fff; color: #101828; font: inherit; font-size: 13px; line-height: 1.5; box-shadow: 0 1px 2px rgba(16, 24, 40, .03); }
+#evacuationOperationsApp textarea { min-height: 86px; resize: vertical; }
+#evacuationOperationsApp #operationsStart, #evacuationOperationsApp #operationsReadmit { margin-top: 16px; }
+#evacuationOperationsApp .evac-ops-link, #evacuationOperationsApp a { color: #b42318; text-underline-offset: 3px; }
+#evacuationOperationsApp .evac-ops-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; }
+#evacuationOperationsApp .evac-ops-feedback { margin: 16px 0; padding: 13px 15px; border: 1px solid #fecdca; border-radius: 9px; background: #fef3f2; color: #912018; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#evacuationOperationsApp .evac-ops-feedback.is-success { border-color: #abefc6; background: #ecfdf3; color: #05603a; }
+#evacuationOperationsApp .evac-ops-feedback > .btn { display: block; margin-top: 10px; background: #fff; }
+#evacuationOperationsApp .evac-ops-close-review { margin-top: 20px; padding: 22px; border: 1px solid #fda29b; border-top: 4px solid #d50000; border-radius: 11px; background: #fffcfc; scroll-margin-top: 110px; }
+#evacuationOperationsApp .evac-ops-close-review:focus { outline: none; }
+#evacuationOperationsApp .evac-ops-close-review .evac-ops-stat { background: #fff; }
+#evacuationOperationsApp .evac-ops-pending { margin: 18px 0; padding: 15px; border: 1px solid #fedf89; border-radius: 9px; background: #fffaeb; color: #7a2e0e; }
+#evacuationOperationsApp .evac-ops-pending > strong { font-size: 13px; }
+#evacuationOperationsApp .evac-ops-check { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 12px; font-size: 13px; font-weight: 400; line-height: 1.6; cursor: pointer; }
+#evacuationOperationsApp .evac-ops-check input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: #d50000; }
+#evacuationOperationsApp #operationsConfirmText { max-width: 260px; letter-spacing: 2px; font-weight: 700; }
+#evacuationOperationsApp .evac-ops-history { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--ops-border); }
+#evacuationOperationsApp .evac-ops-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--ops-border); border-radius: 9px; }
+#evacuationOperationsApp .evac-ops-table { width: 100%; min-width: 610px; border-collapse: collapse; text-align: left; font-size: 12px; }
+#evacuationOperationsApp .evac-ops-table th { background: #f9fafb; color: #475467; font-weight: 600; }
+#evacuationOperationsApp .evac-ops-table th, #evacuationOperationsApp .evac-ops-table td { padding: 13px 15px; border-bottom: 1px solid #eaecf0; vertical-align: top; line-height: 1.6; }
+#evacuationOperationsApp .evac-ops-table tr:last-child td { border-bottom: 0; }
+#evacuationOperationsApp .evac-ops-table td:first-child { max-width: 230px; overflow-wrap: anywhere; }
+#evacuationOperationsApp .evac-ops-status { display: block; width: fit-content; margin-top: 5px; padding: 2px 8px; border-radius: 20px; background: #f2f4f7; color: #475467; font-size: 10px; font-weight: 600; }
+#evacuationOperationsApp summary { color: #b42318; cursor: pointer; font-weight: 600; }
+#evacuationOperationsApp .evac-ops-empty { margin: 0; padding: 18px; border: 1px dashed #d0d5dd; border-radius: 9px; background: #f9fafb; color: #667085; }
+#evacuationOperationsApp .evac-ops-archive-heading { margin: 16px 0 8px; font-size: 12px; }
+#evacuationOperationsApp .evac-ops-archive { display: grid; gap: 10px; min-width: 230px; }
+#evacuationOperationsApp .evac-ops-stay { padding: 12px; border: 1px solid var(--ops-border); border-radius: 8px; background: #f9fafb; }
+#evacuationOperationsApp .evac-ops-stay-count { display: block; color: var(--ops-muted); font-size: 11px; margin-top: 3px; }
+#evacuationOperationsApp .evac-ops-stay p, #evacuationOperationsApp .evac-ops-stay li { font-size: 12px; }
+#evacuationOperationsApp .evac-ops-stay ul { padding-left: 18px; margin: 10px 0; }
+#evacuationOperationsApp .evac-ops-stay li + li { margin-top: 8px; }
+@media (max-width: 850px) { #evacuationOperationsApp .evac-ops-layout { grid-template-columns: minmax(0, 1fr); } #evacuationOperationsApp .evac-ops-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { #evacuationOperationsApp { padding: 16px; } #evacuationOperationsApp .evac-ops-header, #evacuationOperationsApp .evac-ops-review-heading { flex-wrap: wrap; } #evacuationOperationsApp .evac-ops-panel, #evacuationOperationsApp .evac-ops-close-review { padding: 16px; } #evacuationOperationsApp .evac-ops-stat { padding: 12px; } #evacuationOperationsApp .evac-ops-stat strong { font-size: 24px; } #evacuationOperationsApp .evac-ops-actions .btn { width: 100%; } #evacuationOperationsApp input:not([type="checkbox"]), #evacuationOperationsApp select, #evacuationOperationsApp textarea { font-size: 16px; } #evacuationOperationsApp .evac-ops-discrepancy { display: block; margin-left: 0; margin-top: 4px; } }

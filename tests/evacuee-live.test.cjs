@@ -215,6 +215,39 @@ test('authenticated account RPC supplies Nick without direct-table queries', asy
   assert.match(h.nodes.get('userStatusHero').innerHTML, /Registration Approved/);
 });
 
+test('released stays show an ended stay while preserving the issued account barcode', async () => {
+  const tables = approvedTables();
+  tables.evacuees[0].current_status = 'released';
+  tables.evacuees[0].checked_in_at = '2026-10-23T03:00:00Z';
+  const snapshot = ownSnapshot(tables);
+  const h = harness({ accountSnapshot: async () => ({ data: snapshot, error: null }) });
+  h.nodes.set('userAssignmentSummary', new Element('userAssignmentSummary'));
+  await h.refresh();
+  assert.equal(h.kpi('data-user-status'), 'Released');
+  assert.equal(h.context.currentState().user.checkedIn, false);
+  assert.equal(h.context.currentState().user.assignment, null);
+  assert.equal(h.context.currentState().user.qrCode, 'NICK-ACTUAL-50');
+  assert.match(h.nodes.get('userStatusHero').innerHTML, /Shelter Stay Ended/);
+  assert.match(h.nodes.get('userAccommodationCard').innerHTML, /Accommodation released/);
+  assert.match(h.nodes.get('userLatestCard').innerHTML, /Shelter stay ended/);
+  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /previous accommodation has been released/);
+  assert.match(h.nodes.get('userProgressSteps').innerHTML, /Released/);
+  assert.doesNotMatch(h.nodes.get('userProgressSteps').innerHTML, /Pending|Checked-In/);
+  assert.match(h.nodes.get('userQrCard').innerHTML, /Show Barcode/);
+});
+
+test('a previous check-in timestamp does not check in a newly readmitted or assigned stay', async () => {
+  for (const currentStatus of ['registered', 'verified', 'accommodated', 'checked_in']) {
+    const tables = approvedTables();
+    tables.evacuees[0].current_status = currentStatus;
+    tables.evacuees[0].checked_in_at = '2026-10-23T03:00:00Z';
+    const h = harness({ accountSnapshot: async () => ({ data: ownSnapshot(tables), error: null }) });
+    await h.refresh();
+    assert.equal(h.context.currentState().user.checkedIn, currentStatus === 'checked_in', currentStatus);
+    if (currentStatus !== 'checked_in') assert.doesNotMatch(h.nodes.get('userLatestCard').innerHTML, /Check-in confirmed/);
+  }
+});
+
 test('an open pending account sees approval and its real barcode on the next refresh', async () => {
   const h = harness();
   await h.refresh();
