@@ -20,3 +20,168 @@
 .records-detail-list span{display:block}
 .records-detail-list b{color:#263a52;font-size:8px}
 .records-detail-empty{color:#9aa5b3;font-size:8px}
+
+
+/* =========================================================
+   ScanSafe v3 — Records/Audit visual polish
+   ========================================================= */
+.records-tabs{
+  position:sticky;
+  top:0;
+  z-index:5;
+  display:flex!important;
+  gap:7px!important;
+  padding:7px!important;
+  margin-bottom:14px!important;
+  border:1px solid #e9edf2!important;
+  border-radius:13px!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 7px 20px rgba(16,36,62,.055)!important;
+  backdrop-filter:blur(10px);
+}
+.records-tabs button{
+  min-height:35px!important;
+  border-radius:9px!important;
+  padding:8px 13px!important;
+  color:#617187!important;
+  font-size:9px!important;
+  font-weight:900!important;
+  transition:all .15s ease;
+}
+.records-tabs button:hover{
+  background:#fff4f4!important;
+  color:#b00000!important;
+}
+.records-tabs button.active{
+  background:linear-gradient(135deg,#e60000,#bd0000)!important;
+  color:#fff!important;
+  box-shadow:0 5px 12px rgba(200,0,0,.16)!important;
+}
+
+.records-panel{
+  border:1px solid #e8edf2!important;
+  border-radius:14px!important;
+  box-shadow:0 9px 26px rgba(16,36,62,.045)!important;
+  background:#fff!important;
+}
+.records-head{
+  padding-bottom:12px!important;
+  border-bottom:1px solid #eef1f4!important;
+}
+.records-head h3{
+  color:#10243e!important;
+  font-size:17px!important;
+}
+.records-head p{
+  max-width:640px;
+  line-height:1.5!important;
+  color:#718095!important;
+}
+
+.records-filters{
+  margin:12px 0!important;
+  padding:10px!important;
+  border:1px solid #edf0f4!important;
+  border-radius:11px!important;
+  background:#fafbfc!important;
+}
+.records-filters input,
+.records-filters select{
+  min-height:38px!important;
+  border:1px solid #dfe5eb!important;
+  background:#fff!important;
+  border-radius:9px!important;
+  color:#263a52!important;
+  outline:none!important;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+.records-filters input:focus,
+.records-filters select:focus{
+  border-color:#df0000!important;
+  box-shadow:0 0 0 3px rgba(223,0,0,.07)!important;
+}
+
+.records-table-wrap{
+  border:1px solid #e8edf2!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+.records-table-wrap .table{
+  border-collapse:separate!important;
+  border-spacing:0!important;
+}
+.records-table-wrap thead th{
+  padding:11px 12px!important;
+  background:#f7f9fb!important;
+  color:#42556e!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  text-transform:uppercase;
+  letter-spacing:.035em;
+  border-bottom:1px solid #e7ebf0!important;
+}
+.records-table-wrap tbody td{
+  padding:11px 12px!important;
+  vertical-align:top!important;
+  border-bottom:1px solid #eef1f4!important;
+  color:#354960!important;
+  font-size:9px!important;
+}
+.records-table-wrap tbody tr:hover td{
+  background:#fffafa!important;
+}
+
+.records-detail-list{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(120px,1fr))!important;
+  gap:6px 10px!important;
+  min-width:300px!important;
+}
+.records-detail-list span{
+  padding:6px 8px!important;
+  border:1px solid #edf0f4!important;
+  border-radius:8px!important;
+  background:#fafbfc!important;
+  color:#5d6c80!important;
+  font-size:8px!important;
+}
+.records-detail-list b{
+  color:#1f334b!important;
+  font-size:8px!important;
+  font-weight:900!important;
+}
+.records-detail-empty{
+  display:inline-block;
+  padding:6px 9px;
+  border-radius:8px;
+  background:#f6f8fa;
+  color:#8d99a8!important;
+}
+
+.records-status{
+  min-width:74px;
+  text-align:center;
+  padding:5px 8px!important;
+  border-radius:999px!important;
+  font-size:7.5px!important;
+  font-weight:900!important;
+}
+.records-status.done{
+  background:#f0f3f6!important;
+  color:#5a6879!important;
+}
+.records-status.active{
+  background:#e7f8ee!important;
+  color:#138347!important;
+}
+.records-restore{
+  border-radius:8px!important;
+}
+
+@media(max-width:900px){
+  .records-detail-list{
+    grid-template-columns:1fr!important;
+    min-width:220px!important;
+  }
+}

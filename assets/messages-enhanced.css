@@ -320,3 +320,180 @@ body.ss-messages-page[data-message-realtime="subscribed"] .ss-conv-head::after{
   padding:6px 9px;font-size:8px;font-weight:800;cursor:pointer
 }
 .ss-delete-conversation:hover{background:#a90000}
+
+
+/* =========================================================
+   ScanSafe v6 — Archive/Delete UI visual polish only
+   ========================================================= */
+.ss-conversation-switch{
+  position:relative;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin:4px 0 12px;
+  padding:5px;
+  border:1px solid #edf0f4;
+  border-radius:12px;
+  background:#f7f8fa;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+}
+.ss-conversation-switch button{
+  position:relative;
+  min-height:34px;
+  border:0;
+  border-radius:9px;
+  background:transparent;
+  color:#657387;
+  font-size:9px;
+  font-weight:800;
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.ss-conversation-switch button:hover{
+  color:#b00000;
+  background:#fff;
+}
+.ss-conversation-switch button.active{
+  color:#fff;
+  background:linear-gradient(135deg,#e60000,#bd0000);
+  box-shadow:0 5px 12px rgba(200,0,0,.18);
+}
+.ss-conversation-switch button span{
+  display:inline-grid;
+  place-items:center;
+  min-width:18px;
+  height:18px;
+  margin-left:5px;
+  padding:0 5px;
+  border-radius:999px;
+  background:rgba(0,0,0,.08);
+  font-size:7px;
+}
+.ss-conversation-switch button.active span{
+  background:rgba(255,255,255,.2);
+  color:#fff;
+}
+
+.ss-contact-archived{
+  display:grid!important;
+  grid-template-columns:38px minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:10px!important;
+  margin-bottom:6px!important;
+  padding:11px!important;
+  border:1px solid #edf0f4!important;
+  border-radius:12px!important;
+  background:linear-gradient(145deg,#fff,#fbfcfd)!important;
+  box-shadow:0 3px 10px rgba(16,36,62,.035)!important;
+}
+.ss-contact-archived:hover{
+  border-color:#efcaca!important;
+  background:#fff8f8!important;
+}
+.ss-contact-archived .ss-contact-copy b{
+  font-size:10px!important;
+  color:#10243e!important;
+}
+.ss-contact-archived .ss-contact-copy>span{
+  margin-top:2px!important;
+  color:#69788d!important;
+}
+.ss-contact-archived .ss-contact-copy small{
+  margin-top:4px!important;
+  color:#a06d6d!important;
+}
+.ss-restore-contact{
+  min-width:64px;
+  border:1px solid #e7b5b5!important;
+  background:#fff!important;
+  color:#b00000!important;
+  border-radius:9px!important;
+  padding:7px 10px!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  cursor:pointer!important;
+  transition:all .15s ease!important;
+}
+.ss-restore-contact:hover{
+  border-color:#d60000!important;
+  color:#fff!important;
+  background:#d60000!important;
+  transform:translateY(-1px);
+}
+
+.ss-conv-tools{
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.ss-archive-conversation,
+.ss-delete-conversation{
+  min-height:31px;
+  border-radius:9px!important;
+  padding:7px 10px!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  cursor:pointer!important;
+  transition:all .16s ease!important;
+}
+.ss-archive-conversation{
+  border:1px solid #e4c0c0!important;
+  background:#fff!important;
+  color:#9d1717!important;
+}
+.ss-archive-conversation:hover{
+  border-color:#cc8c8c!important;
+  background:#fff3f3!important;
+  transform:translateY(-1px);
+}
+.ss-delete-conversation{
+  border:1px solid #c90000!important;
+  background:linear-gradient(135deg,#df0000,#bd0000)!important;
+  color:#fff!important;
+  box-shadow:0 4px 10px rgba(190,0,0,.12);
+}
+.ss-delete-conversation:hover{
+  background:linear-gradient(135deg,#c90000,#9f0000)!important;
+  transform:translateY(-1px);
+}
+
+.ss-recipient-lock{
+  position:relative;
+  margin:0 12px 8px!important;
+  padding:8px 10px 8px 28px!important;
+  border:1px solid #f0d2d2!important;
+  border-radius:10px!important;
+  background:linear-gradient(90deg,#fff9f9,#fff)!important;
+  color:#7a8797!important;
+}
+.ss-recipient-lock::before{
+  content:'';
+  position:absolute;
+  left:10px;
+  top:50%;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#15a957;
+  transform:translateY(-50%);
+  box-shadow:0 0 0 3px rgba(21,169,87,.1);
+}
+.ss-recipient-lock b{
+  color:#b00000!important;
+  font-size:9px!important;
+}
+.ss-recipient-lock b::before{display:none!important}
+
+@media(max-width:560px){
+  .ss-conv-tools{
+    width:100%;
+    justify-content:flex-start!important;
+    margin-top:5px;
+  }
+  .ss-conv-last{display:none}
+  .ss-archive-conversation,.ss-delete-conversation{
+    flex:1;
+  }
+}
