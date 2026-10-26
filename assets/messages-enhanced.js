@@ -393,7 +393,10 @@
   async function loadContacts(selectFirst=false){
     if(!state.sb||!isStaff) return;
     let data=null,error=null;
-    let result=await state.sb.rpc('get_staff_message_contacts_v2');
+    let result=await state.sb.rpc('get_staff_message_contacts_v3');
+    if(result.error && /PGRST202|does not exist|could not find/i.test((result.error.code||'')+' '+(result.error.message||''))){
+      result=await state.sb.rpc('get_staff_message_contacts_v2');
+    }
     if(result.error && /PGRST202|does not exist|could not find/i.test((result.error.code||'')+' '+(result.error.message||''))){
       result=await state.sb.rpc('get_staff_message_contacts');
     }
@@ -469,7 +472,11 @@
         ${avatarMarkup(state.currentName,c?.profile_url||'')}
         <div><b>${esc(state.currentName)}</b><span>Evacuee • ScanSafe Account</span></div>
       </div>
-      <span class="ss-conv-last">${esc(c?.last_at?relative(c.last_at):'')}</span>`;
+      <div class="ss-conv-tools">
+        <span class="ss-conv-last">${esc(c?.last_at?relative(c.last_at):'')}</span>
+        <button type="button" class="ss-archive-conversation" data-archive-conversation title="Archive conversation">Archive</button>
+      </div>`;
+      head.querySelector('[data-archive-conversation]')?.addEventListener('click',archiveCurrentConversation);
     }
 
     await setupTypingChannel(state.currentId,state.currentName);
@@ -480,6 +487,29 @@
 
     renderThread(data||[],state.currentName);
     setTimeout(()=>loadContacts(false),120);
+  }
+
+  async function archiveCurrentConversation(){
+    if(!isStaff||!state.currentId||!state.sb) return;
+    const receiver=selectedReceiver();
+    if(!receiver?.id) return;
+    if(!window.confirm(`Archive conversation with ${receiver.name}? Messages will be retained and searchable in Reports & Analytics.`)) return;
+    try{
+      const {error}=await state.sb.rpc('archive_scansafe_conversation',{
+        p_user_id:receiver.id,p_reason:null
+      });
+      if(error) throw error;
+      window.toast?.(`Conversation with ${receiver.name} archived.`);
+      state.currentId=null; state.currentName='';
+      setRecipientLock(null,'Select an evacuee');
+      const head=document.querySelector('[data-enhanced-conv-head]');
+      if(head) head.innerHTML='<div><b>Conversation archived</b><span>Open another conversation or view Archived Conversations in Reports & Analytics.</span></div>';
+      const t=thread();
+      if(t) t.innerHTML='<div class="ss-empty-chat"><b>Conversation archived</b><span>Message history was retained.</span></div>';
+      await loadContacts(true);
+    }catch(error){
+      window.toast?.(error?.message||'Conversation could not be archived.');
+    }
   }
 
   async function directSend(receiver,message){

@@ -285,3 +285,10 @@ body.ss-messages-page[data-message-realtime="subscribed"] .ss-conv-head::after{
   }
   body.ss-messages-page .conversation{min-height:560px!important}
 }
+
+.ss-conv-tools{display:flex;align-items:center;gap:8px}
+.ss-archive-conversation{
+  border:1px solid #e4bcbc;background:#fff;color:#a40000;border-radius:8px;
+  padding:6px 9px;font-size:8px;font-weight:800;cursor:pointer
+}
+.ss-archive-conversation:hover{background:#fff0f0}

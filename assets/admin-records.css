@@ -1,0 +1,14 @@
+.records-tabs{display:flex;gap:6px;padding:6px;margin-bottom:12px;overflow:auto}
+.records-tabs button{border:0;background:transparent;padding:9px 12px;border-radius:8px;font-size:9px;font-weight:800;color:#5d6d82;white-space:nowrap;cursor:pointer}
+.records-tabs button.active{background:#e60000;color:#fff}
+.records-panel{margin-top:0}
+.records-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.records-head h3{margin:0 0 4px;font-size:16px}.records-head p{margin:0;color:#6f7d90;font-size:9px}
+.records-filters{display:flex;gap:8px;margin-bottom:10px}.records-filters input,.records-filters select{border:1px solid #dce2e8;border-radius:8px;padding:9px 10px;font:inherit;font-size:9px;min-width:180px}
+.records-filters input{flex:1}.records-table-wrap{overflow:auto;max-height:570px;border:1px solid #edf0f4;border-radius:9px}
+.records-table-wrap .table{min-width:850px;margin:0}.records-table-wrap thead th{position:sticky;top:0;background:#f8fafc;z-index:2}
+.records-table-wrap code{font-size:7.5px;white-space:normal;word-break:break-word;color:#53647a}
+.records-status{display:inline-block;padding:4px 7px;border-radius:999px;font-size:8px;font-weight:800;text-transform:capitalize}
+.records-status.done{background:#eef2f6;color:#556477}.records-status.active{background:#e9f8ef;color:#168647}
+.records-restore{padding:6px 9px!important;font-size:8px!important}
+@media(max-width:720px){.records-head,.records-filters{flex-direction:column}.records-filters input,.records-filters select{width:100%;min-width:0}}

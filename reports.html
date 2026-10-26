@@ -1,11 +1,17 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe Reports &amp; Analytics</title><link rel="stylesheet" href="assets/style.css?v=operations-v22"><link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
 <link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
-<link rel="stylesheet" href="assets/reports-live.css?v=reports-v1">
-</head><body><div class="admin-app"><header class="admin-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions"><div class="avatar">A</div><div class="identity"><strong>Admin</strong>Administrator</div><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon "><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon "><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a><a class="nav-item " href="barcode-scanner.html"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><span>Barcode Scanner</span></a><a class="nav-item active" href="reports.html"><svg class="icon "><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a><a class="nav-item" href="needs-requests.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Needs Requests</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item " href="messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a></aside>
+<link rel="stylesheet" href="assets/reports-live.css?v=reports-v2">
+<link rel="stylesheet" href="assets/admin-records.css?v=records-v1"></head><body><div class="admin-app"><header class="admin-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions"><div class="avatar">A</div><div class="identity"><strong>Admin</strong>Administrator</div><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon "><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon "><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a><a class="nav-item " href="barcode-scanner.html"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><span>Barcode Scanner</span></a><a class="nav-item active" href="reports.html"><svg class="icon "><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a><a class="nav-item" href="needs-requests.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Needs Requests</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item " href="messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a></aside>
 <main class="admin-main">
 <section class="page">
 <div class="page-title"><div><h1>Reports &amp; Analytics</h1><p>Generate reports and analyze evacuation and shelter data.</p></div><div class="date-line"><svg class="icon sm"><use href="assets/icons.svg#calendar"></use></svg><span data-now></span></div></div>
 <div id="adminDataStatus" class="card card-pad" role="status" style="margin-bottom:12px">Loading live data...</div>
+<nav class="records-tabs card" data-records-tabs>
+  <button type="button" class="active" data-records-tab="analytics">Analytics</button>
+  <button type="button" data-records-tab="stays">Stay History</button>
+  <button type="button" data-records-tab="audit">Audit Trail</button>
+  <button type="button" data-records-tab="archives">Archived Conversations</button>
+</nav>
 <section class="card card-pad">
 <h3 class="section-h"><svg class="icon"><use href="assets/icons.svg#filter"></use></svg> Report Filters</h3>
 <div class="report-filter">
@@ -68,6 +74,26 @@
 <script src="assets/account-media.js?v=live-profile-v1"></script>
 <script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
-<script src="assets/reports-live.js?v=reports-v1"></script>
+
+<section class="records-panel card card-pad" data-records-panel="stays" hidden>
+  <div class="records-head"><div><h3>Stay History</h3><p>Completed and active shelter stays. Released stays remain as permanent history.</p></div><button class="btn out" data-records-export="stays">Export CSV</button></div>
+  <div class="records-filters"><input data-stay-search placeholder="Search evacuee / space / shelter..."><select data-stay-status><option value="all">All statuses</option><option value="assigned">Assigned</option><option value="admitted">Admitted</option><option value="released">Released / Completed</option></select></div>
+  <div class="records-table-wrap"><table class="table"><thead><tr><th>Evacuee</th><th>Group</th><th>Space</th><th>Time In</th><th>Departure</th><th>Duration</th><th>Status</th></tr></thead><tbody data-stay-history><tr><td colspan="7">Loading stay history...</td></tr></tbody></table></div>
+</section>
+
+<section class="records-panel card card-pad" data-records-panel="audit" hidden>
+  <div class="records-head"><div><h3>Admin Audit Trail</h3><p>Permanent system activity records for accountability and review.</p></div><button class="btn out" data-records-export="audit">Export CSV</button></div>
+  <div class="records-filters"><input data-audit-search placeholder="Search actor / event / target..."><select data-audit-event><option value="all">All events</option></select></div>
+  <div class="records-table-wrap"><table class="table"><thead><tr><th>Date & Time</th><th>Actor</th><th>Event</th><th>Target</th><th>Details</th></tr></thead><tbody data-audit-history><tr><td colspan="5">Loading audit trail...</td></tr></tbody></table></div>
+</section>
+
+<section class="records-panel card card-pad" data-records-panel="archives" hidden>
+  <div class="records-head"><div><h3>Archived Conversations</h3><p>Hidden from active Messages, but never deleted. A new message automatically restores the conversation.</p></div><button class="btn out" data-records-export="archives">Export CSV</button></div>
+  <div class="records-filters"><input data-archive-search placeholder="Search evacuee..."></div>
+  <div class="records-table-wrap"><table class="table"><thead><tr><th>Evacuee</th><th>Last Message</th><th>Archived At</th><th>Archived By</th><th>Action</th></tr></thead><tbody data-archived-conversations><tr><td colspan="5">Loading archived conversations...</td></tr></tbody></table></div>
+</section>
+
+<script src="assets/reports-live.js?v=reports-v2"></script>
+<script src="assets/admin-records.js?v=records-v1"></script>
 </body>
 </html>
