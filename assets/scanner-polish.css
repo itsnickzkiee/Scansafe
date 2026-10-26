@@ -370,3 +370,102 @@
     overflow:auto;
   }
 }
+
+
+/* =========================================================
+   FIT FIX — keep scanner cards inside the admin content area
+   Visual/layout only; no scanner behavior changes.
+   ========================================================= */
+.scanner-page,
+.scanner-page .admin-app,
+.scanner-page .admin-main,
+.scanner-page .page{
+  max-width:100%;
+  overflow-x:hidden;
+}
+
+.scanner-page .admin-main,
+.scanner-page .page,
+.scanner-page .scanner-page-grid,
+.scanner-page .scanner-bottom,
+.scanner-page .scanner-page-grid > *,
+.scanner-page .scanner-bottom > *{
+  min-width:0;
+}
+
+.scanner-page .scanner-page-grid{
+  width:100%;
+  max-width:100%;
+  grid-template-columns:minmax(0,1.18fr) minmax(0,.9fr) minmax(0,.9fr);
+  gap:12px;
+}
+
+.scanner-page .scanner-page-grid > .card,
+.scanner-page .scanner-bottom > .card{
+  width:100%;
+  max-width:100%;
+}
+
+.scanner-page .scan-body,
+.scanner-page #lastScannedEvacuee{
+  min-width:0;
+}
+
+.scanner-page .scanner-camera-select,
+.scanner-page .scan-frame,
+.scanner-page .manual,
+.scanner-page .manual .searchbar{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+
+.scanner-page .manual input{
+  min-width:0;
+  width:100%;
+}
+
+.scanner-page .scanner-bottom{
+  width:100%;
+  max-width:100%;
+  grid-template-columns:minmax(0,1.2fr) minmax(0,.9fr) minmax(0,.9fr);
+  gap:12px;
+}
+
+/* At normal laptop widths with the admin sidebar open,
+   2 columns are safer and avoid the right card touching/crossing the edge. */
+@media(max-width:1280px){
+  .scanner-page .scanner-page-grid{
+    grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  }
+
+  .scanner-page .scanner-page-grid > section:first-child{
+    grid-row:span 2;
+  }
+
+  .scanner-page .scanner-page-grid > section:nth-child(2),
+  .scanner-page .scanner-page-grid > section:nth-child(3){
+    min-height:230px;
+  }
+
+  .scanner-page .scanner-bottom{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+
+  .scanner-page .scanner-bottom > section:first-child{
+    grid-column:1 / -1;
+  }
+}
+
+@media(max-width:900px){
+  .scanner-page .scanner-page-grid,
+  .scanner-page .scanner-bottom{
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .scanner-page .scanner-page-grid > section:first-child,
+  .scanner-page .scanner-bottom > section:first-child{
+    grid-row:auto;
+    grid-column:auto;
+  }
+}
