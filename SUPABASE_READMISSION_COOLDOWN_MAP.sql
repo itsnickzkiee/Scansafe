@@ -128,6 +128,7 @@ as $scan$
 declare
   v_input text:=btrim(coalesce(p_barcode_value,''));
   v_canonical text;
+  v_barcode_id bigint;
   v_evacuee public.evacuees%rowtype;
   v_barcode public.barcodes%rowtype;
   v_stay public.scansafe_operation_stays%rowtype;
@@ -141,21 +142,38 @@ begin
   end if;
   if v_input='' then raise exception 'A barcode value is required'; end if;
 
-  select e,b into v_evacuee,v_barcode
+  select b.barcode_id
+    into v_barcode_id
   from public.barcodes b
   join public.evacuees e on e.evacuee_id=b.evacuee_id
-  where b.barcode_value=v_input and b.status='active' and e.approval_status='approved'
+  where b.barcode_value=v_input
+    and b.status='active'
+    and e.approval_status='approved'
   limit 1;
 
-  if not found and to_regclass('public.scansafe_barcode_aliases') is not null then
+  if v_barcode_id is null
+     and to_regclass('public.scansafe_barcode_aliases') is not null then
     execute
-      'select e,b
+      'select b.barcode_id
          from public.scansafe_barcode_aliases a
          join public.barcodes b on b.barcode_id=a.barcode_id
          join public.evacuees e on e.evacuee_id=b.evacuee_id
-        where a.barcode_value=$1 and b.status=''active'' and e.approval_status=''approved''
+        where a.barcode_value=$1
+          and b.status=''active''
+          and e.approval_status=''approved''
         limit 1'
-      into v_evacuee,v_barcode using v_input;
+      into v_barcode_id
+      using v_input;
+  end if;
+
+  if v_barcode_id is not null then
+    select * into v_barcode
+    from public.barcodes
+    where barcode_id=v_barcode_id;
+
+    select * into v_evacuee
+    from public.evacuees
+    where evacuee_id=v_barcode.evacuee_id;
   end if;
 
   if found and lower(coalesce(v_evacuee.current_status,''))='released' then
@@ -244,6 +262,7 @@ as $readmit$
 declare
   v_input text:=btrim(coalesce(p_barcode_value,''));
   v_canonical text;
+  v_barcode_id bigint;
   v_evacuee public.evacuees%rowtype;
   v_barcode public.barcodes%rowtype;
   v_stay public.scansafe_operation_stays%rowtype;
@@ -260,20 +279,41 @@ begin
   end if;
   if v_input='' then raise exception 'A barcode value is required'; end if;
 
-  select e,b into v_evacuee,v_barcode
+  select b.barcode_id
+    into v_barcode_id
   from public.barcodes b
   join public.evacuees e on e.evacuee_id=b.evacuee_id
-  where b.barcode_value=v_input and b.status='active' and e.approval_status='approved'
+  where b.barcode_value=v_input
+    and b.status='active'
+    and e.approval_status='approved'
   limit 1;
-  if not found and to_regclass('public.scansafe_barcode_aliases') is not null then
+
+  if v_barcode_id is null
+     and to_regclass('public.scansafe_barcode_aliases') is not null then
     execute
-      'select e,b from public.scansafe_barcode_aliases a
-       join public.barcodes b on b.barcode_id=a.barcode_id
-       join public.evacuees e on e.evacuee_id=b.evacuee_id
-       where a.barcode_value=$1 and b.status=''active'' and e.approval_status=''approved'' limit 1'
-      into v_evacuee,v_barcode using v_input;
+      'select b.barcode_id
+         from public.scansafe_barcode_aliases a
+         join public.barcodes b on b.barcode_id=a.barcode_id
+         join public.evacuees e on e.evacuee_id=b.evacuee_id
+        where a.barcode_value=$1
+          and b.status=''active''
+          and e.approval_status=''approved''
+        limit 1'
+      into v_barcode_id
+      using v_input;
   end if;
-  if not found then raise exception 'Approved active barcode not found'; end if;
+
+  if v_barcode_id is null then
+    raise exception 'Approved active barcode not found';
+  end if;
+
+  select * into v_barcode
+  from public.barcodes
+  where barcode_id=v_barcode_id;
+
+  select * into v_evacuee
+  from public.evacuees
+  where evacuee_id=v_barcode.evacuee_id;
 
   perform 1 from public.evacuee_groups where group_id=v_evacuee.group_id for update;
   v_operation:=public.scansafe_operations_current();
