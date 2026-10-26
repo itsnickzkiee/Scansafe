@@ -568,11 +568,72 @@
     setTimeout(()=>loadContacts(false),120);
   }
 
+  function scansafeConfirm(options={}){
+    return new Promise(resolve=>{
+      document.getElementById('ssConfirmDialog')?.remove();
+
+      const tone=options.tone==='danger'?'danger':'warning';
+      const title=options.title||'Confirm action';
+      const message=options.message||'Are you sure?';
+      const note=options.note||'';
+      const actionLabel=options.actionLabel||'Confirm';
+
+      document.body.insertAdjacentHTML('beforeend',`
+        <div class="ss-confirm-modal" id="ssConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="ssConfirmTitle">
+          <button type="button" class="ss-confirm-backdrop" data-confirm-cancel aria-label="Close confirmation"></button>
+          <section class="ss-confirm-card ${tone}">
+            <div class="ss-confirm-icon" aria-hidden="true">${tone==='danger'?'!':'i'}</div>
+            <div class="ss-confirm-copy">
+              <span class="ss-confirm-kicker">${tone==='danger'?'Important action':'Confirmation'}</span>
+              <h3 id="ssConfirmTitle">${esc(title)}</h3>
+              <p>${esc(message)}</p>
+              ${note?`<div class="ss-confirm-note">${esc(note)}</div>`:''}
+            </div>
+            <div class="ss-confirm-actions">
+              <button type="button" class="ss-confirm-cancel" data-confirm-cancel>Cancel</button>
+              <button type="button" class="ss-confirm-action ${tone}" data-confirm-action>${esc(actionLabel)}</button>
+            </div>
+          </section>
+        </div>`);
+
+      const modal=document.getElementById('ssConfirmDialog');
+      let resolved=false;
+      const finish=value=>{
+        if(resolved) return;
+        resolved=true;
+        document.removeEventListener('keydown',onKey);
+        if(modal){
+          modal.classList.add('closing');
+          setTimeout(()=>modal.remove(),140);
+        }
+        document.body.classList.remove('ss-modal-open');
+        resolve(value);
+      };
+      const onKey=e=>{
+        if(e.key==='Escape'){e.preventDefault();finish(false);}
+        if(e.key==='Enter'){e.preventDefault();finish(true);}
+      };
+
+      document.body.classList.add('ss-modal-open');
+      modal.querySelectorAll('[data-confirm-cancel]').forEach(btn=>btn.addEventListener('click',()=>finish(false)));
+      modal.querySelector('[data-confirm-action]')?.addEventListener('click',()=>finish(true));
+      document.addEventListener('keydown',onKey);
+      setTimeout(()=>modal.querySelector('[data-confirm-action]')?.focus(),40);
+    });
+  }
+
   async function clearCurrentConversation(){
     if(!isStaff||!state.currentId||!state.sb) return;
     const receiver=selectedReceiver();
     if(!receiver?.id) return;
-    if(!window.confirm(`Delete this conversation with ${receiver.name} from the Messages view?\n\nThe visible message history will be cleared, but audit/database records are retained for accountability.`)) return;
+    const confirmed=await scansafeConfirm({
+      tone:'danger',
+      title:`Delete conversation with ${receiver.name}?`,
+      message:'This will clear the visible message history from the Messages view.',
+      note:'Audit and database records will still be retained for accountability. New messages will appear normally.',
+      actionLabel:'Delete Conversation'
+    });
+    if(!confirmed) return;
     try{
       const {data,error}=await state.sb.rpc('clear_scansafe_conversation',{p_user_id:receiver.id});
       if(error) throw error;
@@ -590,7 +651,14 @@
     if(!isStaff||!state.currentId||!state.sb) return;
     const receiver=selectedReceiver();
     if(!receiver?.id) return;
-    if(!window.confirm(`Archive conversation with ${receiver.name}? Messages will be retained. You can restore it from Messages → Archived.`)) return;
+    const confirmed=await scansafeConfirm({
+      tone:'warning',
+      title:`Archive conversation with ${receiver.name}?`,
+      message:'The conversation will be moved out of the Active list.',
+      note:'Messages are retained and you can restore the conversation anytime from Messages → Archived.',
+      actionLabel:'Archive Conversation'
+    });
+    if(!confirmed) return;
     try{
       const {error}=await state.sb.rpc('archive_scansafe_conversation',{
         p_user_id:receiver.id,p_reason:null

@@ -497,3 +497,75 @@ body.ss-messages-page[data-message-realtime="subscribed"] .ss-conv-head::after{
     flex:1;
   }
 }
+
+
+/* ScanSafe custom confirmation dialog */
+.ss-confirm-modal{
+  position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;
+  padding:18px;animation:ssConfirmFade .16s ease both;
+}
+.ss-confirm-modal.closing{animation:ssConfirmOut .14s ease both}
+.ss-confirm-backdrop{
+  position:absolute;inset:0;border:0;background:rgba(8,18,31,.58);
+  backdrop-filter:blur(4px);
+}
+.ss-confirm-card{
+  position:relative;z-index:1;width:min(430px,100%);padding:22px;
+  border:1px solid #e8edf2;border-radius:18px;background:#fff;
+  box-shadow:0 28px 80px rgba(7,20,38,.28);
+  animation:ssConfirmCardIn .18s ease both;
+}
+.ss-confirm-card.danger{border-top:4px solid #d60000}
+.ss-confirm-card.warning{border-top:4px solid #d88b00}
+.ss-confirm-icon{
+  width:44px;height:44px;display:grid;place-items:center;margin-bottom:14px;
+  border-radius:14px;font-size:20px;font-weight:900;
+}
+.ss-confirm-card.danger .ss-confirm-icon{background:#fff0f0;color:#d00000}
+.ss-confirm-card.warning .ss-confirm-icon{background:#fff7e8;color:#c87800}
+.ss-confirm-kicker{
+  display:block;margin-bottom:4px;color:#8b96a5;font-size:8px;font-weight:900;
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.ss-confirm-copy h3{margin:0;color:#10243e;font-size:20px;line-height:1.25}
+.ss-confirm-copy p{margin:10px 0 0;color:#526176;font-size:11px;line-height:1.55}
+.ss-confirm-note{
+  margin-top:12px;padding:10px 11px;border:1px solid #edf0f4;border-radius:10px;
+  background:#f8fafc;color:#68778b;font-size:9px;line-height:1.45;
+}
+.ss-confirm-card.danger .ss-confirm-note{border-color:#f1d0d0;background:#fff8f8}
+.ss-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}
+.ss-confirm-actions button{
+  min-height:40px;border-radius:10px;font-size:9px;font-weight:900;cursor:pointer;
+  transition:all .15s ease;
+}
+.ss-confirm-cancel{border:1px solid #dce2e8;background:#fff;color:#536379}
+.ss-confirm-cancel:hover{background:#f5f7f9;border-color:#cbd3dc}
+.ss-confirm-action{border:1px solid transparent;color:#fff}
+.ss-confirm-action.danger{
+  background:linear-gradient(135deg,#e00000,#b60000);
+  box-shadow:0 7px 16px rgba(190,0,0,.16);
+}
+.ss-confirm-action.danger:hover{
+  background:linear-gradient(135deg,#c90000,#990000);transform:translateY(-1px)
+}
+.ss-confirm-action.warning{
+  background:linear-gradient(135deg,#e49a12,#bd7500);
+  box-shadow:0 7px 16px rgba(190,120,0,.14);
+}
+.ss-confirm-action.warning:hover{
+  background:linear-gradient(135deg,#ce8605,#a46200);transform:translateY(-1px)
+}
+@keyframes ssConfirmFade{from{opacity:0}to{opacity:1}}
+@keyframes ssConfirmOut{from{opacity:1}to{opacity:0}}
+@keyframes ssConfirmCardIn{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+  to{opacity:1;transform:none}
+}
+@media(max-width:520px){
+  .ss-confirm-modal{align-items:end;padding:10px}
+  .ss-confirm-card{width:100%;border-radius:18px 18px 12px 12px;padding:18px}
+  .ss-confirm-copy h3{font-size:18px}
+  .ss-confirm-actions{grid-template-columns:1fr}
+  .ss-confirm-action{grid-row:1}.ss-confirm-cancel{grid-row:2}
+}
