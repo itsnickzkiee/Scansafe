@@ -13,7 +13,7 @@
 <section class="login-left">
 <img class="logo-img" src="assets/logo-login.svg">
 <h1>Safer Evacuations.<br>Smarter Shelter Management.</h1>
-<p>QR-assisted evacuee registration, organized accommodation assignment, occupancy monitoring, notifications, and emergency information in one ScanSafe portal.</p>
+<p>Barcode-assisted evacuee registration, organized accommodation assignment, occupancy monitoring, notifications, and emergency information in one ScanSafe portal.</p>
 </section>
 
 <section class="login-right">
@@ -53,7 +53,7 @@ Android only • Direct APK download
 </p>
 
 <p style="font-size:10px;color:#98a2b3;text-align:center;margin-top:14px">
-Evacuee registration is reviewed by the admin before QR issuance.
+Evacuee registration is reviewed by the admin before Barcode issuance.
 </p>
 </form>
 </section>
@@ -66,7 +66,7 @@ Evacuee registration is reviewed by the admin before QR issuance.
 <button type="button" class="btn out" onclick="closePublicRegistration()">Close</button>
 </div>
 
-<p class="muted">Submit your information for admin review. Your account will be created after submission, but no QR code is issued until admin approval.</p>
+<p class="muted">Submit your information for admin review. Your account will be created after submission, but no Barcode is issued until admin approval.</p>
 
 <div class="prototype-form-grid">
 <div class="field"><label>Full Name</label><input id="publicName" placeholder="Full name" required></div>
@@ -112,7 +112,7 @@ Evacuee registration is reviewed by the admin before QR issuance.
 
 <div class="coverage-helper"><b>Coverage verification:</b> Registrations from Abangan Norte, Marilao are marked within the configured service area. Other locations can still submit but will require manual admin verification.</div>
 
-<button class="btn red full">Submit Registration</button>
+<button id="publicRegistrationSubmit" class="btn red full">Submit Registration</button>
 
 <div class="registration-helper">After submission: Account Created → You can log in immediately → Pending Admin Approval → Barcode issued after approval → Eligible for accommodation assignment.</div>
 </form>

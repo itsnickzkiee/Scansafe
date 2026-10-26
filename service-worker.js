@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v24-evacuee-ui-cleanup';
+const CACHE_NAME='scansafe-pwa-v25-auth-registration-recovery';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

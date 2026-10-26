@@ -107,6 +107,10 @@ function harness(options = {}) {
       if (name === 'get_my_scansafe_account') return options.accountSnapshot ? options.accountSnapshot() : { data: null, error: missingRpc };
       if (name === 'get_scansafe_map_availability') return options.mapSnapshot ? options.mapSnapshot() : { data: copy(tables.accommodation_spaces.filter(row => row.status !== 'inactive')), error: null };
       if (name === 'get_my_profile') return { data: profile, error: null };
+      if (name === 'scansafe_repair_my_registration_link') {
+        const row = tables.evacuees.find(item => item.auth_user_id === session?.user?.id);
+        return { data: row ? { status: 'linked', evacuee_id: row.evacuee_id, registration_code: row.registration_code, needs_registration_id: false } : { status: 'completion_required', evacuee_id: null, registration_code: null, needs_registration_id: true }, error: null };
+      }
       if (name === 'scansafe_admin_dashboard_snapshot') return options.snapshot ? options.snapshot() : { data: null, error: missingRpc };
       if (name === 'approve_evacuee_registration') {
         const row = tables.evacuees.find(item => item.evacuee_id === args.p_evacuee_id);
@@ -327,14 +331,16 @@ test('same-account refresh failures preserve confirmed data with a visible error
   assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /last confirmed data/);
 });
 
-test('an authoritative missing registration clears an earlier approved barcode', async () => {
+test('an authoritative missing registration clears prior barcode and shows completion state', async () => {
   const h = harness({ tables: approvedTables() });
   await h.refresh();
   h.tables.evacuees = [];
   await h.refresh();
-  assert.equal(h.inspect().loaded, false);
+  assert.equal(h.inspect().loaded, true);
   assert.equal(h.context.currentState().user.qrCode, null);
   assert.doesNotMatch(h.nodes.get('userQrCard').innerHTML, /NICK-ACTUAL-50/);
+  assert.match(h.nodes.get('userQrCard').innerHTML, /Barcode not available yet/);
+  assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /Complete Registration/);
 });
 
 test('account switching clears Nick data before a different account can render', async () => {

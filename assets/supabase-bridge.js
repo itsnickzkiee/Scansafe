@@ -83,6 +83,7 @@
   }
 
   let publicRegistrationInFlight=false;
+  let publicRegistrationCompletionMode=false;
 
   function normalizeProfileRpcResult(data){
     if(!data) return null;
@@ -182,6 +183,66 @@
     };
   };
 
+  function registrationRecoveryRpcMissing(error){
+    return ['PGRST202','42883'].includes(String(error?.code||'')) || /could not find.*function|function.*does not exist/i.test(String(error?.message||''));
+  }
+  async function repairMyRegistrationLink(sb=readyClient()){
+    if(!sb) throw new Error('ScanSafe backend is unavailable.');
+    const {data,error}=await sb.rpc('scansafe_repair_my_registration_link');
+    if(error){
+      if(registrationRecoveryRpcMissing(error)) throw new Error('Registration recovery is not installed yet. Run SUPABASE_AUTH_REGISTRATION_LINK_RECOVERY.sql in Supabase.');
+      throw error;
+    }
+    return data||{status:'completion_required',needs_registration_id:true};
+  }
+  function rememberRegistrationCompletion(user,profile){
+    sessionStorage.setItem('scansafeRegistrationCompletion','1');
+    sessionStorage.setItem('scansafeRegistrationCompletionEmail',user?.email||'');
+    sessionStorage.setItem('scansafeRegistrationCompletionName',profile?.full_name||user?.user_metadata?.full_name||'');
+  }
+  function clearRegistrationCompletion(){
+    sessionStorage.removeItem('scansafeRegistrationCompletion');
+    sessionStorage.removeItem('scansafeRegistrationCompletionEmail');
+    sessionStorage.removeItem('scansafeRegistrationCompletionName');
+  }
+  function goToRegistrationCompletion(){
+    const user=window.ScanSafeDB.session?.user,profile=window.ScanSafeDB.profile;
+    if(user) rememberRegistrationCompletion(user,profile);
+    location.href='index.html?completeRegistration=1';
+  }
+  window.ScanSafeCompleteRegistration=goToRegistrationCompletion;
+  async function configureRegistrationCompletionMode(){
+    if(mapPage()!=='index.html') return false;
+    const params=new URLSearchParams(location.search);
+    const requested=params.get('completeRegistration')==='1'||sessionStorage.getItem('scansafeRegistrationCompletion')==='1';
+    if(!requested) return false;
+    const sb=readyClient(); if(!sb) return false;
+    const {data,error}=await sb.auth.getSession(); if(error||!data?.session?.user) return false;
+    const session=data.session; window.ScanSafeDB.session=session;
+    const profile=await getProfile(session.user.id); if(profile?.role!=='evacuee') return false;
+    let recovery=null;
+    try{ recovery=await repairMyRegistrationLink(sb); }
+    catch(error){ uiError(error.message||'Registration recovery could not be checked.'); return false; }
+    if(recovery?.status!=='completion_required'&&!recovery?.needs_registration_id){ clearRegistrationCompletion(); location.replace('user-portal.html'); return true; }
+    publicRegistrationCompletionMode=true; rememberRegistrationCompletion(session.user,profile);
+    if(typeof window.openPublicRegistration==='function') window.openPublicRegistration();
+    const form=document.querySelector('.public-register'); if(form) form.dataset.registrationMode='complete';
+    const title=document.querySelector('.public-register .dialog-head h2'); if(title) title.textContent=recovery?.needs_registration_id&&recovery?.status!=='completion_required'?'Complete Registration ID':'Complete Registration';
+    const intro=document.querySelector('.public-register > p.muted'); if(intro) intro.textContent='Your ScanSafe login account is active, but the evacuee registration is incomplete. Complete the details below; admin approval will still control Barcode issuance.';
+    const name=document.getElementById('publicName'),email=document.getElementById('publicEmail');
+    if(name&&!name.value) name.value=profile.full_name||session.user.user_metadata?.full_name||sessionStorage.getItem('scansafeRegistrationCompletionName')||'';
+    if(email){ email.value=session.user.email||sessionStorage.getItem('scansafeRegistrationCompletionEmail')||''; email.readOnly=true; }
+    for(const id of ['publicPassword','publicConfirmPassword']){ const input=document.getElementById(id); if(input){ input.required=false; input.removeAttribute('minlength'); const field=input.closest('.field'); if(field) field.hidden=true; } }
+    if(recovery?.status!=='completion_required'){
+      try{ const account=await sb.rpc('get_my_scansafe_account'),ev=account?.data?.evacuee; const set=(id,value)=>{const el=document.getElementById(id);if(el&&value!=null&&value!=='')el.value=value;};
+        if(ev){ set('publicName',ev.full_name);set('publicAge',ev.age);set('publicGender',ev.gender);set('publicGroup',ev.group_size);set('publicNeeds',ev.needs_summary||'None');set('publicAddress',ev.address);set('publicBarangay',ev.barangay);set('publicCity',ev.city);set('publicValidIdType',ev.valid_id_type);set('publicValidIdNumber',ev.valid_id_number); }
+      }catch(error){ console.warn('ScanSafe registration prefill:',error.message); }
+    }
+    const button=document.getElementById('publicRegistrationSubmit'); if(button) button.textContent='Complete Registration';
+    registrationResult('Your login is active. Complete the missing registration so the admin can review it.');
+    return true;
+  }
+
   async function bootstrapSession(){
     const sb=readyClient();
     if(!sb) return;
@@ -263,6 +324,19 @@
       return;
     }
 
+    if(profile.role==='evacuee'){
+      try{
+        const recovery=await repairMyRegistrationLink(sb);
+        if(recovery?.status==='completion_required'||recovery?.needs_registration_id){
+          rememberRegistrationCompletion(data.user,profile);
+          location.href='index.html?completeRegistration=1';
+          return;
+        }
+      }catch(linkError){
+        uiError(linkError.message||'Login succeeded, but ScanSafe could not verify the registration link.');
+        return;
+      }
+    }
     localStorage.setItem('scanSafeLoginRole', profile.role==='evacuee'?'user':profile.role);
     if(typeof window.showScanSafeLoginSplash==='function'){
       window.showScanSafeLoginSplash(profile.role==='evacuee'?'user-portal.html':'admin-dashboard.html');
@@ -295,10 +369,15 @@
       return;
     }
 
+    const sessionResult=await sb.auth.getSession();
+    const existingSession=sessionResult?.data?.session||null;
+    const completingExisting=!!(publicRegistrationCompletionMode&&existingSession?.user?.id);
     const password=document.getElementById('publicPassword')?.value||'';
     const confirmPassword=document.getElementById('publicConfirmPassword')?.value||'';
-    if(password.length<8){ if(typeof toast==='function') toast('Password must be at least 8 characters.'); return; }
-    if(password!==confirmPassword){ if(typeof toast==='function') toast('Password and confirm password do not match.'); return; }
+    if(!completingExisting){
+      if(password.length<8){ if(typeof toast==='function') toast('Password must be at least 8 characters.'); return; }
+      if(password!==confirmPassword){ if(typeof toast==='function') toast('Password and confirm password do not match.'); return; }
+    }
 
     const file=document.getElementById('publicValidIdImage')?.files?.[0]||null;
     if(!file){registrationResult('Please upload your valid ID image before submitting.',true);return;}
@@ -321,6 +400,23 @@
 
     if(!payload.p_full_name || !payload.p_email || !payload.p_valid_id_type || !payload.p_valid_id_number){
       if(typeof toast==='function') toast('Please complete all required registration fields.');
+      return;
+    }
+    if(completingExisting){
+      if(String(existingSession.user.email||'').toLowerCase()!==payload.p_email){ registrationResult('The registration email must match the signed-in ScanSafe account.',true); return; }
+      publicRegistrationInFlight=true; const submitButton=document.getElementById('publicRegistrationSubmit');
+      if(submitButton){submitButton.disabled=true;submitButton.textContent='Saving...';} registrationResult('');
+      try{
+        const {data,error}=await sb.rpc('scansafe_complete_my_registration',payload); if(error) throw error; const code=data?.registration_code||'your registration';
+        if(!window.ScanSafeMedia?.uploadRegistrationId) throw new Error('The registration ID upload service is unavailable. Reload ScanSafe and try again.');
+        if(window.ScanSafeMedia?.init) await window.ScanSafeMedia.init({getClient:readyClient,getContext:()=>({userId:existingSession.user.id,role:'evacuee',profile:window.ScanSafeDB.profile||{id:existingSession.user.id,full_name:payload.p_full_name,role:'evacuee'}})});
+        const uploaded=await window.ScanSafeMedia.uploadRegistrationId({file,ownerId:existingSession.user.id});
+        if(!uploaded?.valid_id?.path) throw new Error('The valid ID image upload was not confirmed.');
+        clearRegistrationCompletion(); publicRegistrationCompletionMode=false;
+        registrationResult('Registration '+code+' is complete and pending admin approval. Your Barcode will be issued only after approval.');
+        if(typeof window.closePublicRegistration==='function') window.closePublicRegistration(); setTimeout(()=>location.replace('user-portal.html'),250);
+      }catch(error){ registrationResult('Registration could not be completed. '+(error?.message||'Please try again.'),true); }
+      finally{ publicRegistrationInFlight=false; if(submitButton){submitButton.disabled=false;submitButton.textContent='Complete Registration';} }
       return;
     }
 
@@ -381,13 +477,12 @@
     }
 
     payload.p_auth_user_id=signupData.user.id;
-    const {data,error}=await sb.rpc('submit_public_registration_account', payload);
-    if(error){
-      console.error(error);
-      registrationResult('Account was created, but registration could not be saved. '+error.message,true);
-      return;
-    }
-    if(typeof data!=='string' || !data.trim()) throw new Error('Registration confirmation was not received. Please check the account before submitting again.');
+    let registrationData=null,registrationError=null;
+    { const result=await sb.rpc('submit_public_registration_account',payload); registrationData=result.data; registrationError=result.error; }
+    if(registrationError&&authSession){ const ownPayload={...payload}; delete ownPayload.p_auth_user_id; const fallback=await sb.rpc('scansafe_complete_my_registration',ownPayload); if(!fallback.error){registrationData=fallback.data?.registration_code||null;registrationError=null;} else console.warn('ScanSafe authenticated registration fallback:',fallback.error.message); }
+    if(registrationError){ console.error(registrationError); registrationResult('Account was created, but the registration could not be linked. Log in with this account and ScanSafe will open Complete Registration automatically.',true); return; }
+    const data=typeof registrationData==='string'?registrationData:registrationData?.registration_code;
+    if(typeof data!=='string'||!data.trim()) throw new Error('Registration confirmation was not received. Please check the account before submitting again.');
     registrationSaved=true;
     const loginEmail=document.getElementById('loginUsername');
     if(loginEmail) loginEmail.value=payload.p_email;
@@ -416,7 +511,7 @@
     registrationResult('Registration '+data+' and your ID image have been saved. You may log in now using the same email and password. Your barcode will be issued after admin approval.');
     for(const id of ['publicPassword','publicConfirmPassword']){const input=document.getElementById(id);if(input) input.value='';}
     }catch(error){
-      registrationResult((registrationSaved?'Your registration is saved, but the ID image upload did not finish. Log in and upload it from Profile. ':'Registration could not be completed. ')+(error?.message||'Please try again.'),true);
+      registrationResult((registrationSaved?'Your registration is saved, but the ID image upload did not finish. Log in again and ScanSafe will reopen Complete Registration. ':'Registration could not be completed. ')+(error?.message||'Please try again.'),true);
       if(registrationSaved && typeof window.closePublicRegistration==='function') window.closePublicRegistration();
     }finally{
       if(temporarySession){
@@ -1254,7 +1349,7 @@
     if(!loaded){
       box.innerHTML='<div class="space-placeholder">Loading accommodation...</div>';
     }else if(String(evacuee?.current_status||'').trim().toLowerCase()==='released'){
-      box.innerHTML='<div class="space-placeholder"><b>Shelter stay ended</b><br>Your previous accommodation has been released. Contact shelter staff if you need a new shelter stay.</div>';
+      box.innerHTML='<div class="space-placeholder"><b>Shelter stay ended</b><br>Your previous accommodation has been released. Use Messages to report if you need another shelter stay.</div>';
     }else if(assignmentError && !assignment){
       box.innerHTML='<div class="space-placeholder">Accommodation could not be loaded. Use Refresh to try again.</div>';
     }else if(!assignment){
@@ -1312,9 +1407,32 @@
     if(center && typeof window.centerUserMapOnSpace==='function') window.centerUserMapOnSpace(id);
   }
 
+  function renderMissingRegistrationState(){
+    const name=window.ScanSafeDB.profile?.full_name||window.ScanSafeDB.session?.user?.user_metadata?.full_name||window.ScanSafeDB.session?.user?.email||'Evacuee';
+    const email=window.ScanSafeDB.session?.user?.email||'--',initial=String(name).trim().charAt(0).toUpperCase()||'E';
+    const values={name,email,age:'--',gender:'--',group:'--',needs:'--',contact:'--',address:'--','emergency-contact':'--',status:'Incomplete','current-status':'--','registration-code':'--',id:'--',initial,shelter:'--',space:'--',capacity:'--',occupied:'--',available:'--',submitted:'--','approved-at':'--'};
+    for(const [key,value] of Object.entries(values)) document.querySelectorAll('[data-user-'+key+']').forEach(el=>setScanSafeText(el,value));
+    setScanSafeText(document.querySelector('.user-top .identity strong'),name);
+    document.querySelectorAll('.user-top .avatar,.mobile-avatar,.profile-avatar,.avatar-circle,.identity-avatar').forEach(el=>{if(el.children.length===0)setScanSafeText(el,initial);});
+    const action='<button type="button" class="btn red" onclick="ScanSafeCompleteRegistration()">Complete Registration</button>';
+    const hero=document.getElementById('userStatusHero'); if(hero) hero.innerHTML='<section class="status-hero pending"><div><small>Registration Status</small><h2>Complete your registration</h2><p>Your login account is active, but no linked evacuee registration was found. Complete the registration so the admin can review it.</p></div><div class="hero-status-mark">!</div></section>';
+    const barcode='<div class="space-placeholder"><b>Barcode not available yet</b><br>Complete registration first. Barcode issuance still requires admin approval.</div>';
+    const qr=document.getElementById('userQrCard'); if(qr) qr.innerHTML='<div class="app-status-icon">&#9638;</div><h3>My Barcode</h3>'+barcode;
+    const barcodeCard=document.querySelector('.barcode-card'); if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcode;
+    const acc=document.getElementById('userAccommodationCard'); if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">Not assigned</div><p>Complete registration and wait for admin approval before accommodation assignment.</p>';
+    const latest=document.getElementById('userLatestCard'); if(latest) latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">Registration incomplete</div><p>Your authenticated account needs a linked evacuee registration.</p>';
+    const progress=document.getElementById('userProgressSteps'); if(progress) progress.innerHTML=[['Submitted','Pending'],['Admin Review','Pending'],['Barcode Issued','Pending'],['Assigned','Pending'],['Checked-In','Pending']].map(([label,state],i)=>'<div class="progress-step '+(i===0?'active':'')+'"><i>'+(i+1)+'</i><b>'+label+'</b><small>'+state+'</small></div>').join('');
+    const members=document.getElementById('userGroupMembersBody'); if(members) members.innerHTML='<tr><td colspan="7">Complete registration to load group information.</td></tr>';
+    const timeline=document.getElementById('userRegistrationTimeline'); if(timeline) timeline.innerHTML='<div class="muted">No registration history yet.</div>';
+    const dataStatus=document.getElementById('evacueeDataStatus'); if(dataStatus){dataStatus.setAttribute('role','alert');dataStatus.innerHTML='<span>Your account is signed in, but the evacuee registration is incomplete.</span> '+action;}
+    const assignment=document.getElementById('userAssignmentState'); if(assignment) assignment.innerHTML='<div class="space-placeholder"><b>No registration yet</b><br>Complete your registration before accommodation can be assigned.</div>';
+    const detail=document.getElementById('spaceDetail'); if(detail) detail.innerHTML='<div class="space-placeholder">Complete registration to view your accommodation details.</div>';
+  }
+
   function renderLiveEvacueeAccount(){
     if(!isEvacueeAppPage()) return;
     const cache=evacueeLiveCache,ev=cache.evacuee;
+    if(cache.loaded&&!ev){ renderMissingRegistrationState(); return; }
     const user=window.currentState?.().user||{};
     const loaded=cache.loaded,approved=loaded && ev?.approval_status==='approved';
     const rejected=loaded && ev?.approval_status==='rejected';
@@ -1354,20 +1472,20 @@
     const hero=document.getElementById('userStatusHero');
     if(hero){
       const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):released?'Shelter Stay Ended':approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
-      const text=!loaded?'Your registration status is being retrieved from the database.':released?'Your accommodation has been released. Your account is saved for future evacuation operations. Contact shelter staff if you need a new shelter stay.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Please contact shelter staff.'):rejected?'Please contact shelter staff to correct your registration.':'Your registration is waiting for administrator review.';
+      const text=!loaded?'Your registration status is being retrieved from the database.':released?'Your accommodation has been released. Your account is saved for future evacuation operations. Use Messages to report if you need another shelter stay.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Refresh first, then report the issue through Messages if needed.'):rejected?'Use Messages to report a registration correction.':'Your registration is waiting for administrator review.';
       hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>'+(released?'Shelter Status':'Registration Status')+'</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
     }
-    const barcodeBody=hasBarcode?'<p>'+(released?'Your barcode remains linked to your account. Show it to staff when requesting a new shelter stay.':'Your issued barcode is ready for scanning or printing.')+'</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Please contact shelter staff if the barcode remains unavailable.':'A barcode is issued after your registration is approved.')+'</div>';
+    const barcodeBody=hasBarcode?'<p>'+(released?'Your barcode remains linked to your account. Show it to staff when requesting a new shelter stay.':'Your issued barcode is ready for scanning or printing.')+'</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Use Refresh; if it remains unavailable, report the issue through Messages.':'A barcode is issued after your registration is approved.')+'</div>';
     const qr=document.getElementById('userQrCard');
     if(qr) qr.innerHTML='<div class="app-status-icon">&#9638;</div><h3>My Barcode</h3>'+barcodeBody;
     const barcodeCard=document.querySelector('.barcode-card');
     if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcodeBody;
     const acc=document.getElementById('userAccommodationCard');
-    if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(released?'Your previous shelter stay has ended. Contact staff for another stay.':assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
+    if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">'+esc(fields.space)+'</div><p>'+esc(released?'Your previous shelter stay has ended. Use Messages if you need another stay.':assigned?fields.shelter:'Authorized staff will confirm your accommodation assignment.')+'</p>';
     const latest=document.getElementById('userLatestCard');
     if(latest){
       const title=!loaded?'Loading updates...':released?'Shelter stay ended':user.checkedIn?'Check-in confirmed':assigned?'Accommodation assigned':hasBarcode?'Barcode issued':approved?'Registration approved':rejected?'Registration needs correction':'Registration submitted';
-      latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">'+esc(title)+'</div><p>'+esc(cache.error?'Refresh failed. Showing the last confirmed account data.':released?'Your previous accommodation is closed. Contact shelter staff for another stay.':loaded?evacueeDate(ev.approved_at||ev.registered_at):'Retrieving your registration.')+'</p>';
+      latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">'+esc(title)+'</div><p>'+esc(cache.error?'Refresh failed. Showing the last confirmed account data.':released?'Your previous accommodation is closed. Use Messages if you need another stay.':loaded?evacueeDate(ev.approved_at||ev.registered_at):'Retrieving your registration.')+'</p>';
     }
     const progress=document.getElementById('userProgressSteps');
     if(progress){
@@ -1470,12 +1588,17 @@
       if(!ownerId) throw new Error('Sign in to view your evacuee registration.');
       const profile=window.ScanSafeDB.profile?.id===ownerId?window.ScanSafeDB.profile:await getProfile(ownerId);
       if(profile?.role!=='evacuee') throw new Error('An evacuee account is required.');
-      const snapshot=await readOwnEvacueeSnapshot(sb,ownerId);
+      let snapshot=await readOwnEvacueeSnapshot(sb,ownerId);
       if(window.ScanSafeDB.session?.user?.id!==ownerId || evacueeLiveCache.ownerId!==ownerId) return null;
-      const ev=snapshot.evacuee;
+      let ev=snapshot.evacuee;
+      if(!ev){ const recovery=await repairMyRegistrationLink(sb); if(recovery?.status==='repaired'||recovery?.status==='linked'){ snapshot=await readOwnEvacueeSnapshot(sb,ownerId); ev=snapshot.evacuee; } }
       if(!ev){
         resetEvacueeLiveAccount(ownerId);
-        throw new Error('No registration was found for this account. Please contact shelter staff.');
+        Object.assign(evacueeLiveCache,{loaded:true,ownerId,evacuee:null,barcode:null,assignment:null,space:null,shelter:null,error:null,warnings:[],updatedAt:new Date().toISOString()});
+        const missingState=window.currentState();
+        missingState.user={...missingState.user,authUserId:ownerId,name:profile.full_name||session.user.user_metadata?.full_name||'Evacuee',email:session.user.email||'',registrationStatus:'Incomplete',qrIssued:false,qrCode:null,assignment:null,checkedIn:false};
+        window.saveScanSafeState(missingState);
+        rememberRegistrationCompletion(session.user,profile); renderLiveEvacueeAccount(); return null;
       }
       if(ev.auth_user_id!==ownerId){
         resetEvacueeLiveAccount(ownerId);
@@ -1587,6 +1710,7 @@
     window.confirmSpaceAssignment = confirmSpaceAssignmentDatabase;
 
     await bootstrapSession();
+    if(await configureRegistrationCompletionMode()) return;
     if(!(await phase9AccessGuard())) return;
 
     if(mapPage()==='profile.html'){
