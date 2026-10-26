@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v27-readmission-map-polish';
+const CACHE_NAME='scansafe-pwa-v28-map-profile-marker';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

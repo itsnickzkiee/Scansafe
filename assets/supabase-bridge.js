@@ -1348,7 +1348,7 @@
       const stack=document.createElement('button');
       stack.type='button';stack.className='map-occupant-stack';stack.style.left=left+'%';stack.style.top=top+'%';stack.dataset.space=spaceCode;
       stack.setAttribute('aria-label',(rows.length===1?rows[0].full_name:rows.length+' accommodated groups')+' in '+spaceCode);
-      stack.title=rows.map(row=>`${row.full_name} • Group ${Number(row.group_size||1)}`).join('\n');
+      stack.title=rows.map(row=>`${row.full_name} • Group ${Number(row.group_size||1)} • ${row.arrival_time?'Checked In':'Assigned'}`).join('\n');
       const visible=rows.slice(0,3);
       stack.innerHTML=visible.map(row=>`<span class="map-occupant-avatar${row.profile_url?' has-photo':''}" title="${gbeaaEscape(row.full_name||'Evacuee')}">${row.profile_url?`<img src="${gbeaaEscape(row.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(row.full_name))}</span>`).join('')+(rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'');
       stack.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();window.selectSpace?.(spaceCode);document.getElementById('spaceDetail')?.scrollIntoView({behavior:'smooth',block:'nearest'});});
@@ -1364,8 +1364,8 @@
     const occupants=mapDbCache.occupants.get(String(spaceCode))||[];
     const cap=Number(row.capacity||0),occ=Number(row.current_occupancy||0),available=Math.max(0,cap-occ);
     const list=occupants.length
-      ? occupants.map(person=>`<div class="map-occupant-row"><span class="map-occupant-avatar${person.profile_url?' has-photo':''}">${person.profile_url?`<img src="${gbeaaEscape(person.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(person.full_name))}</span><span><b>${gbeaaEscape(person.full_name||'Evacuee')}</b><small>Group of ${Number(person.group_size||1)} • Arrived ${person.arrival_time?new Date(person.arrival_time).toLocaleString():'Not recorded'}</small></span><em>Checked In</em></div>`).join('')
-      : '<div class="space-placeholder compact">No checked-in evacuees are currently accommodated in this space.</div>';
+      ? occupants.map(person=>`<div class="map-occupant-row"><span class="map-occupant-avatar${person.profile_url?' has-photo':''}">${person.profile_url?`<img src="${gbeaaEscape(person.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(person.full_name))}</span><span><b>${gbeaaEscape(person.full_name||'Evacuee')}</b><small>Group of ${Number(person.group_size||1)} • ${person.arrival_time?'Arrived '+new Date(person.arrival_time).toLocaleString():'Assigned — waiting for check-in'}</small></span><em>${person.arrival_time?'Checked In':'Assigned'}</em></div>`).join('')
+      : '<div class="space-placeholder compact">No evacuees are currently assigned to this space.</div>';
     box.innerHTML=`
       <div class="room-banner"><svg class="icon xl bigicon"><use href="assets/icons.svg#home"></use></svg><div><h2>${gbeaaEscape(row.space_name||spaceCode)}</h2><div style="margin-top:5px">${statusPill(normalizeDbSpaceStatus(row))}</div></div></div>
       <div class="detail-list"><div class="detail-line"><b>Space Type</b><span>${gbeaaEscape(row.space_type||'Accommodation')}</span></div><div class="detail-line"><b>Capacity</b><span>${cap}</span></div><div class="detail-line"><b>Occupied</b><span>${occ}</span></div><div class="detail-line"><b>Available</b><span>${available}</span></div></div>
