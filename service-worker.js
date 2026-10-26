@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v23-media-notifications';
+const CACHE_NAME='scansafe-pwa-v24-evacuee-ui-cleanup';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

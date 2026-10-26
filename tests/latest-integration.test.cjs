@@ -42,5 +42,5 @@ test('service worker includes live media and notification assets', () => {
   const sw = read('service-worker.js');
   assert.match(sw, /account-media\.js/);
   assert.match(sw, /notification-center\.js/);
-  assert.match(sw, /scansafe-pwa-v23-media-notifications/);
+  assert.match(sw, /scansafe-pwa-v24-evacuee-ui-cleanup/);
 });

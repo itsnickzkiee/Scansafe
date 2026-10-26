@@ -100,22 +100,43 @@
     const el = document.getElementById('profilePhotoUpload');
     if (!el || mounted === el) return;
     mounted = el;
-    el.classList.add('account-media-controls');
-    el.innerHTML = '<h3>Account images</h3><p class="muted">JPG, PNG or WebP, up to 2 MB each. Registration ID images are visible only to you and authorized shelter staff.</p>' +
-      '<div class="account-media-upload-row"><label>Profile photo<input type="file" accept="image/jpeg,image/png,image/webp" data-media-file="profile"></label><button type="button" class="btn red" data-media-upload="profile">Upload profile photo</button></div>' +
-      '<div class="account-media-upload-row"><label>Registration ID image<input type="file" accept="image/jpeg,image/png,image/webp" data-media-file="valid-id"></label><button type="button" class="btn out" data-media-upload="valid-id">Upload ID image</button></div>' +
-      '<p data-media-id-state class="muted">Checking your uploaded ID...</p><p data-media-status role="status" aria-live="polite"></p>';
-    el.querySelectorAll('[data-media-upload]').forEach(button => button.addEventListener('click', async () => {
-      const uid = owner(), kind = button.dataset.mediaUpload;
-      const input = el.querySelector('[data-media-file="' + kind + '"]');
-      if (!uid) { status('Sign in before uploading your account image.', true); return; }
-      button.disabled = true; status('Uploading image...', false);
+    el.classList.add('account-media-controls', 'profile-photo-uploader');
+    el.innerHTML =
+      '<input class="profile-photo-file" type="file" accept="image/jpeg,image/png,image/webp" data-media-file="profile" aria-label="Choose profile photo">' +
+      '<p class="profile-photo-upload-status" data-media-status role="status" aria-live="polite"></p>';
+
+    const input = el.querySelector('[data-media-file="profile"]');
+    const picker = el.closest('.profile-photo-control')?.querySelector('[data-profile-photo-picker]');
+    if (!picker || !input) return;
+
+    picker.addEventListener('click', () => {
+      if (!owner()) { status('Sign in before uploading your profile photo.', true); return; }
+      input.click();
+    });
+
+    input.addEventListener('change', async () => {
+      const uid = owner(), file = input.files?.[0];
+      if (!file) return;
+      if (!uid) { status('Sign in before uploading your profile photo.', true); input.value = ''; return; }
+
+      picker.disabled = true;
+      picker.classList.add('is-uploading');
+      status('Uploading profile photo...', false);
       try {
-        await upload(kind, input?.files?.[0], uid);
-        if (owner() === uid) { input.value = ''; status(kind === 'profile' ? 'Profile photo saved.' : 'Registration ID image saved for staff review.', false); }
-      } catch (error) { if (owner() === uid) status(message(error), true); }
-      finally { if (button.isConnected) button.disabled = false; }
-    }));
+        await upload('profile', file, uid);
+        if (owner() === uid) {
+          input.value = '';
+          status('Profile photo updated.', false);
+        }
+      } catch (error) {
+        if (owner() === uid) status(message(error), true);
+      } finally {
+        if (picker.isConnected) {
+          picker.disabled = false;
+          picker.classList.remove('is-uploading');
+        }
+      }
+    });
   }
   function refresh() {
     const uid = owner(), c = context();
@@ -136,8 +157,6 @@
           }
           paintAvatars(avatarUrl, uid);
         } else clearAvatars();
-        const idState = mounted?.querySelector('[data-media-id-state]');
-        if (idState) idState.textContent = data.valid_id ? 'Registration ID image uploaded.' : 'No registration ID image has been uploaded yet. You can add it here.';
         return data;
       } catch (error) { if (started === generation && owner() === uid) status(message(error), true); return null; }
     })();

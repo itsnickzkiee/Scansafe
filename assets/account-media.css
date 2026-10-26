@@ -20,3 +20,37 @@
 .account-media-image-link img{display:block;width:100%;height:auto;max-height:360px;object-fit:contain}
 @media(max-width:560px){.account-media-review-fields,.account-media-review-images{grid-template-columns:1fr}.account-media-upload-row button{width:100%}}
 @media print{.account-media-controls,.account-media-review-images{display:none!important}}
+
+
+/* Evacuee profile-photo control: avatar is the upload surface. */
+.profile-photo-control{position:relative;width:82px;min-width:82px;height:82px;flex:0 0 82px}
+.profile-photo-control .person-round{width:82px;height:82px;margin:0}
+.profile-photo-plus{
+  position:absolute;right:-2px;bottom:1px;width:27px;height:27px;border:3px solid #fff;
+  border-radius:999px;background:#e00000;color:#fff;display:grid;place-items:center;padding:0;
+  font-size:20px;line-height:1;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(159,0,0,.24);z-index:3
+}
+.profile-photo-plus:hover{background:#bd0000}
+.profile-photo-plus:focus-visible{outline:2px solid #e00000;outline-offset:2px}
+.profile-photo-plus:disabled{cursor:wait;opacity:.68}
+.profile-photo-plus.is-uploading{animation:profile-photo-pulse .9s ease-in-out infinite alternate}
+.profile-photo-uploader{
+  position:absolute;left:50%;top:calc(100% + 9px);transform:translateX(-50%);
+  width:max-content;max-width:220px;margin:0;padding:0;border:0;z-index:4
+}
+.profile-photo-file{
+  position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;
+  overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important
+}
+.profile-photo-upload-status{
+  margin:0;padding:0;font-size:9px!important;line-height:1.3!important;text-align:center;color:#06704a;background:transparent
+}
+.profile-photo-upload-status:empty{display:none}
+.profile-photo-hint{margin-top:4px;font-size:9px!important}
+.user-grid-single{grid-template-columns:minmax(0,1fr)!important}
+@keyframes profile-photo-pulse{from{transform:scale(1)}to{transform:scale(.9)}}
+@media(max-width:560px){
+  .profile-photo-control{width:72px;min-width:72px;height:72px;flex-basis:72px}
+  .profile-photo-control .person-round{width:72px;height:72px}
+  .profile-photo-plus{width:25px;height:25px;font-size:18px}
+}
