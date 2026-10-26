@@ -5242,3 +5242,44 @@ body.barcode-viewer-open {
 .notify-grid .tab[role="button"] { cursor: pointer; user-select: none; }
 .notify-grid .tab[role="button"]:focus-visible { outline: 2px solid #d00000; outline-offset: 2px; }
 #profilePhotoUpload:empty { display: none; }
+
+
+/* Request Needs eligibility lock */
+.user-side .nav-item.needs-nav-locked{
+  opacity:.52;
+  cursor:not-allowed;
+  background:#f7f7f8;
+  color:#667085;
+}
+.user-side .nav-item.needs-nav-locked:hover{
+  background:#f7f7f8;
+  color:#667085;
+  transform:none;
+}
+.user-side .nav-item.needs-nav-locked .icon{
+  opacity:.62;
+}
+.needs-lock-badge{
+  margin-left:auto;
+  display:inline-grid;
+  place-items:center;
+  width:21px;
+  height:21px;
+  border-radius:999px;
+  background:#eef0f3;
+  color:#667085;
+  font-size:11px;
+  line-height:1;
+  flex:0 0 21px;
+}
+.user-side .nav-item.needs-nav-locked .nav-badge:not([hidden]){
+  margin-left:4px;
+}
+@media(max-width:720px){
+  .needs-lock-badge{
+    width:19px;
+    height:19px;
+    flex-basis:19px;
+    font-size:10px;
+  }
+}

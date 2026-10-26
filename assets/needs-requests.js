@@ -71,6 +71,33 @@
     element.hidden = !message;
     element.className = 'needs-feedback' + (kind === 'success' ? ' is-success' : ' is-error');
   }
+  function updateNeedsNavigation(available, reason) {
+    const message = available
+      ? 'Request necessities for your assigned accommodation.'
+      : String(reason || 'Waiting for accommodation assignment.');
+
+    document.querySelectorAll('a[href="user-needs.html"]').forEach(link => {
+      link.classList.toggle('needs-nav-locked', !available);
+      link.setAttribute('aria-disabled', String(!available));
+      link.dataset.needsEligibility = available ? 'available' : 'locked';
+      link.title = message;
+
+      let lock = link.querySelector('[data-needs-lock]');
+      if (!available) {
+        if (!lock) {
+          lock = document.createElement('span');
+          lock.className = 'needs-lock-badge';
+          lock.setAttribute('data-needs-lock', '');
+          lock.setAttribute('aria-hidden', 'true');
+          lock.textContent = '🔒';
+          link.appendChild(lock);
+        }
+      } else if (lock) {
+        lock.remove();
+      }
+    });
+  }
+
   function clearBadges() {
     document.querySelectorAll('[data-needs-count]').forEach(element => { element.textContent = ''; element.hidden = true; });
     document.querySelectorAll('[data-needs-alert]').forEach(element => { element.removeAttribute('data-needs-active'); element.removeAttribute('aria-label'); });
@@ -79,6 +106,7 @@
       element.setAttribute('aria-disabled', 'true');
       element.title = 'Waiting for accommodation assignment.';
     });
+    updateNeedsNavigation(false, state.eligibilityReason || 'Waiting for accommodation assignment.');
   }
   function updateBadges() {
     const count = state.mode === 'staff' ? number(state.counts.pending) : number(state.counts.active);
@@ -87,12 +115,18 @@
       if (count) element.setAttribute('data-needs-active', 'true'); else element.removeAttribute('data-needs-active');
       element.setAttribute('aria-label', state.mode === 'staff' ? count + ' pending necessity requests' : count + ' active necessity requests');
     });
+    const available = state.mode === 'evacuee' && state.loaded && state.eligible === true && !state.error;
+    const reason = available
+      ? 'Request necessities for your assigned accommodation.'
+      : state.eligibilityReason || (state.error ? 'Request Needs is temporarily unavailable.' : 'Waiting for accommodation assignment.');
+
     document.querySelectorAll('[data-needs-gated]').forEach(element => {
-      const available = state.mode === 'evacuee' && state.loaded && state.eligible === true && !state.error;
       element.disabled = !available;
       element.setAttribute('aria-disabled', String(!available));
-      element.title = available ? 'Request necessities for your assigned accommodation.' : state.eligibilityReason || 'Waiting for accommodation assignment.';
+      element.title = reason;
     });
+
+    if (state.mode === 'evacuee') updateNeedsNavigation(available, reason);
   }
   function reset() {
     revision += 1;
@@ -516,6 +550,23 @@
       if (isCurrent(generation, key)) { state.updating.delete(id); renderList(true); }
     }
   }
+  function handleNeedsNavigation(event) {
+    const link = event.target?.closest?.('a[href="user-needs.html"]');
+    if (!link || !link.classList.contains('needs-nav-locked')) return;
+
+    // If the evacuee is already on the Request Needs page, let the page remain
+    // visible so the eligibility reason can be read. Block navigation elsewhere.
+    if (page === 'user-needs.html') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const reason = state.eligibilityReason ||
+      link.title ||
+      'Request Needs becomes available after your accommodation is assigned.';
+    if (typeof window.toast === 'function') window.toast(reason);
+    else link.title = reason;
+  }
+
   function handleClick(event) {
     const action = event.target?.closest?.('[data-needs-action]');
     if (!action || !mount?.contains(action)) return;
@@ -551,6 +602,7 @@
   function installListeners() {
     if (listenersInstalled) return;
     listenersInstalled = true;
+    document.addEventListener('click', handleNeedsNavigation, true);
     document.addEventListener('click', handleClick);
     document.addEventListener('input', handleInput);
     document.addEventListener('change', handleInput);
