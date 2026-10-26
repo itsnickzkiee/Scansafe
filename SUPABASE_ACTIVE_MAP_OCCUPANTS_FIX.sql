@@ -5,6 +5,21 @@
 rollback;
 begin;
 
+-- Phase 9 removes the old staff ALL policy to prevent direct assignment writes.
+-- Restore only the SELECT access used by the map's active-assignment loader.
+-- Keep existing owner/staff policies and all mutation permissions unchanged.
+alter table public.accommodation_assignments enable row level security;
+grant select on public.accommodation_assignments to authenticated;
+drop policy if exists scansafe_staff_read_active_map_assignments
+on public.accommodation_assignments;
+create policy scansafe_staff_read_active_map_assignments
+on public.accommodation_assignments for select to authenticated
+using (
+  auth.uid() is not null
+  and coalesce(public.is_staff(),false)
+  and assignment_status='active'
+);
+
 create or replace function public.get_scansafe_active_map_occupants()
 returns jsonb
 language plpgsql
@@ -43,20 +58,20 @@ begin
     select
       a.assignment_id,
       a.space_id,
-      s.space_code,
-      coalesce(s.space_name,s.space_code) as space_name,
+      upper(btrim(s.space_code)) as space_code,
+      coalesce(s.space_name,upper(btrim(s.space_code))) as space_name,
       a.group_id,
       e.evacuee_id,
-      e.full_name,
+      coalesce(nullif(btrim(e.full_name),''),'Evacuee') as full_name,
       coalesce(g.group_size,a.occupant_count,1) as group_size,
       e.current_status,
       st.checked_in_at
     from public.accommodation_assignments a
     join public.accommodation_spaces s
       on s.space_id=a.space_id
-    join public.evacuee_groups g
+    left join public.evacuee_groups g
       on g.group_id=a.group_id
-    join lateral (
+    left join lateral (
       select ev.evacuee_id,ev.full_name,ev.current_status
       from public.evacuees ev
       where ev.group_id=a.group_id

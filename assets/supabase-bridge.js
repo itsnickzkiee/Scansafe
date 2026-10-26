@@ -1060,10 +1060,12 @@
 
   // Use existing RLS-protected tables when the optional snapshot RPC has not
   // been installed. Page through every record so counts are never capped at 1000.
-  async function adminReadAll(sb,table,columns,orderColumn){
+  async function adminReadAll(sb,table,columns,orderColumn,filters={}){
     const rows=[];
     for(let offset=0;;offset+=1000){
-      const {data,error}=await sb.from(table).select(columns).order(orderColumn,{ascending:false}).range(offset,offset+999);
+      let query=sb.from(table).select(columns).order(orderColumn,{ascending:false}).range(offset,offset+999);
+      for(const [column,value] of Object.entries(filters)) query=query.eq(column,value);
+      const {data,error}=await query;
       if(error) throw error;
       rows.push(...(data||[]));
       if(!data || data.length<1000) return rows;
@@ -1172,16 +1174,16 @@
       }
       mapDbCache.spaces.clear();
       for(const row of adminLiveCache.spaces){
-        mapDbCache.spaces.set(row.space_code,row);
+        mapDbCache.spaces.set(normalizeMapSpaceCode(row.space_code),row);
       }
       mapDbCache.ready=true;
-      window.getDynamicOccupancy=id=>Number(mapDbCache.spaces.get(id)?.current_occupancy||0);
+      window.getDynamicOccupancy=id=>Number(mapDbCache.spaces.get(normalizeMapSpaceCode(id))?.current_occupancy||0);
       window.getSpaceStatus=id=>{
-        const row=mapDbCache.spaces.get(id);
+        const row=mapDbCache.spaces.get(normalizeMapSpaceCode(id));
         return row?normalizeDbSpaceStatus(row):'full';
       };
       window.getAvailableSlots=id=>{
-        const row=mapDbCache.spaces.get(id);
+        const row=mapDbCache.spaces.get(normalizeMapSpaceCode(id));
         return row?Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0)):0;
       };
       for(const row of adminLiveCache.spaces){
@@ -1193,6 +1195,10 @@
       renderAdminLiveDashboard();
       if(typeof window.renderSpaces==='function') window.renderSpaces();
       if(typeof window.renderRooms==='function') window.renderRooms();
+      if(mapPage()==='shelter-room.html'){
+        installAdminMapMonitoring();
+        await loadAdminMapOccupants();
+      }
       const selectedSpace=document.querySelector('[data-space].selected')?.dataset.space;
       if(selectedSpace && typeof window.selectSpace==='function') window.selectSpace(selectedSpace);
       const selectedRoom=document.querySelector('[data-room].selected')?.dataset.room;
@@ -1218,8 +1224,19 @@
     inspect:()=>({
       page:mapPage(),
       spaces:[...mapDbCache.spaces.values()],
+      activeAssignments:mapDbCache.activeAssignments||[],
+      hotspotCodes:[...document.querySelectorAll('.map-hotspot[data-space]')].map(node=>normalizeMapSpaceCode(node.dataset.space)),
       occupants:[...mapDbCache.occupants.entries()].map(([space,rows])=>({space,rows})),
-      occupantDebug:mapDbCache.occupantDebug||null,
+      renderedMarkers:[...document.querySelectorAll('.map-occupant-overlay')].map(node=>({
+        space_code:normalizeMapSpaceCode(node.dataset.space),
+        avatars:node.querySelectorAll('.map-occupant-avatar').length,
+        label:node.querySelector('.map-occupant-overlay-label')?.textContent||'',
+        left:node.style.left,top:node.style.top
+      })),
+      unmatchedSpaceCodes:[...new Set((mapDbCache.activeAssignments||[]).map(row=>normalizeMapSpaceCode(row.space_code)))]
+        .filter(code=>!code || ![...document.querySelectorAll('.map-hotspot[data-space]')].some(node=>normalizeMapSpaceCode(node.dataset.space)===code)),
+      occupantDebug:{...mapDbCache.occupantDebug,
+        renderedCount:document.querySelectorAll('.map-occupant-overlay .map-occupant-avatar').length},
       adminAssignments:(adminLiveCache.evacuees||[])
         .filter(row=>row.assigned_space_code)
         .map(row=>({
@@ -1296,6 +1313,10 @@
   // =========================================================
   const mapDbCache={ spaces:new Map(), groups:new Map(), occupants:new Map(), ready:false,ownerId:null,availabilityState:'unavailable',error:null,revision:0 };
 
+  function normalizeMapSpaceCode(value){
+    return String(value||'').trim().toUpperCase();
+  }
+
   function mapPage(){
     return (location.pathname.split('/').pop()||'').toLowerCase();
   }
@@ -1309,8 +1330,9 @@
   }
 
   function syncSpaceIntoExistingMap(row){
-    if(typeof HALLWAY_SPACES==='undefined' || !row?.space_code || !HALLWAY_SPACES[row.space_code]) return;
-    const d=HALLWAY_SPACES[row.space_code];
+    const code=normalizeMapSpaceCode(row?.space_code);
+    if(typeof HALLWAY_SPACES==='undefined' || !code || !HALLWAY_SPACES[code]) return;
+    const d=HALLWAY_SPACES[code];
     d.name=row.space_name || (row.space_code==='ML'?'Main Lobby':'Hallway '+row.space_code);
     d.cap=Number(row.capacity||0);
     d.occ=Number(row.current_occupancy||0);
@@ -1322,144 +1344,110 @@
     return String(name||'Evacuee').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part.charAt(0)).join('').toUpperCase()||'EV';
   }
 
-  function adminMapFallbackOccupants(){
-    const rows=[];
-    for(const row of adminLiveCache.evacuees||[]){
-      const spaceCode=String(row.assigned_space_code||'').trim();
-      if(!spaceCode) continue;
-      if(String(row.current_status||'').toLowerCase()==='released') continue;
-      if(String(row.approval_status||'').toLowerCase()!=='approved') continue;
-      rows.push({
-        space_code:spaceCode,
-        space_name:row.assigned_space_name||spaceCode,
-        group_id:row.group_id,
-        evacuee_id:row.evacuee_id,
-        full_name:row.full_name||'Evacuee',
-        group_size:Number(row.group_size||1),
-        arrival_time:row.arrival_time||null,
-        current_status:row.current_status||'',
-        map_status:row.arrival_time?'checked_in':'assigned',
-        source:'admin_live_fallback'
-      });
-    }
-    return rows;
-  }
-
   async function adminMapDirectAssignmentOccupants(sb){
-    try{
-      const [assignmentRes,evacueeRes,groupRes]=await Promise.all([
-        sb.from('accommodation_assignments')
-          .select('assignment_id,group_id,space_id,occupant_count,assignment_status')
-          .eq('assignment_status','active'),
-        sb.from('evacuees')
-          .select('evacuee_id,group_id,full_name,current_status,approval_status')
-          .eq('approval_status','approved'),
-        sb.from('evacuee_groups')
-          .select('group_id,group_size')
-      ]);
-      if(assignmentRes.error) throw assignmentRes.error;
-      if(evacueeRes.error) throw evacueeRes.error;
-      if(groupRes.error) throw groupRes.error;
-
-      const evacByGroup=new Map();
-      for(const row of evacueeRes.data||[]){
-        if(String(row.current_status||'').toLowerCase()==='released') continue;
-        const key=String(row.group_id);
-        if(!evacByGroup.has(key)) evacByGroup.set(key,row);
-      }
-      const groupById=new Map((groupRes.data||[]).map(row=>[String(row.group_id),row]));
-      const spaceById=new Map(
-        [...mapDbCache.spaces.values()].map(row=>[String(row.space_id),row])
-      );
-
-      return (assignmentRes.data||[]).map(asg=>{
-        const ev=evacByGroup.get(String(asg.group_id));
-        const space=spaceById.get(String(asg.space_id));
-        if(!ev || !space?.space_code) return null;
-        return {
-          space_code:String(space.space_code),
-          space_name:space.space_name||space.space_code,
-          group_id:asg.group_id,
-          evacuee_id:ev.evacuee_id,
-          full_name:ev.full_name||'Evacuee',
-          group_size:Number(groupById.get(String(asg.group_id))?.group_size||asg.occupant_count||1),
-          arrival_time:null,
-          current_status:ev.current_status||'',
-          map_status:'assigned',
-          source:'direct_assignment_fallback'
-        };
-      }).filter(Boolean);
-    }catch(error){
-      console.warn('ScanSafe direct map assignment fallback:',error?.message||error);
-      return [];
+    const results=await Promise.allSettled([
+      adminReadAll(sb,'accommodation_assignments','*','assignment_id',{assignment_status:'active'}),
+      adminReadAll(sb,'evacuees','evacuee_id,group_id,full_name,current_status','evacuee_id'),
+      adminReadAll(sb,'evacuee_groups','group_id,group_size','group_id')
+    ]);
+    if(results[0].status==='rejected') throw results[0].reason;
+    const optional=index=>results[index].status==='fulfilled'?results[index].value:[];
+    const evacByGroup=new Map();
+    for(const row of optional(1).sort((a,b)=>Number(a.evacuee_id)-Number(b.evacuee_id))){
+      if(!evacByGroup.has(String(row.group_id))) evacByGroup.set(String(row.group_id),row);
     }
+    const groupById=new Map(optional(2).map(row=>[String(row.group_id),row]));
+    const spaceById=new Map([...mapDbCache.spaces.values()].map(row=>[String(row.space_id),row]));
+    const assignments=results[0].value.filter(row=>row.assignment_status==='active').map(row=>({
+      ...row,space_code:normalizeMapSpaceCode(spaceById.get(String(row.space_id))?.space_code)
+    }));
+    const rows=assignments.map(asg=>{
+      const ev=evacByGroup.get(String(asg.group_id));
+      const space=spaceById.get(String(asg.space_id));
+      // A missing photo/member detail must never hide a real active assignment.
+      return {...asg,space_name:space?.space_name||asg.space_code,
+        evacuee_id:ev?.evacuee_id,full_name:ev?.full_name||'Evacuee',
+        group_size:Number(asg.occupant_count||groupById.get(String(asg.group_id))?.group_size||1),
+        current_status:ev?.current_status||'',arrival_time:null,
+        map_status:mapOccupantCheckedIn(ev)?'checked_in':'assigned',source:'active_assignment'};
+    });
+    return {assignments,rows,metadataErrors:results.slice(1).filter(result=>result.status==='rejected').map(result=>result.reason?.message||String(result.reason))};
   }
 
-  function mergeAdminMapOccupants(primary,fallback){
-    const merged=new Map();
-    for(const row of fallback||[]){
-      const key=[row.space_code,row.group_id||row.evacuee_id].join(':');
-      merged.set(key,{...row});
-    }
-    for(const row of primary||[]){
-      const key=[row.space_code,row.group_id||row.evacuee_id].join(':');
-      merged.set(key,{...(merged.get(key)||{}),...row,source:'occupant_rpc'});
-    }
-    return [...merged.values()];
+  function mapOccupantCheckedIn(row){
+    const status=String(row?.current_status||'').trim().toLowerCase().replace(/[- ]/g,'_');
+    return !!row?.arrival_time || row?.map_status==='checked_in' || ['checked_in','checkedin'].includes(status);
   }
 
   async function loadAdminMapOccupants(){
     if(mapPage()!=='shelter-room.html') return [];
     const sb=readyClient();
-    if(!sb || !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) return [];
-
-    let rows=[];
-    let rpcError=null;
+    const ownerId=window.ScanSafeDB.session?.user?.id;
+    const revision=mapDbCache.occupantRevision=(mapDbCache.occupantRevision||0)+1;
+    const current=()=>revision===mapDbCache.occupantRevision && ownerId===window.ScanSafeDB.session?.user?.id &&
+      ['admin','staff'].includes(window.ScanSafeDB.profile?.role);
+    if(!sb || !ownerId || !current()) return [];
+    let result;
     try{
-      const {data,error}=await sb.rpc('get_scansafe_active_map_occupants');
-      if(error) throw error;
-      rows=Array.isArray(data)?data:[];
+      result=await adminMapDirectAssignmentOccupants(sb);
     }catch(error){
-      rpcError=error;
-      console.error('ScanSafe active map occupants:',error?.message||error);
+      if(current()) mapDbCache.occupantDebug={source:'accommodation_assignments',assignmentError:error.message||String(error)};
+      console.error('ScanSafe active map assignments:',error?.message||error);
+      return [];
     }
-
-    // Profile photo is optional; initials remain the guaranteed visual fallback.
-    await Promise.all(rows.map(async row=>{
-      if(!row?.evacuee_id || !sb.storage?.from) return;
-      try{
-        const detail=await sb.rpc('get_scansafe_registration_details',{
-          p_evacuee_id:Number(row.evacuee_id)
-        });
-        const path=detail?.data?.profile_photo?.path;
-        if(!path) return;
-        const signed=await sb.storage
-          .from('scansafe-account-media')
-          .createSignedUrl(path,300);
-        const url=signed?.data?.signedUrl;
-        if(/^https?:\/\//i.test(String(url||''))) row.profile_url=url;
-      }catch(_){}
-    }));
-
+    if(!current()) return [];
+    const {rows,assignments,metadataErrors}=result;
+    mapDbCache.activeAssignments=assignments;
+    mapDbCache.occupantDebug={source:'accommodation_assignments',assignmentError:null,metadataErrors,rpcError:null};
     mapDbCache.occupants.clear();
     for(const row of rows){
-      const key=String(row.space_code||'').trim().toUpperCase();
+      const key=normalizeMapSpaceCode(row.space_code);
       if(!key) continue;
       if(!mapDbCache.occupants.has(key)) mapDbCache.occupants.set(key,[]);
       mapDbCache.occupants.get(key).push(row);
     }
-
-    mapDbCache.occupantDebug={
-      source:'get_scansafe_active_map_occupants',
-      renderedCount:rows.length,
-      rpcError:rpcError?.message||null
+    const render=()=>{
+      if(!current()) return;
+      renderAdminMapOccupants();
+      const selected=document.querySelector('[data-space].selected')?.dataset.space;
+      if(selected) renderAdminMapSpaceDetail(selected);
     };
-
-    renderAdminMapOccupants();
-
-    // Map/image sizing can settle after the async RPC. Re-render a few times;
-    // this only repositions overlays and does not query the database again.
-    [60,220,700].forEach(delay=>setTimeout(renderAdminMapOccupants,delay));
+    render();
+    // Optional enrichment runs AFTER initials render. A missing RPC, missing
+    // member, or stalled image request cannot suppress assignment markers.
+    void (async()=>{
+      try{
+        const {data,error}=await sb.rpc('get_scansafe_active_map_occupants');
+        if(!current()) return;
+        if(error) throw error;
+        if(!Array.isArray(data)) throw new Error('Invalid map occupant details response.');
+        const details=new Map(data.map(row=>[String(row.assignment_id),row]));
+        for(const row of rows){
+          const detail=details.get(String(row.assignment_id));
+          if(!detail || String(detail.group_id)!==String(row.group_id) || normalizeMapSpaceCode(detail.space_code)!==row.space_code) continue;
+          row.evacuee_id=row.evacuee_id||detail.evacuee_id;
+          if(detail.full_name) row.full_name=detail.full_name;
+          row.arrival_time=detail.arrival_time||null;
+          row.map_status=mapOccupantCheckedIn(row)?'checked_in':'assigned';
+        }
+        render();
+      }catch(error){
+        if(current()) mapDbCache.occupantDebug.rpcError=error.message||String(error);
+      }
+    })();
+    for(const row of rows){
+      if(!row.evacuee_id || !sb.storage?.from) continue;
+      void (async()=>{
+        try{
+          const {data,error}=await sb.rpc('get_scansafe_registration_details',{p_evacuee_id:Number(row.evacuee_id)});
+          if(!current() || error || !data?.profile_photo?.path) return;
+          const signed=await sb.storage.from('scansafe-account-media').createSignedUrl(data.profile_photo.path,300);
+          if(!current()) return;
+          const url=signed?.data?.signedUrl;
+          if(/^https?:\/\//i.test(String(url||''))){ row.profile_url=url;render(); }
+        }catch(_){} // Initials stay visible on a storage/network error.
+      })();
+    }
     return rows;
   }
 
@@ -1470,13 +1458,12 @@
 
     stage.querySelectorAll('.map-occupant-overlay').forEach(node=>node.remove());
     const stageRect=stage.getBoundingClientRect();
-    if(!stageRect.width || !stageRect.height) return;
 
     for(const [spaceCode,rows] of mapDbCache.occupants.entries()){
       if(!rows?.length) continue;
 
       const hotspot=[...stage.querySelectorAll('.map-hotspot[data-space]')]
-        .find(node=>String(node.dataset.space||'').trim().toUpperCase()===String(spaceCode).trim().toUpperCase());
+        .find(node=>normalizeMapSpaceCode(node.dataset.space)===spaceCode);
       if(!hotspot) continue;
 
       const rect=hotspot.getBoundingClientRect();
@@ -1486,8 +1473,12 @@
       const overlay=document.createElement('div');
       overlay.className='map-occupant-overlay';
       overlay.dataset.space=spaceCode;
-      overlay.style.left=left+'px';
-      overlay.style.top=top+'px';
+      // Match the existing percentage hotspots, even before image dimensions
+      // arrive. Percent anchors also stay correct when the sidebar resizes.
+      const percent=['left','top','width','height'].every(key=>/^\d+(\.\d+)?%$/.test(hotspot.style[key]));
+      if(!percent && (!stageRect.width || !stageRect.height)) continue;
+      overlay.style.left=percent?(parseFloat(hotspot.style.left)+parseFloat(hotspot.style.width)/2).toFixed(3)+'%':left+'px';
+      overlay.style.top=percent?(parseFloat(hotspot.style.top)+parseFloat(hotspot.style.height)/2).toFixed(3)+'%':top+'px';
       overlay.style.zIndex='80';
 
       const visible=rows.slice(0,3);
@@ -1500,36 +1491,57 @@
           `</span>`
         ).join('')+
         (rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'')+
-        `<span class="map-occupant-overlay-label">${rows.length===1?gbeaaEscape(rows[0].full_name||'Evacuee'):rows.length+' groups'}</span>`;
+        `<span class="map-occupant-overlay-label">${rows.length===1?gbeaaEscape(rows[0].full_name||'Evacuee'):rows.length+' groups'}${rows.some(mapOccupantCheckedIn)?' · Checked In':''}</span>`;
 
       overlay.title=rows
-        .map(row=>`${row.full_name} • ${row.arrival_time?'Checked In':'Assigned'} • Group ${Number(row.group_size||1)}`)
+        .map(row=>`${row.full_name} • ${mapOccupantCheckedIn(row)?'Checked In':'Assigned'} • Group ${Number(row.group_size||1)}`)
         .join('\n');
 
       stage.appendChild(overlay);
+      installMapPhotoFallback(overlay);
     }
+  }
+
+  function installMapPhotoFallback(root){
+    root.querySelectorAll('.map-occupant-avatar img').forEach(img=>{
+      img.addEventListener('error',()=>{
+        const avatar=img.parentElement;
+        if(!avatar) return;
+        avatar.classList.remove('has-photo');
+        avatar.textContent=mapOccupantInitials(avatar.title);
+      },{once:true});
+    });
   }
 
   function renderAdminMapSpaceDetail(spaceCode){
     if(mapPage()!=='shelter-room.html') return;
     const box=document.getElementById('spaceDetail');
-    const row=mapDbCache.spaces.get(String(spaceCode));
+    const row=mapDbCache.spaces.get(normalizeMapSpaceCode(spaceCode));
     if(!box || !row) return;
-    const occupants=mapDbCache.occupants.get(String(spaceCode))||[];
+    const occupants=mapDbCache.occupants.get(normalizeMapSpaceCode(spaceCode))||[];
     const cap=Number(row.capacity||0),occ=Number(row.current_occupancy||0),available=Math.max(0,cap-occ);
     const list=occupants.length
-      ? occupants.map(person=>`<div class="map-occupant-row"><span class="map-occupant-avatar${person.profile_url?' has-photo':''}">${person.profile_url?`<img src="${gbeaaEscape(person.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(person.full_name))}</span><span><b>${gbeaaEscape(person.full_name||'Evacuee')}</b><small>Group of ${Number(person.group_size||1)} • ${person.arrival_time?'Arrived '+new Date(person.arrival_time).toLocaleString():'Assigned — waiting for check-in'}</small></span><em>${person.arrival_time?'Checked In':'Assigned'}</em></div>`).join('')
-      : '<div class="space-placeholder compact">No evacuees are currently assigned to this space.</div>';
+      ? occupants.map(person=>`<div class="map-occupant-row"><span class="map-occupant-avatar${person.profile_url?' has-photo':''}" title="${gbeaaEscape(person.full_name||'Evacuee')}">${person.profile_url?`<img src="${gbeaaEscape(person.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(person.full_name))}</span><span><b>${gbeaaEscape(person.full_name||'Evacuee')}</b><small>Group of ${Number(person.group_size||1)} • ${person.arrival_time?'Arrived '+new Date(person.arrival_time).toLocaleString():mapOccupantCheckedIn(person)?'Checked In':'Assigned — waiting for check-in'}</small></span><em>${mapOccupantCheckedIn(person)?'Checked In':'Assigned'}</em></div>`).join('')
+      : `<div class="space-placeholder compact">${mapDbCache.occupantDebug?.assignmentError?'Occupants could not be refreshed. Use Refresh to retry.':'No evacuees are currently assigned to this space.'}</div>`;
     box.innerHTML=`
       <div class="room-banner"><svg class="icon xl bigicon"><use href="assets/icons.svg#home"></use></svg><div><h2>${gbeaaEscape(row.space_name||spaceCode)}</h2><div style="margin-top:5px">${statusPill(normalizeDbSpaceStatus(row))}</div></div></div>
       <div class="detail-list"><div class="detail-line"><b>Space Type</b><span>${gbeaaEscape(row.space_type||'Accommodation')}</span></div><div class="detail-line"><b>Capacity</b><span>${cap}</span></div><div class="detail-line"><b>Occupied</b><span>${occ}</span></div><div class="detail-line"><b>Available</b><span>${available}</span></div></div>
       <div class="map-monitor-note"><b>Automatic Assignment</b><span>Accommodation is assigned during barcode check-in using current shelter capacity and evacuee requirements.</span></div>
       <div class="map-occupants-panel"><div class="panel-head"><h3>Current Occupants</h3><span>${occupants.length} group${occupants.length===1?'':'s'}</span></div>${list}</div>`;
+    installMapPhotoFallback(box);
   }
 
   function installAdminMapMonitoring(){
     if(mapPage()!=='shelter-room.html' || window.__scanSafeMapMonitoringInstalled) return;
     window.__scanSafeMapMonitoringInstalled=true;
+    const stage=document.querySelector('.floor-image-stage');
+    stage?.querySelector('.floor-plan-image')?.addEventListener('load',renderAdminMapOccupants);
+    if(stage && typeof window.ResizeObserver==='function'){
+      const observer=new window.ResizeObserver(renderAdminMapOccupants);
+      observer.observe(stage);
+      window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
+    }
+    window.addEventListener('resize',renderAdminMapOccupants);
     const original=window.selectSpace;
     window.selectSpace=function(spaceCode){
       if(typeof original==='function') original(spaceCode);
@@ -1581,7 +1593,7 @@
 
     mapDbCache.spaces.clear();
     for(const row of data.filter(row=>row.status!=='inactive')){
-      mapDbCache.spaces.set(row.space_code,row);
+      mapDbCache.spaces.set(normalizeMapSpaceCode(row.space_code),row);
       syncSpaceIntoExistingMap(row);
     }
     mapDbCache.ready=true;
@@ -1601,19 +1613,19 @@
     }
 
     window.getDynamicOccupancy=function(id){
-      const row=mapDbCache.spaces.get(id);
+      const row=mapDbCache.spaces.get(normalizeMapSpaceCode(id));
       if(row) return Number(row.current_occupancy||0);
       if(adminLivePages.has(page)||isEvacueeAppPage()) return 0;
       return window.__scanSafePrototypeGetDynamicOccupancy ? window.__scanSafePrototypeGetDynamicOccupancy(id) : 0;
     };
     window.getSpaceStatus=function(id){
-      const row=mapDbCache.spaces.get(id);
+      const row=mapDbCache.spaces.get(normalizeMapSpaceCode(id));
       if(row) return normalizeDbSpaceStatus(row);
       if(adminLivePages.has(page)||isEvacueeAppPage()) return 'full';
       return window.__scanSafePrototypeGetSpaceStatus ? window.__scanSafePrototypeGetSpaceStatus(id) : 'full';
     };
     window.getAvailableSlots=function(id){
-      const row=mapDbCache.spaces.get(id);
+      const row=mapDbCache.spaces.get(normalizeMapSpaceCode(id));
       if(row) return Math.max(0,Number(row.capacity||0)-Number(row.current_occupancy||0));
       if(adminLivePages.has(page)||isEvacueeAppPage()) return 0;
       return window.__scanSafePrototypeGetAvailableSlots ? window.__scanSafePrototypeGetAvailableSlots(id) : 0;
