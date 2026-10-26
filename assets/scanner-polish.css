@@ -1,0 +1,372 @@
+/* ScanSafe Barcode Scanner — visual polish only
+   No scanner logic, barcode lifecycle, accommodation, or database behavior changes. */
+
+.scanner-page .page{
+  padding-top:18px;
+  padding-bottom:24px;
+}
+
+.scanner-page .page-title{
+  margin-bottom:14px;
+}
+
+.scanner-page .page-title h1{
+  letter-spacing:-.02em;
+}
+
+.scanner-page #adminDataStatus{
+  border:1px solid #e7ebf0;
+  border-radius:12px;
+  background:linear-gradient(135deg,#ffffff,#fbfcfd);
+  box-shadow:0 5px 18px rgba(16,36,62,.045);
+}
+
+.scanner-page .scanner-page-grid{
+  display:grid;
+  grid-template-columns:minmax(390px,1.08fr) minmax(300px,.86fr) minmax(300px,.82fr);
+  gap:14px;
+  align-items:stretch;
+}
+
+.scanner-page .scanner-page-grid > .card,
+.scanner-page .scanner-bottom > .card{
+  border:1px solid #e5eaf0;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 9px 26px rgba(16,36,62,.055);
+  overflow:hidden;
+}
+
+.scanner-page .scan-panel{
+  display:flex;
+  flex-direction:column;
+}
+
+.scanner-page .panel-head-red{
+  padding:16px 18px;
+  background:linear-gradient(135deg,#e20000 0%,#bd0000 100%);
+  border-bottom:1px solid rgba(120,0,0,.16);
+}
+
+.scanner-page .panel-head-red h2{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0 0 5px;
+  font-size:16px;
+  line-height:1.2;
+  color:#fff;
+}
+
+.scanner-page .panel-head-red p{
+  margin:0;
+  max-width:540px;
+  color:rgba(255,255,255,.9);
+  font-size:10px;
+  line-height:1.5;
+}
+
+.scanner-page .scan-body{
+  padding:16px;
+}
+
+.scanner-page .scanner-camera-label{
+  display:block;
+  margin-bottom:6px;
+  color:#33475f;
+  font-size:9px;
+  font-weight:800;
+}
+
+.scanner-page .scanner-camera-select{
+  min-height:40px;
+  border:1px solid #dbe2ea;
+  border-radius:9px;
+  background:#fff;
+  color:#24374f;
+  padding:0 11px;
+  outline:none;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+
+.scanner-page .scanner-camera-select:focus{
+  border-color:#d70000;
+  box-shadow:0 0 0 3px rgba(215,0,0,.07);
+}
+
+.scanner-page .scan-frame{
+  position:relative;
+  min-height:240px;
+  margin-top:10px;
+  border:1px solid #253246;
+  border-radius:12px;
+  background:
+    radial-gradient(circle at 50% 35%,rgba(255,255,255,.04),transparent 36%),
+    linear-gradient(145deg,#111d30,#0d1728);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025);
+  overflow:hidden;
+}
+
+.scanner-page #scanSafeQrReader{
+  height:100%;
+  min-height:240px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:22px;
+  color:#fff;
+}
+
+.scanner-page #scanSafeQrReader .barcode{
+  opacity:.96;
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.2));
+}
+
+.scanner-page #scanSafeQrReader h3{
+  color:#fff;
+  font-weight:800;
+}
+
+.scanner-page .scanner-status{
+  min-height:0!important;
+  margin:9px 0 0!important;
+  padding:8px 10px;
+  border-radius:8px;
+  background:#f8fafc;
+  color:#607086!important;
+  font-size:9px!important;
+  line-height:1.45!important;
+}
+
+.scanner-page .scanner-status[data-state="success"]{
+  background:#edf9f2;
+  color:#087443!important;
+}
+
+.scanner-page .scanner-status[data-state="warning"]{
+  background:#fff8e9;
+  color:#905600!important;
+}
+
+.scanner-page .scanner-status[data-state="error"]{
+  background:#fff0f0;
+  color:#b42318!important;
+}
+
+.scanner-page #scannerStartButton{
+  min-height:42px;
+  margin-top:10px!important;
+  border-radius:10px;
+  box-shadow:0 5px 13px rgba(208,0,0,.13);
+}
+
+.scanner-page .manual{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 118px;
+  gap:8px;
+  align-items:center;
+}
+
+.scanner-page .manual .searchbar{
+  min-height:40px;
+  border:1px solid #dce3ea;
+  border-radius:9px;
+  background:#fff;
+}
+
+.scanner-page .manual .searchbar:focus-within{
+  border-color:#d70000;
+  box-shadow:0 0 0 3px rgba(215,0,0,.06);
+}
+
+.scanner-page #manualScanButton{
+  min-height:40px;
+  border-radius:9px;
+}
+
+.scanner-page #lastScannedEvacuee{
+  padding:16px;
+}
+
+.scanner-page #lastScannedEvacuee .section-h{
+  margin-bottom:12px;
+  color:#10243e;
+  font-size:14px;
+}
+
+.scanner-page .space-placeholder{
+  min-height:82px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  border:1px dashed #d9e0e8;
+  border-radius:10px;
+  background:#fbfcfd;
+  color:#6f7d90;
+  text-align:center;
+  font-size:9px;
+  line-height:1.5;
+}
+
+.scanner-page .verify-head{
+  padding:15px 17px;
+  background:linear-gradient(135deg,#168246,#0d6d3a);
+  color:#fff;
+}
+
+.scanner-page .verify-head h3{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+.scanner-page .verify-head > div{
+  margin-top:5px;
+  color:rgba(255,255,255,.9);
+  line-height:1.45;
+}
+
+.scanner-page #scanResult{
+  border-radius:10px;
+}
+
+.scanner-page .scanner-bottom{
+  display:grid;
+  grid-template-columns:1.25fr .86fr .86fr;
+  gap:14px;
+  margin-top:14px;
+}
+
+.scanner-page .scanner-bottom .card{
+  padding:16px;
+}
+
+.scanner-page .scanner-bottom .section-h{
+  margin-bottom:12px;
+  color:#10243e;
+  font-size:13px;
+}
+
+.scanner-page .scanner-bottom .table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  overflow:hidden;
+}
+
+.scanner-page .scanner-bottom .table th{
+  padding:9px 8px;
+  background:#f6f8fa;
+  border-bottom:1px solid #e4e9ef;
+  color:#4d5f76;
+  font-size:8px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.025em;
+}
+
+.scanner-page .scanner-bottom .table td{
+  padding:10px 8px;
+  border-bottom:1px solid #edf1f4;
+  color:#43546b;
+  font-size:9px;
+  vertical-align:middle;
+}
+
+.scanner-page .scanner-bottom .table tr:last-child td{
+  border-bottom:0;
+}
+
+.scanner-page .scanner-bottom .table tr:hover td{
+  background:#fffafa;
+}
+
+.scanner-page #scannerHistory td:nth-child(3){
+  max-width:90px;
+  word-break:break-all;
+  font-variant-numeric:tabular-nums;
+}
+
+.scanner-page #scannerHistory td:nth-child(5){
+  white-space:nowrap;
+}
+
+.scanner-page .scanner-bottom > .card:nth-child(2){
+  background:linear-gradient(180deg,#fff,#fcfdff);
+}
+
+.scanner-page .scanner-bottom > .card:nth-child(3){
+  background:linear-gradient(180deg,#fff,#fffafa);
+}
+
+.scanner-page .scanner-bottom > .card:nth-child(3) .section-h{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#9e1a1a;
+}
+
+@media(max-width:1180px){
+  .scanner-page .scanner-page-grid{
+    grid-template-columns:1fr 1fr;
+  }
+  .scanner-page .scanner-page-grid > section:first-child{
+    grid-row:span 2;
+  }
+  .scanner-page .scanner-bottom{
+    grid-template-columns:1fr 1fr;
+  }
+  .scanner-page .scanner-bottom > section:first-child{
+    grid-column:1 / -1;
+  }
+}
+
+@media(max-width:820px){
+  .scanner-page .scanner-page-grid,
+  .scanner-page .scanner-bottom{
+    grid-template-columns:1fr;
+  }
+  .scanner-page .scanner-page-grid > section:first-child,
+  .scanner-page .scanner-bottom > section:first-child{
+    grid-row:auto;
+    grid-column:auto;
+  }
+  .scanner-page .manual{
+    grid-template-columns:1fr;
+  }
+  .scanner-page #manualScanButton{
+    width:100%;
+  }
+}
+
+@media(max-width:560px){
+  .scanner-page .page{
+    padding-left:10px;
+    padding-right:10px;
+  }
+  .scanner-page .scanner-page-grid,
+  .scanner-page .scanner-bottom{
+    gap:10px;
+  }
+  .scanner-page .scan-body,
+  .scanner-page #lastScannedEvacuee,
+  .scanner-page .scanner-bottom .card{
+    padding:12px;
+  }
+  .scanner-page .panel-head-red,
+  .scanner-page .verify-head{
+    padding:13px 14px;
+  }
+  .scanner-page .scan-frame,
+  .scanner-page #scanSafeQrReader{
+    min-height:210px;
+  }
+  .scanner-page .scanner-bottom{
+    overflow:visible;
+  }
+  .scanner-page .scanner-bottom .card{
+    overflow:auto;
+  }
+}
