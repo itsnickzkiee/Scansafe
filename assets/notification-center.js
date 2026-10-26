@@ -7,6 +7,7 @@
   let panel = null, opened = false, selectedId = null, selectedItem = null, markError = '', markingId = null;
   let poll = null, channel = null, channelClient = null, trigger = null, refreshTask = null;
   let pageFilter = 'all', pageSelectedId = null, pageBound = false;
+  let dashboardObserver = null, dashboardPainting = false;
   const bindings = new Map();
 
   function node(tag, className, text) {
@@ -22,6 +23,56 @@
     if (id) element.id = id;
     return element;
   }
+  function dashboardAnnouncement() {
+    if (role !== 'evacuee' || !loaded) return null;
+    return items.find(function (item) {
+      return item && (item.audience === 'evacuees' || item.audience === 'all')
+        && ['announcement','emergency','system','accommodation'].includes(item.category);
+    }) || null;
+  }
+  function paintDashboardLatest() {
+    const card = document.getElementById('userLatestCard');
+    const item = dashboardAnnouncement();
+    if (!card || !item || dashboardPainting) return;
+    const id = String(item.notification_id);
+    if (card.querySelector('[data-dashboard-notification-id="' + id + '"]')) return;
+    dashboardPainting = true;
+    const urgent = item.notification_level === 'urgent' || item.category === 'emergency';
+    const warning = item.notification_level === 'warning';
+    const safe = function(v){ return String(v||'').replace(/[<>&]/g,''); };
+    card.innerHTML =
+      '<div data-dashboard-notification-id="' + safe(id) + '" class="notification-dashboard-update">' +
+        '<div class="app-status-icon">' + (urgent ? '!' : '●') + '</div>' +
+        '<div class="notification-dashboard-copy">' +
+          '<div class="notification-dashboard-kicker">Latest Update' + (!item.is_read ? ' • New' : '') + '</div>' +
+          '<div class="app-value">' + safe(item.title || 'Shelter Announcement') + '</div>' +
+          '<p>' + safe(item.message || '') + '</p>' +
+          '<small>' + safe(dateText(item.created_at)) + '</small>' +
+        '</div>' +
+      '</div>';
+    card.classList.toggle('is-urgent-update', urgent);
+    card.classList.toggle('is-warning-update', warning && !urgent);
+    card.setAttribute('role','button');
+    card.setAttribute('tabindex','0');
+    card.onclick = function () { location.href='user-notifications.html'; };
+    card.onkeydown = function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault(); location.href='user-notifications.html';
+      }
+    };
+    dashboardPainting = false;
+    if (!dashboardObserver) {
+      dashboardObserver = new MutationObserver(function () {
+        if (dashboardPainting) return;
+        const current = document.getElementById('userLatestCard');
+        if (current && !current.querySelector('[data-dashboard-notification-id="' + id + '"]')) {
+          setTimeout(paintDashboardLatest,0);
+        }
+      });
+      dashboardObserver.observe(card,{childList:true,subtree:true});
+    }
+  }
+
   function context() {
     const value = options.getContext ? options.getContext() : null;
     const userId = value && value.userId;
@@ -48,6 +99,8 @@
     loaded = false; loadError = ''; hasMore = false; selectedId = null; selectedItem = null; markError = ''; markingId = null;
     pageFilter = 'all'; pageSelectedId = null;
     if (panel) panel.replaceChildren();
+    if (dashboardObserver) { dashboardObserver.disconnect(); dashboardObserver = null; }
+    dashboardPainting = false;
     paintBells();
   }
   function syncAccount() {
@@ -80,6 +133,7 @@
       badge.hidden = !(count > 0);
       badge.setAttribute('aria-label', count + ' unread notifications');
     });
+    paintDashboardLatest();
   }
   function attachBells() {
     document.querySelectorAll(bellSelector).forEach(function (bell) {
@@ -340,7 +394,7 @@
         items = data.items.filter(function (item) { return item && /^\d+$/.test(String(item.notification_id)); });
         if (selectedId) selectedItem = items.find(function (item) { return String(item.notification_id) === selectedId; }) || selectedItem;
         unread = count; total = all; hasMore = !!data.has_more; loaded = true; loadError = '';
-        paintBells(); render(); connectRealtime(client, stamp);
+        paintBells(); render(); paintDashboardLatest(); connectRealtime(client, stamp);
         return true;
       } catch (error) {
         if (!current(stamp) || request !== sequence) return false;

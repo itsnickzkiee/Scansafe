@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="assets/style.css?v=operations-v22">
 <link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
 <link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
-<link rel="stylesheet" href="assets/messages-enhanced.css?v=messages-v1">
+<link rel="stylesheet" href="assets/messages-enhanced.css?v=messages-v2">
 </head>
 
 <body class="user-shell ss-messages-page">
@@ -41,7 +41,7 @@
     <main class="user-main">
 <div id="evacueeDataStatus" class="card card-pad" role="status" aria-live="polite" style="margin-bottom:12px">Loading your registration from the database...</div>
 <section class="user-hero"><h1>Messages</h1><p>Contact shelter staff and review your conversation.</p><div class="date-card"><svg class="icon"><use href="assets/icons.svg#calendar"></use></svg><div><b data-now>Loading date...</b></div></div></section>
-<div class="messages-grid" style="grid-template-columns:330px 1fr;height:650px"><section class="card card-pad msg-col"><h3 class="section-h">Recent Conversations</h3><div class="folder active"><span class="folder-left"><span class="avatar">A</span><span><b data-message-admin-name>ScanSafe Staff</b><br><span class="muted" data-user-conversation-preview style="font-size:9px">Loading your conversation...</span></span></span></div></section><section class="card conversation"><header class="conv-head"><div style="display:flex;gap:10px;align-items:center"><span class="avatar">A</span><div><b data-message-admin-name>ScanSafe Staff</b><div class="muted" style="font-size:9px">Authorized shelter personnel</div></div></div></header><div class="thread" id="thread"><div class="space-placeholder">Loading messages...</div></div><div class="msg-input"><textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message..."></textarea><button type="button" class="btn red" data-message-send aria-label="Send message"><svg class="icon"><use href="assets/icons.svg#send"></use></svg></button></div></section></div>
+<div class="messages-grid" style="grid-template-columns:330px 1fr;height:650px"><section class="card card-pad msg-col"><h3 class="section-h">Conversation</h3><div class="folder active"><span class="folder-left"><span class="avatar">A</span><span><b data-message-admin-name>ScanSafe Staff</b><br><span class="muted" data-user-conversation-preview style="font-size:9px">Loading your conversation...</span></span></span></div></section><section class="card conversation"><header class="ss-conv-head" data-enhanced-conv-head><div style="display:flex;gap:10px;align-items:center"><span class="avatar">A</span><div><b data-message-admin-name>ScanSafe Staff</b><div class="muted" style="font-size:9px">Authorized shelter personnel</div></div></div></header><div class="thread" id="ssThread"><div class="space-placeholder">Loading messages...</div></div><div class="msg-input"><textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message..."></textarea><button type="button" class="btn red" data-message-send aria-label="Send message"><svg class="icon"><use href="assets/icons.svg#send"></use></svg></button></div></section></div>
 </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
@@ -52,7 +52,7 @@
 <script src="assets/account-media.js?v=integration-v23"></script>
 <script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
-<script src="assets/messages-enhanced.js?v=messages-v1"></script>
+<script src="assets/messages-enhanced.js?v=messages-v2"></script>
 </body>
 
 </html>

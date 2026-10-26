@@ -30,7 +30,8 @@
     search:'',
     initialized:false,
     refreshTimer:null,
-    lastThreadIds:new Set()
+    lastThreadIds:new Set(),
+    selectionSeq:0
   };
 
   const templates={
@@ -100,7 +101,7 @@
   }
 
   function thread(){
-    return document.getElementById('thread');
+    return document.getElementById('ssThread');
   }
 
   function scrollBottom(smooth=true){
@@ -272,6 +273,47 @@
     }
   }
 
+
+  function recipientLock(){
+    if(!isStaff) return null;
+    let lock=document.querySelector('[data-selected-recipient]');
+    if(lock) return lock;
+    const composer=document.querySelector('.conversation .msg-input');
+    if(!composer) return null;
+    lock=document.createElement('div');
+    lock.className='ss-recipient-lock';
+    lock.dataset.selectedRecipient='';
+    lock.innerHTML='<span>Sending to</span><b data-recipient-name>Select an evacuee</b>';
+    composer.parentElement.insertBefore(lock,composer);
+    return lock;
+  }
+  function setRecipientLock(id,name){
+    if(!isStaff) return;
+    const lock=recipientLock();
+    if(!lock) return;
+    lock.dataset.selectedRecipient=String(id||'');
+    lock.querySelector('[data-recipient-name]').textContent=name||'Select an evacuee';
+    const send=document.querySelector('[data-message-send]');
+    if(send) send.disabled=!id;
+  }
+  function selectedReceiver(){
+    const lock=document.querySelector('[data-selected-recipient]');
+    const id=String(lock?.dataset.selectedRecipient||'').trim();
+    if(!id) return null;
+    const contact=state.contacts.find(c=>String(c.user_id)===id);
+    return contact?{id,name:contact.full_name||'Evacuee'}:null;
+  }
+  async function staffSendExact(receiver,message){
+    const {data,error}=await state.sb.rpc('staff_send_scansafe_message_v2',{
+      p_receiver:receiver.id,p_message:message
+    });
+    if(error) throw error;
+    if(!data || String(data.receiver_id)!==String(receiver.id)){
+      throw new Error('Recipient verification failed. Message was not confirmed.');
+    }
+    return data;
+  }
+
   async function loadUserContact(){
     const {data,error}=await state.sb.rpc('get_my_scansafe_message_contact');
     if(error){
@@ -342,7 +384,9 @@
         </button>`).join('');
     }
     host.querySelectorAll('[data-contact-id]').forEach(btn=>{
-      btn.addEventListener('click',()=>selectContact(btn.dataset.contactId));
+      btn.addEventListener('click',event=>{
+        event.preventDefault();event.stopPropagation();selectContact(btn.dataset.contactId);
+      });
     });
     const total=state.contacts.reduce((n,c)=>n+Number(c.unread_count||0),0);
     const count=document.querySelector('[data-all-message-count]');
@@ -354,12 +398,16 @@
 
   async function selectContact(id){
     if(!id||!state.sb) return;
-    state.currentId=id;
     const c=state.contacts.find(x=>String(x.user_id)===String(id));
-    state.currentName=c?.full_name||'Evacuee';
+    if(!c) return;
+
+    const seq=++state.selectionSeq;
+    state.currentId=String(c.user_id);
+    state.currentName=c.full_name||'Evacuee';
+    setRecipientLock(state.currentId,state.currentName);
     renderContacts();
 
-    const head=document.querySelector('.conversation .conv-head');
+    const head=document.querySelector('[data-enhanced-conv-head]');
     if(head){
       head.innerHTML=`<div class="ss-conv-person">
         <span class="avatar">${esc(initials(state.currentName))}</span>
@@ -367,21 +415,19 @@
       </div>
       <span class="ss-conv-last">${esc(c?.last_at?relative(c.last_at):'')}</span>`;
     }
-    await setupTypingChannel(id,state.currentName);
-    const {data,error}=await state.sb.rpc('get_staff_thread',{p_user_id:id});
+
+    await setupTypingChannel(state.currentId,state.currentName);
+    const requestedId=state.currentId;
+    const {data,error}=await state.sb.rpc('get_staff_thread',{p_user_id:requestedId});
     if(error){console.warn('Staff thread:',error.message);return;}
+    if(seq!==state.selectionSeq || String(state.currentId)!==String(requestedId)) return;
+
     renderThread(data||[],state.currentName);
-    // Marking thread read changes unread count; refresh list without changing selection.
     setTimeout(()=>loadContacts(false),120);
   }
 
   async function directSend(receiver,message){
-    if(isStaff){
-      return state.sb.rpc('staff_send_scansafe_message',{
-        p_receiver:receiver,
-        p_message:message
-      });
-    }
+    if(isStaff) return staffSendExact(receiver,message);
     return state.sb.rpc('send_message_to_scansafe_admin',{p_message:message});
   }
 
@@ -390,9 +436,13 @@
     const input=document.getElementById('messageInput');
     const message=String(input?.value||'').trim();
     if(!message) return;
-    const receiver=isStaff?state.currentId:state.contactId;
-    if(isStaff&&!receiver){
+    const receiver=isStaff?selectedReceiver():{id:state.contactId,name:state.contactName};
+    if(!receiver?.id){
       window.toast?.('Select an evacuee first.');
+      return;
+    }
+    if(isStaff && String(receiver.id)!==String(state.currentId)){
+      window.toast?.('Recipient changed. Select the evacuee again before sending.');
       return;
     }
 
@@ -405,11 +455,12 @@
 
     try{
       const result=await directSend(receiver,message);
-      if(result.error) throw result.error;
-      updateOptimistic(temp,'Sent');
+      if(result?.error) throw result.error;
+      updateOptimistic(temp,isStaff?'Sent to '+receiver.name:'Sent');
       setTimeout(async()=>{
         if(isStaff){
-          await Promise.all([selectContact(receiver),loadContacts(false)]);
+          await loadContacts(false);
+          if(String(state.currentId)===String(receiver.id)) await selectContact(receiver.id);
         }else{
           await loadUserThread();
         }
@@ -513,11 +564,10 @@
     if(!text){status.textContent='Type a message.';return;}
     btn.disabled=true; status.textContent='Sending…';
     try{
-      const result=await state.sb.rpc('staff_send_scansafe_message',{
-        p_receiver:composeSelected,p_message:text
-      });
-      if(result.error) throw result.error;
-      status.textContent='Sent.';
+      const contact=state.contacts.find(c=>String(c.user_id)===String(composeSelected));
+      if(!contact) throw new Error('Selected evacuee is no longer available.');
+      const result=await staffSendExact({id:contact.user_id,name:contact.full_name||'Evacuee'},text);
+      status.textContent='Sent to '+(result.receiver_name||contact.full_name||'evacuee')+'.';
       const id=composeSelected;
       await loadContacts(false);
       closeCompose();
@@ -532,7 +582,13 @@
   function bindCompose(){
     if(!isStaff) return;
     ensureComposeModal();
-    document.querySelector('.compose')?.addEventListener('click',openCompose);
+    const compose=document.querySelector('.compose');
+    if(compose){
+      compose.onclick=null;
+      compose.addEventListener('click',event=>{
+        event.preventDefault();event.stopPropagation();openCompose();
+      });
+    }
   }
 
   function templateText(label){
@@ -597,7 +653,7 @@
       });
       if(error) throw error;
       box.value='';
-      if(feedback) feedback.textContent='Sent successfully to '+label+'.';
+      if(feedback) feedback.textContent='Sent to '+label+'. It will appear in Notifications and the latest dashboard update.';
       window.toast?.('Announcement sent to '+label+'.');
     }catch(error){
       if(feedback) feedback.textContent=error?.message||'Announcement could not be sent.';

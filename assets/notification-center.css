@@ -81,3 +81,12 @@
   .notification-center-row { padding: 16px 14px; }
 }
 @media print { #scansafeNotificationCenter { display: none !important; } }
+
+#userLatestCard .notification-dashboard-update{display:flex;align-items:flex-start;gap:11px;width:100%}
+#userLatestCard .notification-dashboard-copy{min-width:0;flex:1}
+#userLatestCard .notification-dashboard-kicker{margin-bottom:5px;color:#b00000;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+#userLatestCard .notification-dashboard-copy p{margin:5px 0 7px;line-height:1.45}
+#userLatestCard .notification-dashboard-copy small{color:#8a95a5;font-size:8px}
+#userLatestCard[role="button"]{cursor:pointer}
+#userLatestCard.is-urgent-update{border-color:#f2b3b3;background:linear-gradient(145deg,#fff,#fff4f4)}
+#userLatestCard.is-warning-update{border-color:#f0d7a0;background:linear-gradient(145deg,#fff,#fffaf0)}

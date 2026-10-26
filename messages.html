@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe Messages</title><link rel="stylesheet" href="assets/style.css?v=operations-v22"><link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
 <link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
-<link rel="stylesheet" href="assets/messages-enhanced.css?v=messages-v1">
+<link rel="stylesheet" href="assets/messages-enhanced.css?v=messages-v2">
 </head><body class="ss-messages-page"><div class="admin-app"><header class="admin-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions"><div class="avatar">A</div><div class="identity"><strong>Admin</strong>Administrator</div><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon "><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon "><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a><a class="nav-item " href="barcode-scanner.html"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><span>Barcode Scanner</span></a><a class="nav-item " href="reports.html"><svg class="icon "><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a><a class="nav-item" href="needs-requests.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Needs Requests</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item active" href="messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a></aside>
 <main class="admin-main">
 <section class="page">
@@ -12,12 +12,12 @@
 <div class="searchbar" style="margin:10px 0"><svg class="icon sm"><use href="assets/icons.svg#search"></use></svg><input data-message-search placeholder="Search messages or people..."></div>
 <div class="folder active"><span class="folder-left"><svg class="icon sm"><use href="assets/icons.svg#message"></use></svg> All Messages</span><span class="count red" data-all-message-count hidden>0</span></div>
 <hr style="border:0;border-top:1px solid #e6ebef">
-<h3 class="section-h">Recent Conversations</h3>
+<h3 class="section-h" data-enhanced-conversations>Conversations</h3>
 <div class="ss-contact-list" data-conversation-list><div class="muted" style="padding:18px 8px;text-align:center;font-size:10px">Loading conversations...</div></div>
 </section>
 <section class="card conversation">
-<header class="conv-head"><div style="display:flex;gap:10px;align-items:center"><span class="avatar"><svg class="icon sm"><use href="assets/icons.svg#message"></use></svg></span><div><b>Select a conversation</b><div class="muted" style="font-size:9px">Choose an evacuee to view messages.</div></div></div></header>
-<div class="thread" id="thread"><div class="muted" style="text-align:center;padding:40px 15px">Loading conversations...</div></div>
+<header class="ss-conv-head" data-enhanced-conv-head><div style="display:flex;gap:10px;align-items:center"><span class="avatar"><svg class="icon sm"><use href="assets/icons.svg#message"></use></svg></span><div><b>Select a conversation</b><div class="muted" style="font-size:9px">Choose an evacuee to view messages.</div></div></div></header>
+<div class="thread" id="ssThread"><div class="muted" style="text-align:center;padding:40px 15px">Loading conversations...</div></div>
 <div class="msg-input"><textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message..."></textarea><button type="button" class="btn red" data-message-send aria-label="Send message"><svg class="icon"><use href="assets/icons.svg#send"></use></svg></button></div>
 </section>
 <aside class="card side-panel">
@@ -36,6 +36,6 @@
 <script src="assets/account-media.js?v=integration-v23"></script>
 <script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
-<script src="assets/messages-enhanced.js?v=messages-v1"></script>
+<script src="assets/messages-enhanced.js?v=messages-v2"></script>
 </body>
 </html>

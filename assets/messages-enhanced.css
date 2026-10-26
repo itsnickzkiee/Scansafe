@@ -204,3 +204,14 @@ body.ss-modal-open{overflow:hidden}
   body.ss-messages-page .bubble{max-width:84%}
   .ss-compose-dialog{padding:16px}
 }
+
+body.ss-messages-page .ss-conv-head{
+  min-height:66px;padding:12px 16px;border-bottom:1px solid #e9edf2;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;
+}
+.ss-recipient-lock{
+  margin:0 12px 7px;padding:7px 10px;border:1px solid #f1d0d0;border-radius:9px;
+  background:#fff7f7;display:flex;align-items:center;gap:7px;color:#68758a;font-size:8px;
+}
+.ss-recipient-lock b{color:#b00000;font-size:9px}
+.ss-recipient-lock b::before{content:'●';margin-right:5px;font-size:7px}
