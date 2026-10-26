@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v31-deterministic-map-occupants';
+const CACHE_NAME='scansafe-pwa-v26-registration-review';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -26,6 +26,8 @@ const APP_SHELL=[
   './assets/account-media.css',
   './assets/notification-center.js',
   './assets/notification-center.css',
+  './assets/registration-review.js',
+  './assets/registration-review.css',
   './assets/supabase-bridge.js',
   './assets/logo.svg',
   './assets/icons.svg',

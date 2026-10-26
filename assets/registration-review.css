@@ -1,0 +1,110 @@
+/* ScanSafe final registration review/correction UI */
+
+/* Password eye */
+.password-eye-wrap{position:relative}
+.password-eye-wrap input{padding-right:42px!important}
+.password-eye{
+  position:absolute;right:7px;top:50%;transform:translateY(-50%);
+  width:32px;height:32px;border:0;border-radius:8px;background:transparent;
+  color:#596a80;display:grid;place-items:center;cursor:pointer
+}
+.password-eye:hover{background:#f3f5f8;color:#c40000}
+.password-eye .icon{width:16px;height:16px}
+
+/* Admin rejection dialog */
+.registration-review-modal{
+  position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;padding:18px
+}
+.registration-review-backdrop{position:absolute;inset:0;border:0;background:rgba(8,18,31,.6);backdrop-filter:blur(4px)}
+.registration-review-card{
+  position:relative;z-index:1;width:min(520px,100%);max-height:min(720px,90vh);overflow:auto;
+  padding:22px;border:1px solid #e7ebf0;border-top:4px solid #d40000;border-radius:18px;
+  background:#fff;box-shadow:0 30px 90px rgba(5,18,38,.3)
+}
+.registration-review-icon{
+  width:44px;height:44px;display:grid;place-items:center;border-radius:14px;
+  background:#fff0f0;color:#c90000;font-size:20px;font-weight:900;margin-bottom:12px
+}
+.registration-review-kicker{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#a46c6c}
+.registration-review-card h3{margin:4px 0 6px;color:#10243e;font-size:20px}
+.registration-review-card>p{margin:0;color:#637287;font-size:10px;line-height:1.55}
+.registration-review-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:16px 0 12px}
+.registration-review-options label{
+  display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #e4e9ef;border-radius:10px;
+  background:#fafbfc;color:#334860;font-size:9px;font-weight:700;cursor:pointer
+}
+.registration-review-options label:has(input:checked){border-color:#e3a5a5;background:#fff4f4;color:#a40000}
+.registration-review-options input{accent-color:#d40000}
+.registration-review-note span{display:block;margin-bottom:5px;font-size:9px;font-weight:800;color:#34495f}
+.registration-review-note textarea{
+  width:100%;min-height:90px;box-sizing:border-box;border:1px solid #dfe5eb;border-radius:10px;padding:10px;
+  resize:vertical;font:inherit;font-size:10px;outline:none
+}
+.registration-review-note textarea:focus{border-color:#d40000;box-shadow:0 0 0 3px rgba(212,0,0,.07)}
+.registration-review-error{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fff0f0;color:#b10000;font-size:9px}
+.registration-review-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+
+/* Admin review history */
+.registration-history{margin-top:16px;border-top:1px solid #e9edf2;padding-top:14px}
+.registration-history-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.registration-history-head b{display:block;color:#10243e;font-size:12px}
+.registration-history-head span{display:block;margin-top:3px;color:#788699;font-size:8px}
+.registration-history-head em{font-style:normal;background:#fff0f0;color:#b00000;border-radius:999px;padding:4px 8px;font-size:7px;font-weight:900}
+.registration-history-list{display:flex;flex-direction:column;gap:8px}
+.registration-history-item{position:relative;display:grid;grid-template-columns:14px 1fr;gap:8px;padding:10px;border:1px solid #edf0f4;border-radius:11px;background:#fbfcfd}
+.registration-history-marker{width:9px;height:9px;margin-top:4px;border-radius:50%;background:#8694a5;box-shadow:0 0 0 4px #eef1f4}
+.registration-history-item.rejected .registration-history-marker{background:#d30000;box-shadow:0 0 0 4px #ffe9e9}
+.registration-history-item.approved .registration-history-marker{background:#15924f;box-shadow:0 0 0 4px #e5f8ed}
+.registration-history-item.resubmitted .registration-history-marker{background:#d28b00;box-shadow:0 0 0 4px #fff3d9}
+.registration-history-title{display:flex;justify-content:space-between;gap:8px}
+.registration-history-title b{font-size:9px;color:#263a52}
+.registration-history-title span,.registration-history-content small{font-size:7.5px;color:#8995a4}
+.registration-history-issues{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.registration-history-issues span{padding:4px 6px;border-radius:999px;background:#fff0f0;color:#af0000;font-size:7px;font-weight:800}
+.registration-history-note{margin:7px 0 0;padding:7px 8px;border-left:3px solid #d40000;background:#fff7f7;color:#5d6d80;font-size:8px}
+.registration-history-snapshot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:8px}
+.registration-history-snapshot span{padding:6px;border:1px solid #edf0f4;border-radius:7px;background:#fff;font-size:7.5px;color:#596b80}
+.registration-history-snapshot b{display:block;margin-bottom:2px;color:#233950;font-size:7px;text-transform:uppercase}
+
+/* Evacuee rejected registration correction */
+.registration-correction-card{
+  margin:0 0 14px;padding:0!important;overflow:hidden;border:1px solid #efcaca!important;border-radius:14px!important;
+  box-shadow:0 9px 26px rgba(150,0,0,.06)!important;background:#fff!important
+}
+.registration-correction-head{display:flex;gap:12px;padding:16px 18px;background:linear-gradient(135deg,#fff6f6,#fff)}
+.registration-correction-alert{
+  flex:0 0 40px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;
+  background:#e00000;color:#fff;font-size:18px;font-weight:900;box-shadow:0 6px 14px rgba(200,0,0,.15)
+}
+.registration-correction-head span{color:#b00000;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+.registration-correction-head h3{margin:3px 0 5px;color:#10243e;font-size:17px}
+.registration-correction-head p{margin:0;color:#68778a;font-size:9px;line-height:1.5}
+.registration-correction-issues{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 12px}
+.registration-correction-issues span{padding:5px 8px;border-radius:999px;background:#fff0f0;color:#a90000;font-size:8px;font-weight:900}
+.registration-admin-note{margin:0 18px 14px;padding:10px 11px;border:1px solid #f0d4d4;border-radius:9px;background:#fffafa}
+.registration-admin-note b{font-size:8px;color:#a60000;text-transform:uppercase}
+.registration-admin-note p{margin:4px 0 0;color:#53647a;font-size:9px;line-height:1.45}
+.registration-correction-card form{padding:0 18px 18px}
+.registration-correction-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.registration-correction-grid label{display:block}
+.registration-correction-grid label.wide{grid-column:1/-1}
+.registration-correction-grid label>span{display:block;margin-bottom:5px;color:#33475e;font-size:8px;font-weight:800}
+.registration-correction-grid input,.registration-correction-grid select{
+  width:100%;min-height:38px;box-sizing:border-box;border:1px solid #dfe5eb;border-radius:9px;padding:8px 10px;
+  background:#fff;color:#263a52;font:inherit;font-size:9px;outline:none
+}
+.registration-correction-grid input:focus,.registration-correction-grid select:focus{
+  border-color:#d50000;box-shadow:0 0 0 3px rgba(213,0,0,.07)
+}
+.registration-id-replacement{padding:10px;border:1px dashed #e1b7b7;border-radius:10px;background:#fffafa}
+.registration-id-replacement small{display:block;margin-top:5px;color:#7e8998;font-size:7.5px}
+.registration-correction-status{min-height:18px;margin:10px 0 4px;font-size:8.5px}
+.registration-correction-status.error{color:#b30000}.registration-correction-status.success{color:#138347}
+.registration-correction-actions{display:flex;gap:8px;padding:0 18px 18px}
+
+@media(max-width:640px){
+  .registration-review-options,.registration-correction-grid,.registration-history-snapshot{grid-template-columns:1fr}
+  .registration-review-actions{grid-template-columns:1fr}
+  .registration-correction-grid label.wide{grid-column:auto}
+  .registration-correction-actions{flex-direction:column}
+}

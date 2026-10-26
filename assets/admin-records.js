@@ -70,7 +70,12 @@ function auditEventLabel(event){
     conversation_archived:'Conversation archived',
     conversation_unarchived:'Conversation restored',
     conversation_unarchived_new_message:'Conversation restored by new message',
-    conversation_cleared:'Conversation deleted from Messages view'
+    conversation_cleared:'Conversation deleted from Messages view',
+    registration_submitted:'Registration submitted',
+    registration_submitted_snapshot:'Registration submitted',
+    registration_rejected:'Registration correction requested',
+    registration_resubmitted:'Registration resubmitted',
+    evacuee_approved:'Registration approved'
   };
   return map[event]||String(event||'System activity').replaceAll('_',' ');
 }
@@ -80,7 +85,14 @@ function detailLabel(key){
     departure_time:'Departure',space_code:'Space',previous_space:'Previous Space',
     group_size:'Group Size',operation_id:'Operation',assignment_id:'Assignment',
     barcode_input:'Barcode',cleared_at:'Cleared At',retention:'Retention',
-    message_id:'Message',previously_archived_at:'Previous Archive'
+    message_id:'Message',previously_archived_at:'Previous Archive',
+    registration_code:'Registration Code',full_name:'Full Name',email:'Email',
+    age:'Age',gender:'Gender',group_size:'Group Size',needs:'Special Needs',
+    contact_number:'Contact Number',emergency_contact:'Emergency Contact',
+    address:'Address',barangay:'Barangay',city:'City',valid_id_type:'Valid ID Type',
+    valid_id_number:'Valid ID Number',approval_status:'Approval Status',
+    current_status:'Current Status',issues:'Review Issues',note:'Admin Note',
+    snapshot_source:'Snapshot Source'
   };
   return labels[key]||String(key||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
 }
