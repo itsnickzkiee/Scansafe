@@ -5,14 +5,18 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('redundant evacuee quick actions are removed', () => {
+test('Quick Actions stay while Contact Staff is removed', () => {
   const info = read('my-information.html');
   const room = read('user-room.html');
+
   assert.doesNotMatch(info, />Contact Staff</);
-  assert.doesNotMatch(info, />Quick Actions</);
+  assert.match(info, /Quick Actions/);
+  assert.match(info, />View Barcode</);
+  assert.match(info, />View Notifications</);
+
   assert.doesNotMatch(room, />Contact Staff</);
-  assert.doesNotMatch(room, />Quick Actions</);
-  assert.doesNotMatch(room, />Report an Issue</);
+  assert.match(room, /Quick Actions/);
+  assert.match(room, />Report an Issue</);
 });
 
 test('profile photo upload is attached to avatar and ID re-upload is not exposed', () => {
