@@ -36,7 +36,10 @@
     livePollTimer:null,
     realtimeStatus:'idle',
     selfProfileUrl:'',
-    contactPhotoCache:new Map()
+    contactPhotoCache:new Map(),
+    archivedContacts:[],
+    conversationMode:'active',
+    currentClearAt:null
   };
 
   const templates={
@@ -393,7 +396,10 @@
   async function loadContacts(selectFirst=false){
     if(!state.sb||!isStaff) return;
     let data=null,error=null;
-    let result=await state.sb.rpc('get_staff_message_contacts_v3');
+    let result=await state.sb.rpc('get_staff_message_contacts_v4');
+    if(result.error && /PGRST202|does not exist|could not find/i.test((result.error.code||'')+' '+(result.error.message||''))){
+      result=await state.sb.rpc('get_staff_message_contacts_v3');
+    }
     if(result.error && /PGRST202|does not exist|could not find/i.test((result.error.code||'')+' '+(result.error.message||''))){
       result=await state.sb.rpc('get_staff_message_contacts_v2');
     }
@@ -412,10 +418,52 @@
     }
   }
 
+  async function loadArchivedContacts(){
+    if(!state.sb||!isStaff) return [];
+    const {data,error}=await state.sb.rpc('get_scansafe_archived_conversations');
+    if(error){
+      console.warn('Archived conversations:',error.message);
+      state.archivedContacts=[];
+    }else{
+      state.archivedContacts=Array.isArray(data)?data:[];
+    }
+    const count=document.querySelector('[data-archived-count]');
+    if(count) count.textContent=String(state.archivedContacts.length);
+    return state.archivedContacts;
+  }
+
+  function switchConversationMode(mode){
+    state.conversationMode=mode==='archived'?'archived':'active';
+    document.querySelectorAll('[data-conversation-mode]').forEach(btn=>{
+      btn.classList.toggle('active',btn.dataset.conversationMode===state.conversationMode);
+    });
+    const title=document.querySelector('[data-enhanced-conversations]');
+    if(title) title.textContent=state.conversationMode==='archived'?'Archived Conversations':'Active Conversations';
+    state.currentId=null;
+    state.currentName='';
+    setRecipientLock(null,'Select an evacuee');
+    const t=thread();
+    if(t) t.innerHTML=`<div class="ss-empty-chat"><b>${state.conversationMode==='archived'?'Archived Conversations':'Select a conversation'}</b><span>${state.conversationMode==='archived'?'Restore a conversation to return it to Active.':'Choose an evacuee from the list.'}</span></div>`;
+    const head=document.querySelector('[data-enhanced-conv-head]');
+    if(head) head.innerHTML=`<div><b>${state.conversationMode==='archived'?'Archived Conversations':'Select a conversation'}</b><span>${state.conversationMode==='archived'?'Message records are retained.':'Choose an evacuee to view messages.'}</span></div>`;
+    renderContacts();
+  }
+
+  async function restoreArchivedConversation(id){
+    if(!state.sb||!id) return;
+    const {error}=await state.sb.rpc('unarchive_scansafe_conversation',{p_user_id:id});
+    if(error){window.toast?.(error.message||'Conversation could not be restored.');return;}
+    window.toast?.('Conversation restored to Active.');
+    await Promise.all([loadArchivedContacts(),loadContacts(false)]);
+    switchConversationMode('active');
+    await selectContact(id);
+  }
+
   function filteredContacts(){
+    const source=state.conversationMode==='archived'?state.archivedContacts:state.contacts;
     const q=state.search.trim().toLowerCase();
-    if(!q) return state.contacts;
-    return state.contacts.filter(c=>
+    if(!q) return source;
+    return source.filter(c=>
       String(c.full_name||'').toLowerCase().includes(q) ||
       String(c.last_message||'').toLowerCase().includes(q)
     );
@@ -426,8 +474,26 @@
     const host=document.querySelector('[data-conversation-list]');
     if(!host) return;
     const list=filteredContacts();
+
     if(!list.length){
-      host.innerHTML='<div class="ss-empty-list">No matching conversations.</div>';
+      host.innerHTML=`<div class="ss-empty-list">${state.conversationMode==='archived'?'No archived conversations.':'No matching conversations.'}</div>`;
+    }else if(state.conversationMode==='archived'){
+      host.innerHTML=list.map(c=>`
+        <div class="ss-contact ss-contact-archived">
+          ${avatarMarkup(c.full_name,'')}
+          <span class="ss-contact-copy">
+            <b>${esc(c.full_name||'Evacuee')}</b>
+            <span>${esc(c.last_message||'No messages')}</span>
+            <small>Archived ${esc(relative(c.archived_at))}</small>
+          </span>
+          <button type="button" class="ss-restore-contact" data-restore-contact="${esc(c.user_id)}">Restore</button>
+        </div>`).join('');
+      host.querySelectorAll('[data-restore-contact]').forEach(btn=>{
+        btn.addEventListener('click',event=>{
+          event.preventDefault();event.stopPropagation();
+          restoreArchivedConversation(btn.dataset.restoreContact);
+        });
+      });
     }else{
       host.innerHTML=list.map(c=>`
         <button type="button" class="ss-contact ${String(c.user_id)===String(state.currentId)?'active':''}" data-contact-id="${esc(c.user_id)}">
@@ -441,12 +507,13 @@
             ${Number(c.unread_count||0)>0?`<em>${Number(c.unread_count)}</em>`:''}
           </span>
         </button>`).join('');
-    }
-    host.querySelectorAll('[data-contact-id]').forEach(btn=>{
-      btn.addEventListener('click',event=>{
-        event.preventDefault();event.stopPropagation();selectContact(btn.dataset.contactId);
+      host.querySelectorAll('[data-contact-id]').forEach(btn=>{
+        btn.addEventListener('click',event=>{
+          event.preventDefault();event.stopPropagation();selectContact(btn.dataset.contactId);
+        });
       });
-    });
+    }
+
     const total=state.contacts.reduce((n,c)=>n+Number(c.unread_count||0),0);
     const count=document.querySelector('[data-all-message-count]');
     if(count){
@@ -456,7 +523,7 @@
   }
 
   async function selectContact(id){
-    if(!id||!state.sb) return;
+    if(!id||!state.sb||state.conversationMode!=='active') return;
     const c=state.contacts.find(x=>String(x.user_id)===String(id));
     if(!c) return;
 
@@ -475,25 +542,55 @@
       <div class="ss-conv-tools">
         <span class="ss-conv-last">${esc(c?.last_at?relative(c.last_at):'')}</span>
         <button type="button" class="ss-archive-conversation" data-archive-conversation title="Archive conversation">Archive</button>
+        <button type="button" class="ss-delete-conversation" data-delete-conversation title="Clear this conversation from Messages">Delete</button>
       </div>`;
       head.querySelector('[data-archive-conversation]')?.addEventListener('click',archiveCurrentConversation);
+      head.querySelector('[data-delete-conversation]')?.addEventListener('click',clearCurrentConversation);
     }
 
     await setupTypingChannel(state.currentId,state.currentName);
     const requestedId=state.currentId;
-    const {data,error}=await state.sb.rpc('get_staff_thread',{p_user_id:requestedId});
-    if(error){console.warn('Staff thread:',error.message);return;}
+    const [threadRes,stateRes]=await Promise.all([
+      state.sb.rpc('get_staff_thread',{p_user_id:requestedId}),
+      state.sb.rpc('get_scansafe_conversation_state',{p_user_id:requestedId})
+    ]);
+    if(threadRes.error){console.warn('Staff thread:',threadRes.error.message);return;}
     if(seq!==state.selectionSeq || String(state.currentId)!==String(requestedId)) return;
 
-    renderThread(data||[],state.currentName);
+    state.currentClearAt=stateRes.error?null:(stateRes.data?.cleared_at||null);
+    const cutoff=state.currentClearAt?new Date(state.currentClearAt).getTime():0;
+    const visible=(threadRes.data||[]).filter(row=>{
+      if(!cutoff) return true;
+      const sent=new Date(row.sent_at||0).getTime();
+      return sent>cutoff;
+    });
+    renderThread(visible,state.currentName);
     setTimeout(()=>loadContacts(false),120);
+  }
+
+  async function clearCurrentConversation(){
+    if(!isStaff||!state.currentId||!state.sb) return;
+    const receiver=selectedReceiver();
+    if(!receiver?.id) return;
+    if(!window.confirm(`Delete this conversation with ${receiver.name} from the Messages view?\n\nThe visible message history will be cleared, but audit/database records are retained for accountability.`)) return;
+    try{
+      const {data,error}=await state.sb.rpc('clear_scansafe_conversation',{p_user_id:receiver.id});
+      if(error) throw error;
+      state.currentClearAt=data?.cleared_at||new Date().toISOString();
+      const t=thread();
+      if(t) t.innerHTML='<div class="ss-empty-chat"><b>Conversation cleared</b><span>Previous messages are hidden from this Messages view. New messages will appear normally.</span></div>';
+      window.toast?.(`Conversation with ${receiver.name} cleared from Messages.`);
+      await loadContacts(false);
+    }catch(error){
+      window.toast?.(error?.message||'Conversation could not be cleared.');
+    }
   }
 
   async function archiveCurrentConversation(){
     if(!isStaff||!state.currentId||!state.sb) return;
     const receiver=selectedReceiver();
     if(!receiver?.id) return;
-    if(!window.confirm(`Archive conversation with ${receiver.name}? Messages will be retained and searchable in Reports & Analytics.`)) return;
+    if(!window.confirm(`Archive conversation with ${receiver.name}? Messages will be retained. You can restore it from Messages → Archived.`)) return;
     try{
       const {error}=await state.sb.rpc('archive_scansafe_conversation',{
         p_user_id:receiver.id,p_reason:null
@@ -503,10 +600,11 @@
       state.currentId=null; state.currentName='';
       setRecipientLock(null,'Select an evacuee');
       const head=document.querySelector('[data-enhanced-conv-head]');
-      if(head) head.innerHTML='<div><b>Conversation archived</b><span>Open another conversation or view Archived Conversations in Reports & Analytics.</span></div>';
+      if(head) head.innerHTML='<div><b>Conversation archived</b><span>Open another conversation or switch to Archived in Messages.</span></div>';
       const t=thread();
       if(t) t.innerHTML='<div class="ss-empty-chat"><b>Conversation archived</b><span>Message history was retained.</span></div>';
-      await loadContacts(true);
+      await Promise.all([loadContacts(false),loadArchivedContacts()]);
+      switchConversationMode('archived');
     }catch(error){
       window.toast?.(error?.message||'Conversation could not be archived.');
     }
@@ -763,6 +861,9 @@
       state.search=input.value||'';
       renderContacts();
     });
+    document.querySelectorAll('[data-conversation-mode]').forEach(btn=>{
+      btn.addEventListener('click',()=>switchConversationMode(btn.dataset.conversationMode));
+    });
   }
 
   function refreshCurrent(){
@@ -815,6 +916,12 @@
       })
       .subscribe();
 
+    state.sb.channel('scansafe-conversation-archive-ui-'+me+'-'+Math.random().toString(36).slice(2))
+      .on('postgres_changes',{event:'*',schema:'public',table:'scansafe_conversation_archives'},()=>{
+        loadArchivedContacts().then(()=>renderContacts());
+      })
+      .subscribe();
+
     // Short visible-page fallback: no manual browser refresh is needed even if
     // a realtime websocket is temporarily reconnecting.
     clearInterval(state.livePollTimer);
@@ -845,7 +952,10 @@
       bindCompose();
       bindTemplates();
       bindAnnouncement();
-      await loadContacts(true);
+      await Promise.all([loadContacts(false),loadArchivedContacts()]);
+      switchConversationMode('active');
+      const first=state.contacts[0]?.user_id;
+      if(first) await selectContact(first);
     }else{
       await loadUserContact();
       await loadSelfPhoto();
@@ -875,6 +985,9 @@
       userId:state.session?.user?.id||null,
       currentContact:isStaff?state.currentId:state.contactId,
       contacts:state.contacts.length,
+      archivedContacts:state.archivedContacts.length,
+      conversationMode:state.conversationMode,
+      currentClearAt:state.currentClearAt,
       typingChannel:!!state.typingChannel,
       realtime:!!state.messageChannel,
       realtimeStatus:state.realtimeStatus,

@@ -12,3 +12,11 @@
 .records-status.done{background:#eef2f6;color:#556477}.records-status.active{background:#e9f8ef;color:#168647}
 .records-restore{padding:6px 9px!important;font-size:8px!important}
 @media(max-width:720px){.records-head,.records-filters{flex-direction:column}.records-filters input,.records-filters select{width:100%;min-width:0}}
+
+.records-detail-list{
+  display:flex;flex-direction:column;gap:4px;min-width:180px;
+  color:#526176;font-size:8px;line-height:1.4
+}
+.records-detail-list span{display:block}
+.records-detail-list b{color:#263a52;font-size:8px}
+.records-detail-empty{color:#9aa5b3;font-size:8px}

@@ -2,7 +2,7 @@
 'use strict';
 if((location.pathname.split('/').pop()||'').toLowerCase()!=='reports.html') return;
 
-const state={sb:null,stays:[],audit:[],archives:[],tab:'analytics'};
+const state={sb:null,stays:[],audit:[],tab:'analytics'};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>{const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString();};
@@ -25,14 +25,12 @@ function switchTab(tab){
 }
 async function refreshRecords(){
   state.sb=client(); if(!state.sb) return;
-  const [s,a,c]=await Promise.all([
+  const [s,a]=await Promise.all([
     state.sb.rpc('get_scansafe_stay_history',{p_limit:1000}),
-    state.sb.rpc('get_scansafe_admin_audit',{p_limit:1500}),
-    state.sb.rpc('get_scansafe_archived_conversations')
+    state.sb.rpc('get_scansafe_admin_audit',{p_limit:1500})
   ]);
   if(!s.error) state.stays=Array.isArray(s.data)?s.data:[];
   if(!a.error) state.audit=Array.isArray(a.data)?a.data:[];
-  if(!c.error) state.archives=Array.isArray(c.data)?c.data:[];
   renderAll();
 }
 function stayFiltered(){
@@ -49,10 +47,6 @@ function auditFiltered(){
     r.actor_name,r.event_type,r.target_type,r.target_id,JSON.stringify(r.details||{})
   ].some(v=>String(v||'').toLowerCase().includes(q))));
 }
-function archiveFiltered(){
-  const q=String($('[data-archive-search]')?.value||'').toLowerCase();
-  return state.archives.filter(r=>!q||String(r.full_name||'').toLowerCase().includes(q));
-}
 function renderStays(){
   const body=$('[data-stay-history]'); if(!body)return;
   const rows=stayFiltered();
@@ -66,6 +60,50 @@ function renderStays(){
     <td><span class="records-status ${r.status==='released'?'done':'active'}">${esc(r.status==='released'?'Completed':r.status)}</span></td>
   </tr>`).join(''):'<tr><td colspan="7">No stay records match.</td></tr>';
 }
+function auditEventLabel(event){
+  const map={
+    gbeaa_assignment:'Accommodation assigned',
+    evacuee_checked_in:'Evacuee checked in',
+    evacuee_released:'Evacuee released',
+    duplicate_checkin_blocked:'Duplicate check-in blocked',
+    account_image_uploaded:'Profile image uploaded',
+    conversation_archived:'Conversation archived',
+    conversation_unarchived:'Conversation restored',
+    conversation_unarchived_new_message:'Conversation restored by new message',
+    conversation_cleared:'Conversation deleted from Messages view'
+  };
+  return map[event]||String(event||'System activity').replaceAll('_',' ');
+}
+function detailLabel(key){
+  const labels={
+    evacuee_name:'Evacuee',reason:'Reason',arrival_time:'Time In',
+    departure_time:'Departure',space_code:'Space',previous_space:'Previous Space',
+    group_size:'Group Size',operation_id:'Operation',assignment_id:'Assignment',
+    barcode_input:'Barcode',cleared_at:'Cleared At',retention:'Retention',
+    message_id:'Message',previously_archived_at:'Previous Archive'
+  };
+  return labels[key]||String(key||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+function detailValue(key,value){
+  if(value===null||value===undefined||value==='') return '—';
+  if(/(_at|_time|departure|arrival)/i.test(key)){
+    const d=new Date(value); if(!Number.isNaN(d.getTime())) return d.toLocaleString();
+  }
+  if(key==='duration_seconds') return dur(value);
+  if(typeof value==='boolean') return value?'Yes':'No';
+  if(typeof value==='object') return JSON.stringify(value);
+  return String(value);
+}
+function auditDetails(details){
+  const d=details&&typeof details==='object'?details:{};
+  const hidden=new Set(['algorithm']);
+  const entries=Object.entries(d).filter(([k])=>!hidden.has(k));
+  if(!entries.length) return '<span class="records-detail-empty">No additional details</span>';
+  return `<div class="records-detail-list">${entries.slice(0,8).map(([k,v])=>
+    `<span><b>${esc(detailLabel(k))}:</b> ${esc(detailValue(k,v))}</span>`
+  ).join('')}</div>`;
+}
+
 function renderAudit(){
   const body=$('[data-audit-history]'); if(!body)return;
   const select=$('[data-audit-event]');
@@ -78,31 +116,12 @@ function renderAudit(){
   body.innerHTML=rows.length?rows.map(r=>`<tr>
     <td>${esc(fmt(r.created_at))}</td>
     <td>${esc(r.actor_name||'System')}</td>
-    <td><b>${esc(String(r.event_type||'').replaceAll('_',' '))}</b></td>
-    <td>${esc(r.target_type||'—')}<br><small>${esc(r.target_id||'')}</small></td>
-    <td><code>${esc(JSON.stringify(r.details||{}))}</code></td>
+    <td><b>${esc(auditEventLabel(r.event_type))}</b></td>
+    <td>${esc(String(r.target_type||'—').replaceAll('_',' '))}<br><small>${esc(r.target_id||'')}</small></td>
+    <td>${auditDetails(r.details)}</td>
   </tr>`).join(''):'<tr><td colspan="5">No audit records match.</td></tr>';
 }
-function renderArchives(){
-  const body=$('[data-archived-conversations]'); if(!body)return;
-  const rows=archiveFiltered();
-  body.innerHTML=rows.length?rows.map(r=>`<tr>
-    <td><b>${esc(r.full_name)}</b></td>
-    <td>${esc(r.last_message||'No messages')}<br><small>${esc(r.last_message_at?fmt(r.last_message_at):'')}</small></td>
-    <td>${esc(fmt(r.archived_at))}</td>
-    <td>${esc(r.archived_by_name||'Staff')}</td>
-    <td><button class="btn out records-restore" data-restore-user="${esc(r.user_id)}">Restore</button></td>
-  </tr>`).join(''):'<tr><td colspan="5">No archived conversations.</td></tr>';
-  $$('[data-restore-user]').forEach(btn=>btn.addEventListener('click',()=>restore(btn.dataset.restoreUser)));
-}
-function renderAll(){renderStays();renderAudit();renderArchives();}
-async function restore(id){
-  if(!state.sb||!id)return;
-  const {error}=await state.sb.rpc('unarchive_scansafe_conversation',{p_user_id:id});
-  if(error){window.toast?.(error.message);return;}
-  window.toast?.('Conversation restored.');
-  await refreshRecords();
-}
+function renderAll(){renderStays();renderAudit();}
 function csvCell(v){return `"${String(v??'').replaceAll('"','""')}"`;}
 function download(name,headers,rows){
   const csv=[headers.map(csvCell).join(','),...rows.map(r=>r.map(csvCell).join(','))].join('\r\n');
@@ -117,21 +136,18 @@ function exportType(type){
   }else if(type==='audit'){
     download('scansafe-audit-trail.csv',['Audit ID','Date','Actor','Event','Target Type','Target ID','Details'],
       auditFiltered().map(r=>[r.audit_id,r.created_at,r.actor_name,r.event_type,r.target_type,r.target_id,JSON.stringify(r.details||{})]));
-  }else{
-    download('scansafe-archived-conversations.csv',['Evacuee','Archived At','Archived By','Last Message','Last Message At'],
-      archiveFiltered().map(r=>[r.full_name,r.archived_at,r.archived_by_name,r.last_message,r.last_message_at]));
   }
 }
 function bind(){
   $$('[data-records-tab]').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.recordsTab)));
-  $$('[data-stay-search],[data-stay-status],[data-audit-search],[data-audit-event],[data-archive-search]').forEach(el=>el.addEventListener('input',renderAll));
+  $$('[data-stay-search],[data-stay-status],[data-audit-search],[data-audit-event]').forEach(el=>el.addEventListener('input',renderAll));
   $$('[data-records-export]').forEach(b=>b.addEventListener('click',()=>exportType(b.dataset.recordsExport)));
 }
 document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{
   bind();
   const hash=location.hash.replace('#','');
-  switchTab(['stays','audit','archives'].includes(hash)?hash:'analytics');
+  switchTab(['stays','audit'].includes(hash)?hash:'analytics');
 },850));
 
-window.ScanSafeRecordsDebug={refresh:refreshRecords,inspect:()=>({stays:state.stays.length,audit:state.audit.length,archives:state.archives.length,tab:state.tab})};
+window.ScanSafeRecordsDebug={refresh:refreshRecords,inspect:()=>({stays:state.stays.length,audit:state.audit.length,tab:state.tab})};
 })();

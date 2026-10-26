@@ -292,3 +292,31 @@ body.ss-messages-page[data-message-realtime="subscribed"] .ss-conv-head::after{
   padding:6px 9px;font-size:8px;font-weight:800;cursor:pointer
 }
 .ss-archive-conversation:hover{background:#fff0f0}
+
+.ss-conversation-switch{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+  margin:2px 0 10px;
+  padding:4px;
+  background:#f4f6f8;
+  border-radius:9px;
+}
+.ss-conversation-switch button{
+  border:0;background:transparent;border-radius:7px;padding:7px 8px;
+  color:#637287;font-size:8px;font-weight:800;cursor:pointer
+}
+.ss-conversation-switch button.active{background:#fff;color:#b00000;box-shadow:0 1px 5px rgba(16,36,62,.08)}
+.ss-conversation-switch button span{margin-left:3px}
+.ss-contact-archived{cursor:default}
+.ss-contact-archived .ss-contact-copy small{font-size:7.5px;color:#9aa4b1;margin-top:2px}
+.ss-restore-contact{
+  border:1px solid #e0b6b6;background:#fff;color:#a40000;border-radius:7px;
+  padding:6px 8px;font-size:8px;font-weight:800;cursor:pointer
+}
+.ss-restore-contact:hover{background:#fff0f0}
+.ss-delete-conversation{
+  border:1px solid #cc0000;background:#cc0000;color:#fff;border-radius:8px;
+  padding:6px 9px;font-size:8px;font-weight:800;cursor:pointer
+}
+.ss-delete-conversation:hover{background:#a90000}
