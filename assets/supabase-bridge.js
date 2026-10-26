@@ -1345,6 +1345,56 @@
     return rows;
   }
 
+  async function adminMapDirectAssignmentOccupants(sb){
+    try{
+      const [assignmentRes,evacueeRes,groupRes]=await Promise.all([
+        sb.from('accommodation_assignments')
+          .select('assignment_id,group_id,space_id,occupant_count,assignment_status')
+          .eq('assignment_status','active'),
+        sb.from('evacuees')
+          .select('evacuee_id,group_id,full_name,current_status,approval_status')
+          .eq('approval_status','approved'),
+        sb.from('evacuee_groups')
+          .select('group_id,group_size')
+      ]);
+      if(assignmentRes.error) throw assignmentRes.error;
+      if(evacueeRes.error) throw evacueeRes.error;
+      if(groupRes.error) throw groupRes.error;
+
+      const evacByGroup=new Map();
+      for(const row of evacueeRes.data||[]){
+        if(String(row.current_status||'').toLowerCase()==='released') continue;
+        const key=String(row.group_id);
+        if(!evacByGroup.has(key)) evacByGroup.set(key,row);
+      }
+      const groupById=new Map((groupRes.data||[]).map(row=>[String(row.group_id),row]));
+      const spaceById=new Map(
+        [...mapDbCache.spaces.values()].map(row=>[String(row.space_id),row])
+      );
+
+      return (assignmentRes.data||[]).map(asg=>{
+        const ev=evacByGroup.get(String(asg.group_id));
+        const space=spaceById.get(String(asg.space_id));
+        if(!ev || !space?.space_code) return null;
+        return {
+          space_code:String(space.space_code),
+          space_name:space.space_name||space.space_code,
+          group_id:asg.group_id,
+          evacuee_id:ev.evacuee_id,
+          full_name:ev.full_name||'Evacuee',
+          group_size:Number(groupById.get(String(asg.group_id))?.group_size||asg.occupant_count||1),
+          arrival_time:null,
+          current_status:ev.current_status||'',
+          map_status:'assigned',
+          source:'direct_assignment_fallback'
+        };
+      }).filter(Boolean);
+    }catch(error){
+      console.warn('ScanSafe direct map assignment fallback:',error?.message||error);
+      return [];
+    }
+  }
+
   function mergeAdminMapOccupants(primary,fallback){
     const merged=new Map();
     for(const row of fallback||[]){
@@ -1364,6 +1414,7 @@
     if(!sb || !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) return [];
 
     const fallback=adminMapFallbackOccupants();
+    const directRows=await adminMapDirectAssignmentOccupants(sb);
     let rpcRows=[];
     let rpcError=null;
 
@@ -1378,7 +1429,10 @@
 
     // The map must still show assigned occupants even if the optional
     // occupant-detail RPC is unavailable or returns no row for older data.
-    const rows=mergeAdminMapOccupants(rpcRows,fallback);
+    const rows=mergeAdminMapOccupants(
+      rpcRows,
+      mergeAdminMapOccupants(directRows,fallback)
+    );
 
     await Promise.all(rows.map(async row=>{
       if(!row?.evacuee_id || !sb.storage?.from) return;
@@ -1405,6 +1459,7 @@
     mapDbCache.occupantDebug={
       rpcCount:rpcRows.length,
       fallbackCount:fallback.length,
+      directAssignmentCount:directRows.length,
       renderedCount:rows.length,
       rpcError:rpcError?.message||null
     };
@@ -1417,22 +1472,49 @@
     if(mapPage()!=='shelter-room.html') return;
     const stage=document.querySelector('.floor-image-stage');
     if(!stage) return;
+
     stage.querySelectorAll('.map-occupant-stack').forEach(node=>node.remove());
+
     for(const [spaceCode,rows] of mapDbCache.occupants.entries()){
       if(!rows?.length) continue;
-      const hotspot=stage.querySelector(`[data-space="${CSS.escape(spaceCode)}"]`);
+
+      const hotspot=stage.querySelector(`.map-hotspot[data-space="${CSS.escape(spaceCode)}"]`);
       if(!hotspot) continue;
-      const left=parseFloat(hotspot.style.left||'0')+parseFloat(hotspot.style.width||'0')/2;
-      const top=parseFloat(hotspot.style.top||'0')+parseFloat(hotspot.style.height||'0')/2;
-      const stack=document.createElement('button');
-      stack.type='button';stack.className='map-occupant-stack';stack.style.left=left+'%';stack.style.top=top+'%';stack.dataset.space=spaceCode;
-      stack.setAttribute('aria-label',(rows.length===1?rows[0].full_name:rows.length+' accommodated groups')+' in '+spaceCode);
-      stack.title=rows.map(row=>`${row.full_name} • Group ${Number(row.group_size||1)} • ${row.arrival_time?'Checked In':'Assigned'}`).join('\n');
+
+      // Anchor the bubble INSIDE the actual accommodation hotspot instead of
+      // calculating coordinates against the whole floor image. This remains
+      // correct during resize, horizontal scrolling and responsive scaling.
+      const stack=document.createElement('span');
+      stack.className='map-occupant-stack map-occupant-stack-anchored';
+      stack.dataset.space=spaceCode;
+      stack.setAttribute(
+        'aria-label',
+        (rows.length===1?rows[0].full_name:rows.length+' accommodated groups')+' in '+spaceCode
+      );
+      stack.title=rows
+        .map(row=>`${row.full_name} • Group ${Number(row.group_size||1)} • ${row.arrival_time?'Checked In':'Assigned'}`)
+        .join('\n');
+
       const visible=rows.slice(0,3);
-      stack.innerHTML=visible.map(row=>`<span class="map-occupant-avatar${row.profile_url?' has-photo':''}" title="${gbeaaEscape(row.full_name||'Evacuee')}">${row.profile_url?`<img src="${gbeaaEscape(row.profile_url)}" alt="">`:gbeaaEscape(mapOccupantInitials(row.full_name))}</span>`).join('')+(rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'');
-      stack.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();window.selectSpace?.(spaceCode);document.getElementById('spaceDetail')?.scrollIntoView({behavior:'smooth',block:'nearest'});});
-      stage.appendChild(stack);
+      stack.innerHTML=
+        visible.map(row=>
+          `<span class="map-occupant-avatar${row.profile_url?' has-photo':''}" title="${gbeaaEscape(row.full_name||'Evacuee')}">`+
+            (row.profile_url
+              ? `<img src="${gbeaaEscape(row.profile_url)}" alt="">`
+              : gbeaaEscape(mapOccupantInitials(row.full_name)))+
+          `</span>`
+        ).join('')+
+        (rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'');
+
+      hotspot.appendChild(stack);
+      hotspot.classList.add('has-map-occupants');
     }
+
+    stage.querySelectorAll('.map-hotspot').forEach(hotspot=>{
+      if(!hotspot.querySelector('.map-occupant-stack')){
+        hotspot.classList.remove('has-map-occupants');
+      }
+    });
   }
 
   function renderAdminMapSpaceDetail(spaceCode){

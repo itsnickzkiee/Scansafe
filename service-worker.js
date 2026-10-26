@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v29-map-marker-fallback';
+const CACHE_NAME='scansafe-pwa-v30-anchored-map-profile-bubble';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

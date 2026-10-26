@@ -5852,3 +5852,27 @@ body.scanner-readmission-open{overflow:hidden}
   .mobile-bottom-nav a>span{font-size:8px!important}
   .previous-stay-grid{grid-template-columns:1fr}
 }
+
+
+/* v30 — profile bubbles are anchored to the accommodation hotspot itself. */
+.map-hotspot.has-map-occupants{
+  overflow:visible!important;
+}
+.map-occupant-stack.map-occupant-stack-anchored{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  z-index:30!important;
+  transform:translate(-50%,-50%)!important;
+  pointer-events:none;
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  min-width:35px;
+  min-height:35px;
+}
+.map-hotspot.selected .map-occupant-stack.map-occupant-stack-anchored{
+  z-index:31!important;
+}
