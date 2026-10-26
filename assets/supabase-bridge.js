@@ -1214,6 +1214,29 @@
     return adminLiveRefreshPromise;
   }
 
+  window.ScanSafeMapDebug={
+    inspect:()=>({
+      page:mapPage(),
+      spaces:[...mapDbCache.spaces.values()],
+      occupants:[...mapDbCache.occupants.entries()].map(([space,rows])=>({space,rows})),
+      occupantDebug:mapDbCache.occupantDebug||null,
+      adminAssignments:(adminLiveCache.evacuees||[])
+        .filter(row=>row.assigned_space_code)
+        .map(row=>({
+          name:row.full_name,
+          group_id:row.group_id,
+          space_code:row.assigned_space_code,
+          status:row.current_status,
+          approval_status:row.approval_status
+        }))
+    }),
+    refresh:async()=>{
+      await loadAdminLiveSnapshot();
+      await loadAccommodationState();
+      return window.ScanSafeMapDebug.inspect();
+    }
+  };
+
   window.ScanSafeAdminLive={
     refresh:loadAdminLiveSnapshot,
     renderSystemUsers:renderAdminSystemUsers,
@@ -1299,23 +1322,70 @@
     return String(name||'Evacuee').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part.charAt(0)).join('').toUpperCase()||'EV';
   }
 
+  function adminMapFallbackOccupants(){
+    const rows=[];
+    for(const row of adminLiveCache.evacuees||[]){
+      const spaceCode=String(row.assigned_space_code||'').trim();
+      if(!spaceCode) continue;
+      if(String(row.current_status||'').toLowerCase()==='released') continue;
+      if(String(row.approval_status||'').toLowerCase()!=='approved') continue;
+      rows.push({
+        space_code:spaceCode,
+        space_name:row.assigned_space_name||spaceCode,
+        group_id:row.group_id,
+        evacuee_id:row.evacuee_id,
+        full_name:row.full_name||'Evacuee',
+        group_size:Number(row.group_size||1),
+        arrival_time:row.arrival_time||null,
+        current_status:row.current_status||'',
+        map_status:row.arrival_time?'checked_in':'assigned',
+        source:'admin_live_fallback'
+      });
+    }
+    return rows;
+  }
+
+  function mergeAdminMapOccupants(primary,fallback){
+    const merged=new Map();
+    for(const row of fallback||[]){
+      const key=[row.space_code,row.group_id||row.evacuee_id].join(':');
+      merged.set(key,{...row});
+    }
+    for(const row of primary||[]){
+      const key=[row.space_code,row.group_id||row.evacuee_id].join(':');
+      merged.set(key,{...(merged.get(key)||{}),...row,source:'occupant_rpc'});
+    }
+    return [...merged.values()];
+  }
+
   async function loadAdminMapOccupants(){
     if(mapPage()!=='shelter-room.html') return [];
     const sb=readyClient();
     if(!sb || !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) return [];
-    const {data,error}=await sb.rpc('get_scansafe_space_occupants');
-    if(error){
-      const missing=error.code==='PGRST202'||error.code==='42883'||/could not find.*get_scansafe_space_occupants|function.*does not exist/i.test(error.message||'');
-      if(!missing) console.warn('ScanSafe map occupants:',error.message);
-      mapDbCache.occupants.clear();
-      renderAdminMapOccupants();
-      return [];
+
+    const fallback=adminMapFallbackOccupants();
+    let rpcRows=[];
+    let rpcError=null;
+
+    try{
+      const {data,error}=await sb.rpc('get_scansafe_space_occupants');
+      if(error) throw error;
+      rpcRows=Array.isArray(data)?data:[];
+    }catch(error){
+      rpcError=error;
+      console.warn('ScanSafe map occupants RPC:',error?.message||error);
     }
-    const rows=Array.isArray(data)?data:[];
+
+    // The map must still show assigned occupants even if the optional
+    // occupant-detail RPC is unavailable or returns no row for older data.
+    const rows=mergeAdminMapOccupants(rpcRows,fallback);
+
     await Promise.all(rows.map(async row=>{
       if(!row?.evacuee_id || !sb.storage?.from) return;
       try{
-        const detail=await sb.rpc('get_scansafe_registration_details',{p_evacuee_id:Number(row.evacuee_id)});
+        const detail=await sb.rpc('get_scansafe_registration_details',{
+          p_evacuee_id:Number(row.evacuee_id)
+        });
         const path=detail?.data?.profile_photo?.path;
         if(!path) return;
         const signed=await sb.storage.from('scansafe-account-media').createSignedUrl(path,300);
@@ -1323,13 +1393,22 @@
         if(/^https?:\/\//i.test(String(url||''))) row.profile_url=url;
       }catch(_){ /* Initials remain the safe fallback. */ }
     }));
+
     mapDbCache.occupants.clear();
     for(const row of rows){
-      const key=String(row.space_code||'');
+      const key=String(row.space_code||'').trim();
       if(!key) continue;
       if(!mapDbCache.occupants.has(key)) mapDbCache.occupants.set(key,[]);
       mapDbCache.occupants.get(key).push(row);
     }
+
+    mapDbCache.occupantDebug={
+      rpcCount:rpcRows.length,
+      fallbackCount:fallback.length,
+      renderedCount:rows.length,
+      rpcError:rpcError?.message||null
+    };
+
     renderAdminMapOccupants();
     return rows;
   }
