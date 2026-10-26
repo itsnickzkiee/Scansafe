@@ -62,25 +62,113 @@
     clearLast('No verified record to display. Try scanning again.');status(message,'error');hasResult=true;
   }
   function row(label,value){return '<div class="detail-line"><b>'+esc(label)+'</b><span>'+esc(value??'Not provided')+'</span></div>';}
+  function scanDate(value){
+    if(!value) return 'Not recorded';
+    const d=new Date(value);
+    return Number.isNaN(d.getTime())?'Not recorded':d.toLocaleString();
+  }
+  function scanDuration(seconds){
+    const total=Math.max(0,Number(seconds)||0);
+    const hours=Math.floor(total/3600);
+    const minutes=Math.floor((total%3600)/60);
+    if(hours && minutes) return hours+'h '+minutes+'m';
+    if(hours) return hours+'h';
+    return minutes+'m';
+  }
   function render(data,value){
     const box=el('scanResult');if(!box) return;
     box.classList.remove('hidden');hasResult=true;
+
     if(data?.valid!==true){
       const label=String(data?.result||'invalid').toUpperCase();
       const message=data?.message||'This barcode could not be verified.';
       box.innerHTML='<div class="scanner-result-badge scanner-result-error">'+esc(label)+'</div><h2 class="scanner-result-title">Barcode not verified</h2><p>'+esc(message)+'</p>'+row('Barcode',value);
       clearLast('No verified evacuee record for this scan.');status(message,'error');return;
     }
+
     const assignment=data.assignment||{};
     const space=data.space_name||assignment.space_name||data.space_code||assignment.space_code;
-    const assigned=['assigned','already_assigned'].includes(data.assignment_state)&&!!space;
-    const assignmentText=assigned?space:'Waiting for assignment';
-    const allocationMessage=data.assignment_message||(assigned?(data.assignment_state==='already_assigned'?'Existing accommodation assignment retained.':'GBEAA assigned an available accommodation space.'):'No accommodation assignment was saved.');
     const shelter=data.shelter_name||assignment.shelter_name||'Not provided';
-    box.innerHTML='<div class="scanner-result-badge">VERIFIED</div><h2 class="scanner-result-title">'+esc(assigned?'Assigned':'Verified \u2014 Waiting for assignment')+'</h2><p>'+esc(allocationMessage)+'</p><div class="detail-list">'+row('Barcode',data.qr_value||value)+row('Accommodation',assignmentText)+row('Shelter',shelter)+row('Assignment',assigned?(data.assignment_state==='already_assigned'?'Already assigned':'Assigned via GBEAA'):'Waiting for assignment')+row('Scanned by',window.ScanSafeDB?.profile?.full_name||'Authorized staff')+(data.scanned_at?row('Scanned at',new Date(data.scanned_at).toLocaleString()):'')+'</div>';
+    const arrival=scanDate(data.arrival_time||assignment.assigned_at||data.scanned_at);
+
+    if(data.scan_state==='already_checked_in' || data.duplicate_scan===true && data.scan_state!=='released'){
+      box.innerHTML=
+        '<div class="scanner-result-badge scanner-result-duplicate">ALREADY CHECKED IN</div>'+
+        '<h2 class="scanner-result-title">Duplicate scan blocked</h2>'+
+        '<p>This barcode already completed check-in for the current evacuation. No new assignment or occupancy was created.</p>'+
+        '<div class="detail-list">'+
+          row('Evacuee',data.full_name||'Evacuee')+
+          row('Arrival Time',arrival)+
+          row('Assigned Space',space||'Current assignment retained')+
+          row('Shelter',shelter)+
+          row('Status','Accommodated / Checked In')+
+        '</div>';
+
+      const last=el('lastScannedEvacuee');
+      if(last) last.innerHTML='<h3 class="section-h">Last Scanned Evacuee</h3><h2 class="scanner-evacuee-name">'+esc(data.full_name||'Evacuee')+'</h2><span class="pill amber">Already Checked In</span><div class="detail-list">'+row('Arrival Time',arrival)+row('Accommodation',space||'Current assignment retained')+row('Group size',data.group_size||'Not provided')+'</div>';
+
+      status('Duplicate scan blocked. '+(data.full_name||'Evacuee')+' is already checked in.','warning');
+      return;
+    }
+
+    if(data.scan_state==='released'){
+      box.innerHTML=
+        '<div class="scanner-result-badge scanner-result-released">RELEASED</div>'+
+        '<h2 class="scanner-result-title">Shelter stay already ended</h2>'+
+        '<p>This barcode cannot automatically check in again for the same evacuation stay.</p>'+
+        '<div class="detail-list">'+
+          row('Evacuee',data.full_name||'Evacuee')+
+          row('Arrival Time',scanDate(data.arrival_time))+
+          row('Departure Time',scanDate(data.departure_time))+
+          (data.stay_duration_seconds!=null?row('Stay Duration',scanDuration(data.stay_duration_seconds)):'')+
+          row('Status','Released')+
+        '</div>';
+      clearLast((data.full_name||'Evacuee')+' has already been released.');
+      status('Released stay. Staff must use the controlled readmission flow before a future check-in.','warning');
+      return;
+    }
+
+    const assigned=['assigned','already_assigned'].includes(data.assignment_state)&&!!space;
+    const checkedIn=data.scan_state==='checked_in' || assigned;
+    const assignmentText=assigned?space:'Waiting for assignment';
+    const allocationMessage=checkedIn
+      ? 'Check-in completed. GBEAA accommodation is confirmed and occupancy was recorded once.'
+      : data.assignment_message||'Barcode verified, but accommodation was not completed.';
+
+    box.innerHTML=
+      '<div class="scanner-result-badge">'+esc(checkedIn?'CHECKED IN':'VERIFIED')+'</div>'+
+      '<h2 class="scanner-result-title">'+esc(checkedIn?'Accommodated / Checked In':'Verified — Waiting for assignment')+'</h2>'+
+      '<p>'+esc(allocationMessage)+'</p>'+
+      '<div class="detail-list">'+
+        row('Barcode',data.qr_value||value)+
+        row('Evacuee',data.full_name||'Evacuee')+
+        row('Arrival Time',checkedIn?arrival:'Not recorded')+
+        row('Accommodation',assignmentText)+
+        row('Shelter',shelter)+
+        row('Assignment',assigned?'Assigned via GBEAA':'Waiting for assignment')+
+        row('Scanned by',window.ScanSafeDB?.profile?.full_name||'Authorized staff')+
+      '</div>';
+
     const last=el('lastScannedEvacuee');
-    if(last) last.innerHTML='<h3 class="section-h">Last Scanned Evacuee</h3><h2 class="scanner-evacuee-name">'+esc(data.full_name||'Evacuee')+'</h2><span class="pill green">Verified</span><div class="detail-list">'+row('Evacuee ID',data.evacuee_id)+row('Age / Gender',[data.age??'Not provided',data.gender||'Not provided'].join(' / '))+row('Group size',data.group_size)+row('Special needs',data.needs_summary||'None recorded')+row('Address',data.address||'Not provided')+row('Contact number',data.contact_number||'Not provided')+row('Approval',data.approval_status||'approved')+row('Accommodation',assignmentText)+'</div>';
-    status(assigned?'Verified. '+(data.assignment_state==='already_assigned'?'Existing assignment: ':'Assigned to ')+space+'.':'Verified. '+allocationMessage,assigned?'success':'warning');
+    if(last) last.innerHTML=
+      '<h3 class="section-h">Last Scanned Evacuee</h3>'+
+      '<h2 class="scanner-evacuee-name">'+esc(data.full_name||'Evacuee')+'</h2>'+
+      '<span class="pill green">'+esc(checkedIn?'Checked In':'Verified')+'</span>'+
+      '<div class="detail-list">'+
+        row('Evacuee ID',data.evacuee_id)+
+        row('Age / Gender',[data.age??'Not provided',data.gender||'Not provided'].join(' / '))+
+        row('Group size',data.group_size)+
+        row('Special needs',data.needs_summary||'None recorded')+
+        row('Arrival Time',checkedIn?arrival:'Not recorded')+
+        row('Accommodation',assignmentText)+
+      '</div>';
+
+    status(
+      checkedIn
+        ? 'Check-in completed. '+(data.full_name||'Evacuee')+' is assigned to '+space+'.'
+        : 'Verified. '+allocationMessage,
+      checkedIn?'success':'warning'
+    );
   }
   function verify(rawValue){
     const value=String(rawValue??'').trim();
@@ -93,9 +181,9 @@
     if(!sb){unavailable('The database connection is unavailable. Reload and try again.');controls();return Promise.resolve(null);}
     const token=++revision;
     const current=()=>token===revision&&context()?.userId===ctx.userId&&context()?.role===ctx.role;
-    busy=true;controls();clearLast('Verifying the barcode and finding an accommodation...');
-    const box=el('scanResult');if(box){box.classList.remove('hidden');box.innerHTML='<p>Verifying barcode and running GBEAA...</p>';}
-    status('Barcode detected. Verifying and assigning an available space...','busy');
+    busy=true;controls();clearLast('Verifying barcode and checking current shelter-stay status...');
+    const box=el('scanResult');if(box){box.classList.remove('hidden');box.innerHTML='<p>Verifying barcode, checking duplicate check-in, and running GBEAA when needed...</p>';}
+    status('Barcode detected. Checking eligibility and one-time check-in status...','busy');
     const promise=(async()=>{
       try{
         await camera()?.stop?.();

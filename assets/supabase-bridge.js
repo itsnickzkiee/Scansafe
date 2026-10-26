@@ -568,10 +568,36 @@
     return d.toLocaleDateString();
   }
 
+  function lifecycleDate(value){
+    if(!value) return 'Not recorded';
+    const d=new Date(value);
+    return Number.isNaN(d.getTime())?'Not recorded':d.toLocaleString();
+  }
+
+  function lifecycleDuration(arrival,departure,seconds){
+    let total=Number(seconds);
+    if(!Number.isFinite(total) && arrival){
+      const start=new Date(arrival).getTime();
+      const end=departure?new Date(departure).getTime():Date.now();
+      if(Number.isFinite(start)&&Number.isFinite(end)) total=Math.max(0,Math.floor((end-start)/1000));
+    }
+    if(!Number.isFinite(total)) return 'Not recorded';
+    const days=Math.floor(total/86400);
+    const hours=Math.floor((total%86400)/3600);
+    const minutes=Math.floor((total%3600)/60);
+    const parts=[];
+    if(days) parts.push(days+'d');
+    if(hours) parts.push(hours+'h');
+    if(minutes || !parts.length) parts.push(minutes+'m');
+    return parts.join(' ');
+  }
+
   function adminLiveStatus(row){
     if(String(row.current_status||'').trim().toLowerCase()==='released') return 'Released';
     if(row.approval_status==='approved'){
-      return row.current_status==='checked_in'?'Checked-In':row.current_status==='accommodated'?'Assigned':'Approved';
+      return ['accommodated','checked_in'].includes(String(row.current_status||'').toLowerCase())
+        ? 'Accommodated'
+        : 'Approved';
     }
     if(row.approval_status==='rejected') return 'Rejected';
     return 'Pending Approval';
@@ -604,6 +630,10 @@
       qrCode:row.barcode_value || null,
       assignment:row.assigned_space_code || null,
       assignmentName:row.assigned_space_name || null,
+      dbGroupId:Number(row.group_id||0)||null,
+      stayStatus:row.stay_status || null,
+      arrivalTime:row.arrival_time || null,
+      departureTime:row.departure_time || null,
       contactNumber:row.contact_number || ''
     };
   }
@@ -695,13 +725,43 @@
       : `<tr><td colspan="10" style="text-align:center;padding:24px;color:#7d8998">No evacuee records found in Supabase.</td></tr>`;
   }
 
-  function showAdminLiveEvacuee(id){
+  async function loadAdminGroupStay(source){
+    if(!source?.group_id || source.__stayLoaded) return source;
+    source.__stayLoaded=true;
+    const sb=readyClient();
+    if(!sb) return source;
+    try{
+      const {data,error}=await sb.rpc('get_scansafe_staff_group_stay',{
+        p_group_id:Number(source.group_id)
+      });
+      if(error){
+        const missing=error.code==='PGRST202'||error.code==='42883'||
+          /could not find.*get_scansafe_staff_group_stay|function.*does not exist/i.test(error.message||'');
+        if(!missing) console.warn('ScanSafe staff stay:',error.message);
+        return source;
+      }
+      if(data){
+        source.stay_status=data.stay_status||null;
+        source.arrival_time=data.arrival_time||null;
+        source.departure_time=data.departure_time||null;
+        source.stay_duration_seconds=data.stay_duration_seconds??null;
+        if(!source.assigned_space_name && data.space_name) source.assigned_space_name=data.space_name;
+      }
+    }catch(error){
+      console.warn('ScanSafe staff stay:',error);
+    }
+    return source;
+  }
+
+  async function showAdminLiveEvacuee(id){
     const box=document.querySelector('#evacDetail');
     if(!box) return;
 
-    const row=adminLiveCache.evacuees
-      .map(adminLiveRequest)
-      .find(x=>String(x.evacueeId)===String(id) || String(x.id)===String(id));
+    const source=adminLiveCache.evacuees
+      .find(x=>String('EV-'+String(x.evacuee_id).padStart(3,'0'))===String(id) ||
+        String(x.registration_code||'')===String(id));
+    if(source) await loadAdminGroupStay(source);
+    const row=source?adminLiveRequest(source):null;
 
     if(!row){
       box.innerHTML='<div class="space-placeholder">Evacuee record not found in Supabase.</div>';
@@ -709,39 +769,170 @@
     }
 
     const canReview=row.approvalStatus==='pending';
+    const canRelease=row.approvalStatus==='approved' &&
+      !!row.arrivalTime &&
+      !!row.assignment &&
+      !!row.dbGroupId;
+
     const barcode=row.barcodeValue
       ? `<div class="prototype-qr-wrap">${typeof qrMarkup==='function'?qrMarkup(row.barcodeValue):adminLiveEsc(row.barcodeValue)}</div>`
       : `<div class="space-placeholder" style="margin-top:12px">Barcode not issued yet.</div>`;
 
+    const stayStatus=String(row.currentStatus||'').toLowerCase()==='released'
+      ? 'Released'
+      : row.arrivalTime
+        ? 'Accommodated / Checked In'
+        : row.approvalStatus==='approved'
+          ? 'Approved — Waiting for Check-In'
+          : row.status;
+
     box.innerHTML=`
-      <div style="display:flex;justify-content:space-between;gap:8px">
-        <h3 class="section-h">${typeof ico==='function'?ico('user'):''} Evacuee Details</h3>
-        ${canReview
-          ? `<button class="btn red" onclick="reviewRegistration('${adminLiveEsc(row.id)}')">Review</button>`
-          : ''}
-      </div>
-      <div class="detail-top">
-        <div class="person-round">${typeof ico==='function'?ico('user','xl'):''}</div>
+      <div class="admin-detail-heading">
         <div>
-          <h2 style="font-size:16px;margin:0 0 4px">${adminLiveEsc(row.name)}</h2>
-          <div class="muted" style="font-size:10px">ID: ${adminLiveEsc(row.evacueeId)}</div>
-          <div style="margin-top:7px">${typeof statusPill==='function'?statusPill(row.status):adminLiveEsc(row.status)}</div>
+          <h3 class="section-h">${typeof ico==='function'?ico('user'):''} Evacuee Details</h3>
+          <p class="muted admin-detail-sub">Registration, barcode, accommodation and shelter-stay lifecycle.</p>
+        </div>
+        <div class="admin-detail-actions">
+          ${canReview?`<button class="btn red" onclick="reviewRegistration('${adminLiveEsc(row.id)}')">Review</button>`:''}
+          ${canRelease?`<button class="btn out release-stay-button" onclick="ScanSafeRelease.open(${Number(row.dbGroupId)},'${adminLiveEsc(row.name).replaceAll("'","&#39;")}',${Number(row.group||1)})">Release ${row.group>1?'Evacuee Group':'Evacuee'}</button>`:''}
         </div>
       </div>
+
+      <div class="detail-top admin-detail-person">
+        <div class="person-round">${typeof ico==='function'?ico('user','xl'):''}</div>
+        <div>
+          <h2>${adminLiveEsc(row.name)}</h2>
+          <div class="muted">ID: ${adminLiveEsc(row.evacueeId)}</div>
+          <div class="admin-status-row">${typeof statusPill==='function'?statusPill(row.status):adminLiveEsc(row.status)}</div>
+        </div>
+      </div>
+
+      <section class="admin-stay-card ${stayStatus==='Released'?'is-released':canRelease?'is-active':''}">
+        <div class="admin-stay-card-head">
+          <div>
+            <small>Shelter Stay</small>
+            <strong>${adminLiveEsc(stayStatus)}</strong>
+          </div>
+          <span class="stay-state-dot"></span>
+        </div>
+        <div class="admin-stay-metrics">
+          <div><small>Arrival Time</small><b>${adminLiveEsc(lifecycleDate(row.arrivalTime))}</b></div>
+          <div><small>Departure Time</small><b>${adminLiveEsc(lifecycleDate(row.departureTime))}</b></div>
+          <div><small>Stay Duration</small><b>${adminLiveEsc(row.arrivalTime?lifecycleDuration(row.arrivalTime,row.departureTime,source?.stay_duration_seconds):'Not started')}</b></div>
+          <div><small>${row.departureTime?'Previous Space':'Assigned Space'}</small><b>${adminLiveEsc(row.assignmentName||row.assignment||'Not assigned')}</b></div>
+        </div>
+      </section>
+
       ${barcode}
-      <div class="detail-list">
+
+      <div class="detail-list admin-profile-list">
         <div class="detail-line"><b>Email</b><span>${adminLiveEsc(row.email||'Not provided')}</span></div>
         <div class="detail-line"><b>Contact Number</b><span>${adminLiveEsc(row.contactNumber||'Not provided')}</span></div>
         <div class="detail-line"><b>Age / Gender</b><span>${adminLiveEsc(row.age)} | ${adminLiveEsc(row.gender)}</span></div>
         <div class="detail-line"><b>Group Size</b><span>${row.group} member${row.group===1?'':'s'}</span></div>
         <div class="detail-line"><b>Barcode Status</b><span>${row.qrIssued?'Issued':'Not Issued'}</span></div>
-        <div class="detail-line"><b>Accommodation</b><span>${adminLiveEsc(row.assignmentName||row.assignment||'Not assigned yet')}</span></div>
+        <div class="detail-line"><b>Accommodation</b><span>${adminLiveEsc(row.assignmentName||row.assignment||(row.currentStatus==='released'?'Released':'Not assigned yet'))}</span></div>
         <div class="detail-line"><b>Special Needs</b><span>${adminLiveEsc(row.needs||'None')}</span></div>
         <div class="detail-line"><b>Address</b><span>${adminLiveEsc(row.address||'Not provided')}</span></div>
       </div>`;
 
     if(window.ScanSafeBarcode?.render) setTimeout(()=>window.ScanSafeBarcode.render(),0);
   }
+
+  let scanSafeReleaseState={groupId:null,name:'',groupSize:1,busy:false};
+
+  function ensureScanSafeReleaseModal(){
+    let modal=document.getElementById('scanSafeReleaseModal');
+    if(modal) return modal;
+    modal=document.createElement('div');
+    modal.id='scanSafeReleaseModal';
+    modal.className='release-stay-modal';
+    modal.hidden=true;
+    modal.innerHTML=`
+      <div class="release-stay-backdrop" data-release-close></div>
+      <section class="release-stay-dialog" role="dialog" aria-modal="true" aria-labelledby="releaseStayTitle">
+        <div class="release-stay-icon">${typeof ico==='function'?ico('logout'):''}</div>
+        <h2 id="releaseStayTitle">Release Shelter Stay</h2>
+        <p id="releaseStayCopy">Confirm that this evacuee has departed the evacuation center.</p>
+        <div class="release-stay-warning" id="releaseStayWarning"></div>
+        <label for="releaseStayReason">Release reason</label>
+        <textarea id="releaseStayReason" maxlength="500" rows="3" placeholder="e.g. Family returned home safely"></textarea>
+        <div class="release-stay-actions">
+          <button type="button" class="btn out" data-release-close>Cancel</button>
+          <button type="button" class="btn red" id="releaseStayConfirm">Confirm Release</button>
+        </div>
+        <p class="release-stay-feedback" id="releaseStayFeedback" role="status" aria-live="polite"></p>
+      </section>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-release-close]').forEach(el=>el.addEventListener('click',()=>window.ScanSafeRelease.close()));
+    modal.querySelector('#releaseStayConfirm')?.addEventListener('click',()=>window.ScanSafeRelease.confirm());
+    return modal;
+  }
+
+  window.ScanSafeRelease={
+    open(groupId,name,groupSize=1){
+      if(!groupId) return;
+      const modal=ensureScanSafeReleaseModal();
+      scanSafeReleaseState={groupId:Number(groupId),name:String(name||'Evacuee'),groupSize:Number(groupSize||1),busy:false};
+      modal.hidden=false;
+      document.body.classList.add('release-stay-open');
+      const copy=modal.querySelector('#releaseStayCopy');
+      const warning=modal.querySelector('#releaseStayWarning');
+      const reason=modal.querySelector('#releaseStayReason');
+      const feedback=modal.querySelector('#releaseStayFeedback');
+      if(copy) copy.textContent='Release '+scanSafeReleaseState.name+' from the current shelter stay?';
+      if(warning) warning.textContent=scanSafeReleaseState.groupSize>1
+        ? 'This will release all '+scanSafeReleaseState.groupSize+' people in this registration group, close the active assignment, and free the occupied capacity.'
+        : 'This will close the active assignment and free the occupied capacity.';
+      if(reason) reason.value='';
+      if(feedback) feedback.textContent='';
+      setTimeout(()=>reason?.focus(),0);
+    },
+    close(){
+      if(scanSafeReleaseState.busy) return;
+      const modal=document.getElementById('scanSafeReleaseModal');
+      if(modal) modal.hidden=true;
+      document.body.classList.remove('release-stay-open');
+      scanSafeReleaseState={groupId:null,name:'',groupSize:1,busy:false};
+    },
+    async confirm(){
+      const modal=ensureScanSafeReleaseModal();
+      const reason=modal.querySelector('#releaseStayReason')?.value.trim()||'';
+      const feedback=modal.querySelector('#releaseStayFeedback');
+      const button=modal.querySelector('#releaseStayConfirm');
+      if(!reason){
+        if(feedback) feedback.textContent='Enter a release reason before confirming.';
+        return;
+      }
+      const sb=readyClient();
+      if(!sb){
+        if(feedback) feedback.textContent='Backend unavailable. Nothing was changed.';
+        return;
+      }
+      scanSafeReleaseState.busy=true;
+      if(button){button.disabled=true;button.textContent='Releasing...';}
+      try{
+        const {data,error}=await sb.rpc('release_scansafe_group',{
+          p_group_id:scanSafeReleaseState.groupId,
+          p_reason:reason
+        });
+        if(error) throw error;
+        if(feedback) feedback.textContent='Released successfully. Departure time and shelter-stay history were recorded.';
+        if(typeof toast==='function') toast(scanSafeReleaseState.name+' released. Occupancy updated.');
+        await Promise.allSettled([loadAdminLiveSnapshot(),loadAccommodationState(),window.ScanSafeNeeds?.refresh?.()]);
+        setTimeout(()=>{
+          scanSafeReleaseState.busy=false;
+          if(button){button.disabled=false;button.textContent='Confirm Release';}
+          window.ScanSafeRelease.close();
+        },450);
+        return data;
+      }catch(error){
+        scanSafeReleaseState.busy=false;
+        if(button){button.disabled=false;button.textContent='Confirm Release';}
+        if(feedback) feedback.textContent=error?.message||'Release failed. No confirmed change was made.';
+      }
+    }
+  };
 
   const adminLivePages=new Set([
     'admin-dashboard.html','evacuees.html','shelter-room.html',
@@ -896,7 +1087,8 @@
       const assignment=assignmentByGroup.get(String(row.group_id));
       const space=spaceById.get(String(assignment?.space_id));
       return {...row,barcode_value:row.approval_status==='approved'?barcode?.barcode_value||null:null,
-        assigned_space_code:space?.space_code||null,assigned_space_name:space?.space_name||null};
+        assigned_space_code:space?.space_code||null,
+        assigned_space_name:space?.space_name||null};
     });
     const hasSpaces=results[1].status==='fulfilled';
     const capacity=spaces.reduce((n,row)=>n+Number(row.capacity||0),0);
@@ -1284,7 +1476,7 @@
   }
 
   const evacueeLiveCache={
-    loaded:false,ownerId:null,evacuee:null,barcode:null,assignment:null,
+    loaded:false,ownerId:null,evacuee:null,barcode:null,assignment:null,stay:null,
     space:null,shelter:null,error:null,warnings:[],updatedAt:null,
     barcodeError:false,assignmentError:false
   };
@@ -1306,7 +1498,7 @@
     localStorage.removeItem('scansafePrototypeStateV4');
     sessionStorage.removeItem('scansafePrototypeStateV4');
     Object.assign(evacueeLiveCache,{
-      loaded:false,ownerId,evacuee:null,barcode:null,assignment:null,
+      loaded:false,ownerId,evacuee:null,barcode:null,assignment:null,stay:null,
       space:null,shelter:null,error:null,warnings:[],updatedAt:null,
       barcodeError:false,assignmentError:false
     });
@@ -1340,6 +1532,79 @@
     const announcements=document.querySelector('.announcement-grid');
     if(announcements) announcements.innerHTML='<div class="space-placeholder">Loading announcements...</div>';
     document.querySelectorAll('.user-top .notif').forEach(el=>el.removeAttribute('data-unread-count'));
+  }
+
+  function renderShelterStayLifecycle(){
+    const boxes=document.querySelectorAll('[data-user-stay-card]');
+    if(!boxes.length) return;
+
+    const cache=evacueeLiveCache;
+    const ev=cache.evacuee;
+    const stay=cache.stay;
+    const loaded=cache.loaded;
+    const approved=loaded && ev?.approval_status==='approved';
+    const released=loaded && String(ev?.current_status||'').toLowerCase()==='released';
+    const active=loaded && !released && (!!stay?.arrival_time || String(ev?.current_status||'').toLowerCase()==='checked_in');
+
+    let label='Loading shelter stay';
+    let copy='Retrieving your shelter-stay status.';
+    let badge='Loading';
+    let stateClass='is-waiting';
+    let arrival='Not recorded',departure='Not recorded',duration='Not started',space='Not assigned';
+
+    if(loaded){
+      if(released){
+        label='Shelter Stay Released';
+        badge='Released';
+        stateClass='is-released';
+        copy='Your accommodation has been released. Your account and stay history remain available.';
+      }else if(active){
+        label='Accommodated / Checked In';
+        badge='Checked In';
+        stateClass='is-active';
+        copy='Your first valid barcode scan completed check-in and confirmed your accommodation.';
+      }else if(approved){
+        label='Approved — Waiting for Check-In';
+        badge='Approved';
+        copy='Show your issued barcode to authorized staff. Your first valid scan records your arrival and accommodation.';
+      }else if(ev?.approval_status==='rejected'){
+        label='Registration Needs Correction';
+        badge='Review';
+        copy='Your shelter stay has not started.';
+      }else{
+        label='Pending Admin Approval';
+        badge='Pending';
+        copy='Check-in becomes available after approval and barcode issuance.';
+      }
+
+      arrival=stay?.arrival_time?lifecycleDate(stay.arrival_time):'Not recorded';
+      departure=stay?.departure_time?lifecycleDate(stay.departure_time):'Not recorded';
+      duration=stay?.arrival_time
+        ? (stay?.departure_time
+            ? lifecycleDuration(stay.arrival_time,stay.departure_time,stay.stay_duration_seconds)
+            : 'In progress')
+        : 'Not started';
+      space=stay?.space_name || cache.space?.space_name || cache.space?.space_code || (released?'Previous space recorded in history':'Not assigned');
+    }
+
+    boxes.forEach(box=>{
+      box.className='card card-pad stay-lifecycle-card '+stateClass;
+      box.innerHTML=`
+        <div class="stay-lifecycle-head">
+          <div>
+            <small>Shelter Stay</small>
+            <h3>${esc(label)}</h3>
+            <p>${esc(copy)}</p>
+          </div>
+          <span class="stay-lifecycle-badge">${esc(badge)}</span>
+        </div>
+        <div class="stay-lifecycle-grid">
+          <div class="stay-lifecycle-metric"><small>Arrival Time</small><strong>${esc(arrival)}</strong></div>
+          <div class="stay-lifecycle-metric"><small>Departure Time</small><strong>${esc(departure)}</strong></div>
+          <div class="stay-lifecycle-metric"><small>Stay Duration</small><strong>${esc(duration)}</strong></div>
+          <div class="stay-lifecycle-metric"><small>${released?'Previous Space':'Assigned Space'}</small><strong>${esc(space)}</strong></div>
+        </div>`;
+    });
   }
 
   function renderLiveEvacueeAssignment(){
@@ -1421,7 +1686,7 @@
     const barcodeCard=document.querySelector('.barcode-card'); if(barcodeCard) barcodeCard.innerHTML='<h3 class="section-h">'+ico('barcode')+' Evacuee Barcode</h3>'+barcode;
     const acc=document.getElementById('userAccommodationCard'); if(acc) acc.innerHTML='<div class="app-status-icon">'+ico('bed')+'</div><h3>Accommodation</h3><div class="app-value">Not assigned</div><p>Complete registration and wait for admin approval before accommodation assignment.</p>';
     const latest=document.getElementById('userLatestCard'); if(latest) latest.innerHTML='<div class="app-status-icon">&#9679;</div><h3>Latest Update</h3><div class="app-value">Registration incomplete</div><p>Your authenticated account needs a linked evacuee registration.</p>';
-    const progress=document.getElementById('userProgressSteps'); if(progress) progress.innerHTML=[['Submitted','Pending'],['Admin Review','Pending'],['Barcode Issued','Pending'],['Assigned','Pending'],['Checked-In','Pending']].map(([label,state],i)=>'<div class="progress-step '+(i===0?'active':'')+'"><i>'+(i+1)+'</i><b>'+label+'</b><small>'+state+'</small></div>').join('');
+    const progress=document.getElementById('userProgressSteps'); if(progress) progress.innerHTML=[['Submitted','Pending'],['Approved','Pending'],['Accommodated','Pending'],['Released','Pending']].map(([label,state],i)=>'<div class="progress-step '+(i===0?'active':'')+'"><i>'+(i+1)+'</i><b>'+label+'</b><small>'+state+'</small></div>').join('');
     const members=document.getElementById('userGroupMembersBody'); if(members) members.innerHTML='<tr><td colspan="7">Complete registration to load group information.</td></tr>';
     const timeline=document.getElementById('userRegistrationTimeline'); if(timeline) timeline.innerHTML='<div class="muted">No registration history yet.</div>';
     const dataStatus=document.getElementById('evacueeDataStatus'); if(dataStatus){dataStatus.setAttribute('role','alert');dataStatus.innerHTML='<span>Your account is signed in, but the evacuee registration is incomplete.</span> '+action;}
@@ -1441,7 +1706,8 @@
     window.ScanSafeBarcodeViewer?.setAccount(hasBarcode?{
       ownerId:cache.ownerId,value:cache.barcode.barcode_value
     }:null);
-    const status=loaded?(released?'Released':approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
+    const accommodated=loaded && !released && (!!cache.stay?.arrival_time || String(ev?.current_status||'').toLowerCase()==='checked_in');
+    const status=loaded?(released?'Released':accommodated?'Accommodated / Checked In':approved?'Approved':rejected?'Rejected':'Pending Approval'):(cache.error?'Unavailable':'Loading');
     const name=loaded?ev.full_name||'Evacuee':window.ScanSafeDB.profile?.full_name||'Evacuee';
     const display=(value,fallback='Not provided')=>value==null||value===''?fallback:value;
     const assigned=loaded && !released && !!cache.assignment;
@@ -1471,8 +1737,8 @@
     });
     const hero=document.getElementById('userStatusHero');
     if(hero){
-      const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):released?'Shelter Stay Ended':approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
-      const text=!loaded?'Your registration status is being retrieved from the database.':released?'Your accommodation has been released. Your account is saved for future evacuation operations. Use Messages to report if you need another shelter stay.':hasBarcode?'Your barcode is ready for shelter verification.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Refresh first, then report the issue through Messages if needed.'):rejected?'Use Messages to report a registration correction.':'Your registration is waiting for administrator review.';
+      const title=!loaded?(cache.error?'Registration unavailable':'Loading registration...'):released?'Shelter Stay Released':accommodated?'Accommodated / Checked In':approved?'Registration Approved':rejected?'Registration Needs Correction':'Pending Admin Approval';
+      const text=!loaded?'Your registration status is being retrieved from the database.':released?'Your departure has been recorded and your accommodation was released. Your account and shelter-stay history remain available.':accommodated?'Your arrival has been recorded. Your assigned accommodation is active for the current shelter stay.':hasBarcode?'Your barcode is ready. Your first valid staff scan records your arrival and accommodation.':approved?(cache.barcodeError?'Your registration is approved. The barcode could not be loaded. Use Refresh to try again.':'Your registration is approved, but no active barcode has been issued. Refresh first, then report the issue through Messages if needed.'):rejected?'Use Messages to report a registration correction.':'Your registration is waiting for administrator review.';
       hero.innerHTML='<section class="status-hero '+(approved?'approved':rejected?'rejected':'pending')+'"><div><small>'+(released?'Shelter Status':'Registration Status')+'</small><h2>'+esc(title)+'</h2><p>'+esc(text)+'</p></div><div class="hero-status-mark">'+(approved?'&#10003;':rejected?'!':'...')+'</div></section>';
     }
     const barcodeBody=hasBarcode?'<p>'+(released?'Your barcode remains linked to your account. Show it to staff when requesting a new shelter stay.':'Your issued barcode is ready for scanning or printing.')+'</p><button type="button" class="btn red full" data-show-barcode onclick="ScanSafeBarcodeViewer.open()">Show Barcode</button>':'<div class="space-placeholder"><b>'+(!loaded?'Loading barcode...':cache.barcodeError?'Barcode temporarily unavailable':approved?'Barcode not issued yet':rejected?'No active barcode':'Awaiting admin approval')+'</b><br>'+(!loaded?'Retrieving your account record.':cache.barcodeError?'Use Refresh to try again.':approved?'Use Refresh; if it remains unavailable, report the issue through Messages.':'A barcode is issued after your registration is approved.')+'</div>';
@@ -1489,21 +1755,32 @@
     }
     const progress=document.getElementById('userProgressSteps');
     if(progress){
-      const steps=[['Submitted',loaded],['Admin Review',approved||rejected],['Barcode Issued',hasBarcode],['Assigned',assigned||released],[released?'Released':'Checked-In',released||!!user.checkedIn]];
+      const steps=[
+        ['Submitted',loaded,'Registration received'],
+        ['Approved',approved||released,'Admin approval'],
+        ['Accommodated',accommodated||released,'Checked in'],
+        ['Released',released,'Stay ended']
+      ];
       let firstPending=false;
-      progress.innerHTML=steps.map(([label,done],index)=>{
-        const active=loaded&&!released&&!done&&!firstPending; if(active) firstPending=true;
-        return '<div class="progress-step '+(done?'done':active?'active':'')+'"><i>'+(done?'&#10003;':index+1)+'</i><b>'+label+'</b><small>'+(!loaded?'Loading':done?'Completed':released?'Stay ended':rejected?'Not completed':'Pending')+'</small></div>';
+      progress.innerHTML=steps.map(([label,done,caption],index)=>{
+        const active=loaded&&!done&&!firstPending; if(active) firstPending=true;
+        return '<div class="progress-step '+(done?'done':active?'active':'')+'"><i>'+(done?'&#10003;':index+1)+'</i><b>'+label+'</b><small>'+(!loaded?'Loading':done?caption:rejected?'Not completed':'Pending')+'</small></div>';
       }).join('');
     }
     const members=document.getElementById('userGroupMembersBody');
     if(members) members.innerHTML=loaded?'<tr><td>1</td><td>'+esc(name)+'</td><td>'+esc(fields.age)+'</td><td>'+esc(fields.gender)+'</td><td>Registrant</td><td>'+esc(status)+'</td><td>--</td></tr>'+(Number(ev.group_size)>1?'<tr><td colspan="7">Individual details for the other group members have not been recorded.</td></tr>':''):'<tr><td colspan="7">Loading registration details...</td></tr>';
     const timeline=document.getElementById('userRegistrationTimeline');
     if(timeline){
-      const events=loaded?[['Information Submitted',ev.registered_at],['Registration Approved',approved?ev.approved_at:null],['Barcode Issued',hasBarcode?cache.barcode.issued_at||cache.barcode.created_at:null],['Accommodation Assigned',cache.assignment?.assigned_at]]:[];
+      const events=loaded?[
+        ['Information Submitted',ev.registered_at],
+        ['Registration Approved',approved?ev.approved_at:null],
+        ['Arrival / Check-In',cache.stay?.arrival_time||null],
+        ['Released / Departure',cache.stay?.departure_time||null]
+      ]:[];
       const recorded=events.filter(([,date])=>date);
       timeline.innerHTML=recorded.length?recorded.map(([label,date])=>'<div class="timeline-row"><span class="timeline-dot">&#10003;</span><div><b>'+esc(label)+'</b><div class="muted">'+esc(evacueeDate(date))+'</div></div></div>').join(''):'<div class="muted">'+(loaded?'No dated registration events have been recorded.':'Loading registration history...')+'</div>';
     }
+    renderShelterStayLifecycle();
     renderLiveEvacueeAssignment();
     renderLiveEvacueeSpaces();
     const selectedSpace=document.querySelector('[data-space].selected')?.dataset.space;
@@ -1533,7 +1810,20 @@
         else throw error;
       }else{
         if(!data || !Object.prototype.hasOwnProperty.call(data,'evacuee')) throw new Error('Invalid account response.');
-        return {...data,warnings:[],barcodeError:false,assignmentError:false};
+        let stay=data.stay||null;
+        const warnings=[];
+        if(!stay){
+          try{
+            const stayResult=await sb.rpc('get_my_scansafe_stay');
+            if(stayResult.error){
+              const missing=stayResult.error.code==='PGRST202'||stayResult.error.code==='42883'||/could not find.*get_my_scansafe_stay|function.*does not exist/i.test(stayResult.error.message||'');
+              if(!missing) warnings.push('Shelter-stay history could not be loaded.');
+            }else stay=stayResult.data||null;
+          }catch(error){
+            console.warn('ScanSafe shelter-stay snapshot:',error?.message||error);
+          }
+        }
+        return {...data,stay,warnings,barcodeError:false,assignmentError:false};
       }
     }
     const {data:ev,error}=await sb.from('evacuees').select('*').eq('auth_user_id',ownerId).maybeSingle();
@@ -1567,7 +1857,15 @@
         }catch(error){ warnings.push('Assigned shelter details could not be loaded.'); }
       }
     }
-    return {evacuee:ev,barcode:barcode.data,assignment:assignment.data,space,shelter,warnings,barcodeError:barcode.error,assignmentError:assignment.error};
+    let stay=null;
+    try{
+      const stayResult=await sb.rpc('get_my_scansafe_stay');
+      if(stayResult.error){
+        const missing=stayResult.error.code==='PGRST202'||stayResult.error.code==='42883'||/could not find.*get_my_scansafe_stay|function.*does not exist/i.test(stayResult.error.message||'');
+        if(!missing) warnings.push('Shelter-stay history could not be loaded.');
+      }else stay=stayResult.data||null;
+    }catch(_){ warnings.push('Shelter-stay history could not be loaded.'); }
+    return {evacuee:ev,barcode:barcode.data,assignment:assignment.data,stay,space,shelter,warnings,barcodeError:barcode.error,assignmentError:assignment.error};
   }
 
   async function performEvacueeLiveRefresh(){
@@ -1594,7 +1892,7 @@
       if(!ev){ const recovery=await repairMyRegistrationLink(sb); if(recovery?.status==='repaired'||recovery?.status==='linked'){ snapshot=await readOwnEvacueeSnapshot(sb,ownerId); ev=snapshot.evacuee; } }
       if(!ev){
         resetEvacueeLiveAccount(ownerId);
-        Object.assign(evacueeLiveCache,{loaded:true,ownerId,evacuee:null,barcode:null,assignment:null,space:null,shelter:null,error:null,warnings:[],updatedAt:new Date().toISOString()});
+        Object.assign(evacueeLiveCache,{loaded:true,ownerId,evacuee:null,barcode:null,assignment:null,stay:null,space:null,shelter:null,error:null,warnings:[],updatedAt:new Date().toISOString()});
         const missingState=window.currentState();
         missingState.user={...missingState.user,authUserId:ownerId,name:profile.full_name||session.user.user_metadata?.full_name||'Evacuee',email:session.user.email||'',registrationStatus:'Incomplete',qrIssued:false,qrCode:null,assignment:null,checkedIn:false};
         window.saveScanSafeState(missingState);
@@ -1613,7 +1911,7 @@
         authUserId:ownerId,requestId:ev.registration_code||null,id:'EV-'+String(ev.evacuee_id).padStart(3,'0'),dbId:ev.evacuee_id,dbGroupId:ev.group_id,
         name:ev.full_name||profile.full_name||'Evacuee',email:ev.email||session.user.email||'',age:ev.age??null,gender:ev.gender||'',group:Number(ev.group_size||1),needs:ev.needs_summary||'None',
         registrationStatus:approved?'Approved':ev.approval_status==='rejected'?'Rejected':'Pending Approval',qrIssued:!!barcode?.barcode_value,qrCode:barcode?.barcode_value||null,
-        assignment:ev.current_status==='released'?null:snapshot.space?.space_code||null,checkedIn:ev.current_status==='checked_in',currentStatus:ev.current_status||'',submitted:ev.registered_at||''
+        assignment:ev.current_status==='released'?null:snapshot.space?.space_code||null,checkedIn:String(ev.current_status||'').toLowerCase()!=='released' && (!!snapshot.stay?.arrival_time || String(ev.current_status||'').toLowerCase()==='checked_in'),currentStatus:ev.current_status||'',submitted:ev.registered_at||''
       };
       state.requests=[];state.activity=[];state.demoGroups=[];state.demoAssignments={};
       window.saveScanSafeState(state);
@@ -1662,7 +1960,11 @@
     evacueeLiveChannel=sb.channel('scansafe-own-account-'+ev.auth_user_id)
       .on('postgres_changes',{event:'*',schema:'public',table:'evacuees',filter:'auth_user_id=eq.'+ev.auth_user_id},()=>loadCurrentEvacueeIntoPrototype())
       .on('postgres_changes',{event:'*',schema:'public',table:'barcodes',filter:'evacuee_id=eq.'+ev.evacuee_id},()=>loadCurrentEvacueeIntoPrototype());
-    if(ev.group_id) evacueeLiveChannel.on('postgres_changes',{event:'*',schema:'public',table:'accommodation_assignments',filter:'group_id=eq.'+ev.group_id},()=>loadCurrentEvacueeIntoPrototype());
+    if(ev.group_id){
+      evacueeLiveChannel
+        .on('postgres_changes',{event:'*',schema:'public',table:'accommodation_assignments',filter:'group_id=eq.'+ev.group_id},()=>loadCurrentEvacueeIntoPrototype())
+        .on('postgres_changes',{event:'*',schema:'public',table:'scansafe_operation_stays',filter:'group_id=eq.'+ev.group_id},()=>loadCurrentEvacueeIntoPrototype());
+    }
     evacueeLiveChannel.subscribe();
   }
 

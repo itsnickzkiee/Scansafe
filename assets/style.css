@@ -5283,3 +5283,282 @@ body.barcode-viewer-open {
     font-size:10px;
   }
 }
+
+
+/* =========================================================
+   ScanSafe shelter-stay lifecycle v26
+   ========================================================= */
+.stay-lifecycle-card{
+  margin-top:14px;
+  overflow:hidden;
+  border:1px solid #e5e9ef;
+  background:linear-gradient(145deg,#ffffff 0%,#fbfcfe 100%);
+}
+.stay-lifecycle-card.is-active{
+  border-color:#b9e4cc;
+  background:linear-gradient(145deg,#ffffff 0%,#f2fbf6 100%);
+}
+.stay-lifecycle-card.is-released{
+  border-color:#d9dee7;
+  background:linear-gradient(145deg,#ffffff 0%,#f5f7fa 100%);
+}
+.stay-lifecycle-head{
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  align-items:flex-start;
+  padding-bottom:14px;
+  border-bottom:1px solid #edf0f4;
+}
+.stay-lifecycle-head small{
+  display:block;
+  color:#8a95a5;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.stay-lifecycle-head h3{
+  margin:4px 0 5px;
+  font-size:18px;
+  color:#10243e;
+}
+.stay-lifecycle-head p{
+  margin:0;
+  max-width:650px;
+  color:#66758a;
+  font-size:11px;
+  line-height:1.55;
+}
+.stay-lifecycle-badge{
+  flex:0 0 auto;
+  border-radius:999px;
+  padding:7px 11px;
+  background:#f0f2f6;
+  color:#59677a;
+  font-size:9px;
+  font-weight:800;
+}
+.is-active .stay-lifecycle-badge{
+  background:#daf5e5;
+  color:#087443;
+}
+.is-released .stay-lifecycle-badge{
+  background:#e8ebef;
+  color:#465466;
+}
+.stay-lifecycle-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-top:14px;
+}
+.stay-lifecycle-metric{
+  min-height:74px;
+  padding:12px;
+  border:1px solid #e9edf2;
+  border-radius:10px;
+  background:rgba(255,255,255,.86);
+}
+.stay-lifecycle-metric small{
+  display:block;
+  color:#8a95a5;
+  font-size:8px;
+  font-weight:700;
+  margin-bottom:6px;
+}
+.stay-lifecycle-metric strong{
+  display:block;
+  color:#10243e;
+  font-size:11px;
+  line-height:1.45;
+}
+
+.scanner-result-duplicate{
+  background:#fff1c9!important;
+  color:#835800!important;
+}
+.scanner-result-released{
+  background:#eef1f5!important;
+  color:#465466!important;
+}
+
+.admin-detail-heading{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+}
+.admin-detail-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.admin-detail-sub{
+  margin:4px 0 0;
+  font-size:9px;
+}
+.admin-detail-person h2{
+  font-size:17px;
+  margin:0 0 4px;
+}
+.admin-status-row{margin-top:7px}
+.admin-stay-card{
+  margin:14px 0;
+  padding:14px;
+  border:1px solid #e6eaf0;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.admin-stay-card.is-active{
+  border-color:#b8e2ca;
+  background:#f2fbf6;
+}
+.admin-stay-card.is-released{
+  background:#f3f5f8;
+}
+.admin-stay-card-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:12px;
+}
+.admin-stay-card-head small{
+  display:block;
+  color:#8a95a5;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+}
+.admin-stay-card-head strong{
+  display:block;
+  margin-top:3px;
+  font-size:13px;
+  color:#10243e;
+}
+.stay-state-dot{
+  width:12px;height:12px;border-radius:999px;
+  background:#a7b0bd;
+  box-shadow:0 0 0 5px rgba(167,176,189,.14);
+}
+.admin-stay-card.is-active .stay-state-dot{
+  background:#13a05a;
+  box-shadow:0 0 0 5px rgba(19,160,90,.13);
+}
+.admin-stay-metrics{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+.admin-stay-metrics>div{
+  padding:9px 10px;
+  border-radius:9px;
+  background:#fff;
+  border:1px solid #e7ebf0;
+}
+.admin-stay-metrics small{
+  display:block;
+  font-size:8px;
+  color:#8b96a5;
+  margin-bottom:4px;
+}
+.admin-stay-metrics b{
+  display:block;
+  font-size:10px;
+  color:#20344d;
+  line-height:1.4;
+}
+.release-stay-button{
+  border-color:#d60000!important;
+  color:#b00000!important;
+}
+.release-stay-modal[hidden]{display:none!important}
+.release-stay-modal{
+  position:fixed;
+  inset:0;
+  z-index:2147483500;
+  display:grid;
+  place-items:center;
+  padding:18px;
+}
+.release-stay-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(10,18,29,.58);
+  backdrop-filter:blur(3px);
+}
+.release-stay-dialog{
+  position:relative;
+  z-index:1;
+  width:min(460px,100%);
+  border-radius:16px;
+  background:#fff;
+  padding:24px;
+  box-shadow:0 28px 80px rgba(7,18,35,.28);
+}
+.release-stay-icon{
+  width:46px;height:46px;border-radius:13px;
+  display:grid;place-items:center;
+  background:#fff0f0;color:#d00000;
+  margin-bottom:12px;
+}
+.release-stay-dialog h2{
+  margin:0 0 7px;
+  color:#10243e;
+  font-size:20px;
+}
+.release-stay-dialog>p{
+  margin:0 0 12px;
+  color:#67758a;
+  font-size:11px;
+  line-height:1.55;
+}
+.release-stay-warning{
+  margin:12px 0;
+  padding:11px 12px;
+  border-radius:10px;
+  background:#fff7e6;
+  border:1px solid #f2d79a;
+  color:#6d531c;
+  font-size:10px;
+  line-height:1.5;
+}
+.release-stay-dialog label{
+  display:block;
+  margin:12px 0 6px;
+  font-size:10px;
+  font-weight:800;
+  color:#253a53;
+}
+.release-stay-dialog textarea{
+  width:100%;
+  resize:vertical;
+  min-height:84px;
+}
+.release-stay-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:9px;
+  margin-top:15px;
+}
+.release-stay-feedback{
+  min-height:16px;
+  margin-top:10px!important;
+  color:#a20b0b!important;
+}
+body.release-stay-open{overflow:hidden}
+
+@media(max-width:720px){
+  .stay-lifecycle-grid{grid-template-columns:1fr 1fr}
+  .stay-lifecycle-head{align-items:center}
+  .admin-stay-metrics{grid-template-columns:1fr}
+  .admin-detail-heading{flex-direction:column}
+  .admin-detail-actions{width:100%;justify-content:stretch}
+  .admin-detail-actions .btn{flex:1}
+}
+@media(max-width:460px){
+  .stay-lifecycle-grid{grid-template-columns:1fr}
+  .release-stay-dialog{padding:18px}
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v25-auth-registration-recovery';
+const CACHE_NAME='scansafe-pwa-v26-checkin-release-lifecycle';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

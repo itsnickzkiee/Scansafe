@@ -245,9 +245,9 @@ function getAvailableSlots(id){const d=getSpaceBase(id);return d?Math.max(0,d.ca
 function formatSpaceName(id){return id==='ML'?'Main Lobby':`Hallway ${id}`}
 function statusPill(s){
   const norm=String(s||'');
-  const good=['Verified','Approved','Assigned','Barcode Issued','Checked-In','available','Active'].includes(norm);
+  const good=['Verified','Approved','Assigned','Accommodated','Accommodated / Checked In','Checked In','Barcode Issued','Checked-In','available','Active'].includes(norm);
   const warn=['Pending','Pending Approval','near','Waiting for Assignment'].includes(norm);
-  const c=good?'green':warn?'yellow':'red';
+  const c=norm==='Released'?'gray':good?'green':warn?'yellow':'red';
   const labels={available:'Available',near:'Near Full',full:'Full'};
   return `<span class="pill ${c}">${labels[norm]||esc(norm)}</span>`
 }

@@ -243,7 +243,7 @@ test('released stays show an ended stay while preserving the issued account barc
   assert.equal(h.context.currentState().user.checkedIn, false);
   assert.equal(h.context.currentState().user.assignment, null);
   assert.equal(h.context.currentState().user.qrCode, 'NICK-ACTUAL-50');
-  assert.match(h.nodes.get('userStatusHero').innerHTML, /Shelter Stay Ended/);
+  assert.match(h.nodes.get('userStatusHero').innerHTML, /Shelter Stay Released/);
   assert.match(h.nodes.get('userAccommodationCard').innerHTML, /Accommodation released/);
   assert.match(h.nodes.get('userLatestCard').innerHTML, /Shelter stay ended/);
   assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /previous accommodation has been released/);
