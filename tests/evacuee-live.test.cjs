@@ -93,16 +93,19 @@ function harness(options = {}) {
   const tables = options.tables || fixtures();
   const errors = options.errors || {};
   const calls = { rpc: [], table: [], auth: 0, viewerAccounts: [] };
+  const authListeners = [];
   const session = options.authenticated === false ? null : { user: { id: 'nick-id', email: 'nick@example.test' } };
   const profile = { id: 'nick-id', full_name: 'Nick Reyes', role: options.role || 'evacuee' };
   const client = {
     auth: {
       getSession: async () => { calls.auth++; return { data: { session }, error: null }; },
-      signOut: async () => ({ error: null })
+      signOut: async () => ({ error: null }),
+      onAuthStateChange: callback => { authListeners.push(callback); return { data: { subscription: { unsubscribe() {} } } }; }
     },
     rpc: async (name, args) => {
       calls.rpc.push({ name, args });
       if (name === 'get_my_scansafe_account') return options.accountSnapshot ? options.accountSnapshot() : { data: null, error: missingRpc };
+      if (name === 'get_scansafe_map_availability') return options.mapSnapshot ? options.mapSnapshot() : { data: copy(tables.accommodation_spaces.filter(row => row.status !== 'inactive')), error: null };
       if (name === 'get_my_profile') return { data: profile, error: null };
       if (name === 'scansafe_admin_dashboard_snapshot') return options.snapshot ? options.snapshot() : { data: null, error: missingRpc };
       if (name === 'approve_evacuee_registration') {
@@ -171,6 +174,15 @@ function harness(options = {}) {
     refresh: () => context.ScanSafeRealUser.refresh(),
     inspect: () => context.ScanSafeEvacueeLive.inspect(),
     kpi: name => String(kpis.get(name).textContent),
+    switchAccount(nextSession) {
+      if (!authListeners.length) {
+        const callback = domCallbacks.find(fn => fn.toString().includes('phase9InstallAuthListener();'));
+        assert.ok(callback, 'auth listener installer should be registered');
+        callback();
+      }
+      client.auth.getSession = async () => ({ data: { session: nextSession }, error: null });
+      authListeners.forEach(callback => callback(nextSession ? 'SIGNED_IN' : 'SIGNED_OUT', nextSession));
+    },
     async bootstrap() {
       const callback = domCallbacks.find(fn => fn.toString().includes('window.__scanSafePrototypeLogin'));
       assert.ok(callback, 'core bridge bootstrap callback should be registered');
@@ -365,4 +377,126 @@ test('RPC responses for another account are rejected without exposing their data
   assert.equal(h.inspect().loaded, false);
   assert.equal(h.context.currentState().user.qrCode, null);
   assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /does not belong/);
+});
+
+function assignedSnapshot() {
+  const tables = approvedTables();
+  return {
+    ...ownSnapshot(tables),
+    assignment: { assignment_id: 101, group_id: 12, space_id: 1, assignment_status: 'active' },
+    space: tables.accommodation_spaces[0],
+    shelter: { shelter_id: 1, shelter_name: 'Actual Shelter' }
+  };
+}
+
+function mapHarness(options = {}) {
+  const h = harness({ page: '/user-room.html', accountSnapshot: async () => ({ data: assignedSnapshot(), error: null }), ...options });
+  for (const id of ['userAssignmentSummary', 'userSpaceList', 'spaceDetail', 'viewerSpaceTitle', 'viewerSpaceMeta', 'viewerSpaceStatus', 'viewerSpaceEyebrow']) h.nodes.set(id, new Element(id));
+  return h;
+}
+
+test('evacuee map reads safe room availability RPC without staff table or group queries', async () => {
+  const h = mapHarness();
+  await h.refresh();
+  assert.equal(h.calls.table.length, 0);
+  assert.equal(h.calls.rpc.filter(call => call.name === 'get_scansafe_map_availability').length, 1);
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 2);
+  assert.match(h.nodes.get('userSpaceList').innerHTML, /Hallway A1|Hallway A2/);
+  assert.doesNotMatch(h.nodes.get('userSpaceList').innerHTML, /Closed Hallway/);
+  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /Actual Shelter/);
+  assert.equal(h.context.getDynamicOccupancy('A1'), 4);
+  assert.equal(h.inspect().warnings.length, 0);
+});
+
+test('missing map RPC retains the confirmed owned assignment with a visible setup warning', async () => {
+  const h = mapHarness({ mapSnapshot: async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find function public.get_scansafe_map_availability' } }) });
+  await h.refresh();
+  assert.equal(h.calls.table.length, 0);
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 1);
+  assert.equal(h.context.getDynamicOccupancy('A1'), 4);
+  assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /latest system update/);
+  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /Hallway A1/);
+  assert.equal(h.context.currentState().user.assignment, 'A1');
+});
+
+test('map permission and network failures stay visible and never become empty or available data', async () => {
+  for (const error of [{ code: '42501', message: 'Permission denied' }, { message: 'Failed to fetch' }]) {
+    const h = mapHarness({ mapSnapshot: async () => ({ data: null, error }) });
+    await h.refresh();
+    assert.equal(h.calls.table.length, 0);
+    assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 1);
+    assert.equal(h.context.getDynamicOccupancy('A1'), 4);
+    assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /could not be refreshed/);
+    assert.doesNotMatch(h.nodes.get('userSpaceList').innerHTML, /No active accommodation spaces/);
+  }
+});
+
+test('same-owner map errors preserve the last confirmed availability list', async () => {
+  let failing = false;
+  const h = mapHarness({ mapSnapshot: async () => failing ? { data: null, error: { message: 'Offline' } } : { data: fixtures().accommodation_spaces, error: null } });
+  await h.refresh();
+  failing = true;
+  await h.refresh();
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 2);
+  assert.equal(h.context.getDynamicOccupancy('A2'), 10);
+  assert.match(h.nodes.get('evacueeDataStatus').innerHTML, /last confirmed space data/);
+});
+
+test('fullscreen map details use confirmed counts and show unavailable for unconfigured spaces', async () => {
+  const h = mapHarness();
+  await h.refresh();
+  h.context.showUserMapViewerSpace('A1');
+  assert.match(h.nodes.get('viewerSpaceMeta').textContent, /4 \/ 10 occupied \/ 6 available/);
+  assert.equal(h.nodes.get('viewerSpaceEyebrow').textContent, 'Your Assigned Space');
+  h.context.showUserMapViewerSpace('A6');
+  assert.match(h.nodes.get('viewerSpaceMeta').textContent, /unavailable/);
+  assert.doesNotMatch(h.nodes.get('viewerSpaceMeta').textContent, /0\/|6 available/);
+  assert.equal(h.nodes.get('viewerSpaceStatus').textContent, 'Unavailable');
+});
+
+test('an authoritative empty map is distinguished from a failed or incomplete response', async () => {
+  const h = mapHarness({ mapSnapshot: async () => ({ data: [], error: null }) });
+  await h.refresh();
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 0);
+  assert.match(h.nodes.get('userSpaceList').innerHTML, /No active accommodation spaces are configured/);
+  assert.equal(h.inspect().warnings.length, 0);
+  // The independently confirmed owned assignment still appears in its summary.
+  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /Hallway A1/);
+  for (const data of [null, [{ space_code: 'A4', capacity: 10, current_occupancy: null }]]) {
+    const incomplete = mapHarness({ mapSnapshot: async () => ({ data, error: null }) });
+    await incomplete.refresh();
+    assert.equal(incomplete.context.ScanSafeEvacueeLive.spaces().length, 1);
+    assert.match(incomplete.nodes.get('evacueeDataStatus').innerHTML, /could not be refreshed/);
+  }
+});
+
+test('an account switch clears map rows immediately and ignores a pending old-owner map response', async () => {
+  let release, started;
+  const gate = new Promise(resolve => { release = resolve; });
+  const mapStarted = new Promise(resolve => { started = resolve; });
+  let current = assignedSnapshot();
+  let first = true;
+  const h = mapHarness({
+    accountSnapshot: async () => ({ data: current, error: null }),
+    mapSnapshot: async () => {
+      if (first) { first = false; started(); await gate; return { data: fixtures().accommodation_spaces, error: null }; }
+      return { data: [{ space_id: 4, space_code: 'A4', space_name: 'Current Map', capacity: 6, current_occupancy: 2, status: 'available' }], error: null };
+    }
+  });
+  const refresh = h.refresh();
+  await mapStarted;
+  h.switchAccount({ user: { id: 'other-id', email: 'other@example.test' } });
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 0);
+  assert.doesNotMatch(h.nodes.get('userSpaceList').innerHTML, /Hallway A1/);
+  release();
+  await refresh;
+  assert.equal(h.context.ScanSafeEvacueeLive.spaces().length, 0);
+  assert.equal(h.inspect().warnings.length, 0);
+  current = ownSnapshot();
+  current.evacuee.auth_user_id = 'other-id';
+  current.evacuee.full_name = 'Other Account';
+  h.context.ScanSafeDB.profile = { id: 'other-id', role: 'evacuee', full_name: 'Other Account' };
+  await h.refresh();
+  assert.deepEqual(copy(h.context.ScanSafeEvacueeLive.spaces()).map(row => row.space_code), ['A4']);
+  assert.doesNotMatch(h.nodes.get('userSpaceList').innerHTML, /Hallway A1|Nick Reyes/);
 });

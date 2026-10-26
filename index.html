@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ScanSafe Login</title>
 <link rel="stylesheet" href="assets/style.css?v=operations-v22">
+<link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
+<link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
 </head>
 <body>
 <div class="login">
@@ -112,7 +114,7 @@ Evacuee registration is reviewed by the admin before QR issuance.
 
 <button class="btn red full">Submit Registration</button>
 
-<div class="registration-helper">After submission: Account Created → Pending Approval → Admin Review → QR Code Issued after approval → Eligible for accommodation assignment.</div>
+<div class="registration-helper">After submission: Account Created → You can log in immediately → Pending Admin Approval → Barcode issued after approval → Eligible for accommodation assignment.</div>
 </form>
 </div>
 
@@ -150,6 +152,8 @@ document.addEventListener('DOMContentLoaded',function(){
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/account-media.js?v=integration-v23"></script>
+<script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
 
 <script>

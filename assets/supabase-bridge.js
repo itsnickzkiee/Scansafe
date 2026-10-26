@@ -71,6 +71,19 @@
     else console.error(message);
   }
 
+  function registrationResult(message,isError=false){
+    const box=document.getElementById('registrationResult');
+    if(box){
+      box.hidden=!message;
+      box.textContent=message||'';
+      box.className='registration-result'+(isError?' is-error':'');
+      box.setAttribute('role',isError?'alert':'status');
+    }
+    if(message && typeof window.toast==='function') window.toast(message);
+  }
+
+  let publicRegistrationInFlight=false;
+
   function normalizeProfileRpcResult(data){
     if(!data) return null;
     if(Array.isArray(data)) return data[0]||null;
@@ -208,7 +221,7 @@
       });
 
       if(code==='email_not_confirmed'){
-        uiError('This older test account was created before the current ScanSafe login setup. Please register a new evacuee account or ask the administrator to reset this test account.');
+        uiError('This account was created under an older authentication setup. ScanSafe no longer uses email confirmation. Please register a new evacuee account or have the administrator reset this test account.');
       }else if(code==='invalid_credentials'){
         uiError('Invalid email or password. Use the exact email and password created during registration.');
       }else if(code==='email_provider_disabled' || code==='provider_disabled'){
@@ -261,6 +274,8 @@
   async function supabaseLogout(){
     window.ScanSafeOperations?.reset();
     window.ScanSafeAppPromo?.reset();
+    window.ScanSafeMedia?.reset();
+    window.ScanSafeNotifications?.reset();
     const sb=readyClient();
     if(sb) await sb.auth.signOut();
     localStorage.removeItem('scanSafeLoginRole');
@@ -273,6 +288,7 @@
 
   async function submitPublicRegistration(event){
     event.preventDefault();
+    if(publicRegistrationInFlight) return;
     const sb=readyClient();
     if(!sb){
       if(typeof toast==='function') toast('ScanSafe backend is unavailable. Registration was not submitted.');
@@ -285,7 +301,9 @@
     if(password!==confirmPassword){ if(typeof toast==='function') toast('Password and confirm password do not match.'); return; }
 
     const file=document.getElementById('publicValidIdImage')?.files?.[0]||null;
+    if(!file){registrationResult('Please upload your valid ID image before submitting.',true);return;}
     if(file && file.size>2*1024*1024){ if(typeof toast==='function') toast('Valid ID image must be 2 MB or smaller.'); return; }
+    if(!['image/jpeg','image/png','image/webp'].includes(String(file.type||''))){registrationResult('Use a JPG, PNG or WEBP valid ID image.',true);return;}
 
     const payload={
       p_full_name:(document.getElementById('publicName')?.value||'').trim(),
@@ -306,8 +324,15 @@
       return;
     }
 
-    // Create the Supabase Auth account first. Password is handled by Supabase Auth
-    // and is never written to ScanSafe tables or localStorage.
+    publicRegistrationInFlight=true;
+    const submitButton=document.getElementById('publicRegistrationSubmit');
+    if(submitButton){submitButton.disabled=true;submitButton.textContent='Submitting...';}
+    let temporarySession=false;
+    let registrationSaved=false;
+    registrationResult('');
+    try{
+    // Passwords stay inside Supabase Auth calls. Registration approval still
+    // controls barcode issuance; it does not control account sign-in.
     const {data:signupData,error:signupError}=await sb.auth.signUp({
       email:payload.p_email,
       password,
@@ -337,25 +362,72 @@
       return;
     }
 
+    if(Array.isArray(signupData.user.identities) && signupData.user.identities.length===0){
+      registrationResult('This email may already have a ScanSafe account. Log in using your existing email and password.',true);
+      return;
+    }
+
+    let authSession=signupData.session||null;
+    if(!authSession){
+      // Compatibility when the backend returns a user without a session. This
+      // succeeds only if normal password sign-in is allowed by Supabase.
+      const signIn=await sb.auth.signInWithPassword({email:payload.p_email,password});
+      if(!signIn.error && signIn.data?.session?.user?.id===signupData.user.id) authSession=signIn.data.session;
+    }
+    if(authSession){
+      temporarySession=true;
+      window.ScanSafeDB.session=authSession;
+      window.ScanSafeDB.profile=null;
+    }
+
     payload.p_auth_user_id=signupData.user.id;
     const {data,error}=await sb.rpc('submit_public_registration_account', payload);
     if(error){
       console.error(error);
-      if(typeof toast==='function') toast('Account was created, but registration could not be saved. '+error.message);
+      registrationResult('Account was created, but registration could not be saved. '+error.message,true);
       return;
     }
+    if(typeof data!=='string' || !data.trim()) throw new Error('Registration confirmation was not received. Please check the account before submitting again.');
+    registrationSaved=true;
+    const loginEmail=document.getElementById('loginUsername');
+    if(loginEmail) loginEmail.value=payload.p_email;
+
+    if(!authSession){
+      registrationResult('Registration '+data+' is saved, but this Supabase project is still requiring email confirmation. ScanSafe does not use email confirmation. Turn Confirm Email OFF in Supabase Authentication, then create a new test account.',true);
+      if(typeof window.closePublicRegistration==='function') window.closePublicRegistration();
+      return;
+    }
+    if(!window.ScanSafeMedia?.uploadRegistrationId) throw new Error('The ID upload service is unavailable. Reload ScanSafe and try again.');
+    if(window.ScanSafeMedia?.init){
+      await window.ScanSafeMedia.init({
+        getClient:readyClient,
+        getContext:()=>({
+          userId:signupData.user.id,
+          role:'evacuee',
+          profile:{id:signupData.user.id,full_name:payload.p_full_name,role:'evacuee'}
+        })
+      });
+    }
+    const uploaded=await window.ScanSafeMedia.uploadRegistrationId({file,ownerId:signupData.user.id});
+    if(!uploaded?.valid_id?.path) throw new Error('The ID image upload was not confirmed. Upload it from Profile after signing in.');
 
     if(typeof window.closePublicRegistration==='function') window.closePublicRegistration();
 
-    if(typeof toast==='function'){
-      toast(
-        'Account created. Registration '+String(data||'')+
-        ' is pending admin approval. You may log in now using the same email and password; no QR is available until approval.'
-      );
+    registrationResult('Registration '+data+' and your ID image have been saved. You may log in now using the same email and password. Your barcode will be issued after admin approval.');
+    for(const id of ['publicPassword','publicConfirmPassword']){const input=document.getElementById(id);if(input) input.value='';}
+    }catch(error){
+      registrationResult((registrationSaved?'Your registration is saved, but the ID image upload did not finish. Log in and upload it from Profile. ':'Registration could not be completed. ')+(error?.message||'Please try again.'),true);
+      if(registrationSaved && typeof window.closePublicRegistration==='function') window.closePublicRegistration();
+    }finally{
+      if(temporarySession){
+        try{await sb.auth.signOut();}catch(error){console.warn('ScanSafe registration session cleanup failed');}
+        window.ScanSafeDB.session=null;
+        window.ScanSafeDB.profile=null;
+        window.ScanSafeMedia?.reset();
+      }
+      publicRegistrationInFlight=false;
+      if(submitButton){submitButton.disabled=false;submitButton.textContent='Submit Registration';}
     }
-
-    // Do not keep a newly-created evacuee signed in on the public/admin login page.
-    if(signupData.session) await sb.auth.signOut();
   }
 
 
@@ -902,7 +974,7 @@
   // Phase 4: Supabase-backed Accommodation Map / Assignment
   // This changes behavior only. Existing HTML/CSS/map design stays untouched.
   // =========================================================
-  const mapDbCache={ spaces:new Map(), groups:new Map(), ready:false };
+  const mapDbCache={ spaces:new Map(), groups:new Map(), ready:false,ownerId:null,availabilityState:'unavailable',error:null,revision:0 };
 
   function mapPage(){
     return (location.pathname.split('/').pop()||'').toLowerCase();
@@ -931,20 +1003,52 @@
     if(!sb) return false;
     const page=mapPage();
     if(!['shelter-room.html','user-room.html','admin-dashboard.html','evacuees.html'].includes(page)) return false;
-
-    const {data,error}=await sb.from('accommodation_spaces')
-      .select('space_id,space_code,space_name,space_type,capacity,current_occupancy,accessible,is_primary,status,shelter_id')
-      .neq('status','inactive')
-      .order('is_primary',{ascending:false})
-      .order('space_code',{ascending:true});
-    if(error){ console.warn('ScanSafe map sync:',error.message); return false; }
+    const isEvacuee=page==='user-room.html';
+    const ownerId=window.ScanSafeDB.session?.user?.id||null;
+    const revision=++mapDbCache.revision;
+    const current=()=>revision===mapDbCache.revision && (!isEvacuee || (
+      ownerId && window.ScanSafeDB.session?.user?.id===ownerId &&
+      evacueeLiveCache.ownerId===ownerId && window.ScanSafeDB.profile?.id===ownerId &&
+      window.ScanSafeDB.profile?.role==='evacuee'
+    ));
+    if(!current()) return false;
+    let data,error;
+    try{
+      // The shared map contains room counts only. Evacuees never query staff
+      // assignment/group joins or rely on staff-only table SELECT policies.
+      const result=isEvacuee?await sb.rpc('get_scansafe_map_availability'):
+        await sb.from('accommodation_spaces')
+          .select('space_id,space_code,space_name,space_type,capacity,current_occupancy,accessible,is_primary,status,shelter_id')
+          .neq('status','inactive')
+          .order('is_primary',{ascending:false})
+          .order('space_code',{ascending:true});
+      ({data,error}=result);
+      if(error) throw error;
+      if(!Array.isArray(data)) throw new Error('The map availability response is incomplete.');
+      if(data.some(row=>!row || !row.space_code || row.capacity==null || row.current_occupancy==null ||
+        !Number.isFinite(Number(row.capacity)) || !Number.isFinite(Number(row.current_occupancy)))){
+        throw new Error('The map availability response is incomplete.');
+      }
+    }catch(error){
+      if(!current()) return false;
+      const missing=error.code==='PGRST202' || error.code==='42883' || /could not find.*function|function.*does not exist/i.test(error.message||'');
+      mapDbCache.error=isEvacuee && missing
+        ? 'Map availability needs the latest system update. Your assigned space is still shown.'
+        : 'Map availability could not be refreshed. Showing the last confirmed space data.';
+      console.warn('ScanSafe map sync:',error.message);
+      return false;
+    }
+    if(!current()) return false;
 
     mapDbCache.spaces.clear();
-    for(const row of data||[]){
+    for(const row of data.filter(row=>row.status!=='inactive')){
       mapDbCache.spaces.set(row.space_code,row);
       syncSpaceIntoExistingMap(row);
     }
     mapDbCache.ready=true;
+    mapDbCache.ownerId=ownerId;
+    mapDbCache.availabilityState=mapDbCache.spaces.size?'ready':'empty';
+    mapDbCache.error=null;
 
     // Once database values are loaded, use DB occupancy as the source of truth.
     if(typeof window.__scanSafePrototypeGetDynamicOccupancy!=='function' && typeof window.getDynamicOccupancy==='function'){
@@ -1122,6 +1226,13 @@
     }
     mapDbCache.spaces.clear();
     mapDbCache.ready=false;
+    mapDbCache.ownerId=ownerId;
+    mapDbCache.availabilityState='unavailable';
+    mapDbCache.error=null;
+    mapDbCache.revision++;
+    const spaceDetail=document.getElementById('spaceDetail');
+    if(spaceDetail) spaceDetail.innerHTML='<div class="space-placeholder">Loading accommodation details...</div>';
+    if(typeof window.closeUserMapViewer==='function') window.closeUserMapViewer();
     const thread=document.getElementById('thread');
     if(thread) thread.innerHTML='<div class="space-placeholder">Loading your messages...</div>';
     const input=document.getElementById('messageInput');
@@ -1160,7 +1271,7 @@
     const box=document.getElementById('userSpaceList');
     if(!box) return;
     const rows=[...mapDbCache.spaces.values()].filter(row=>row.status!=='inactive');
-    box.innerHTML=rows.length?rows.map(row=>'<div class="mobile-space-row"><div><b>'+esc(row.space_name||row.space_code)+'</b><small>'+Number(row.current_occupancy||0)+' / '+Number(row.capacity||0)+' occupied</small></div>'+statusPill(normalizeDbSpaceStatus(row))+'</div>').join(''):'<div class="space-placeholder">Accommodation space data is unavailable.</div>';
+    box.innerHTML=rows.length?rows.map(row=>'<div class="mobile-space-row"><div><b>'+esc(row.space_name||row.space_code)+'</b><small>'+Number(row.current_occupancy||0)+' / '+Number(row.capacity||0)+' occupied</small></div>'+statusPill(normalizeDbSpaceStatus(row))+'</div>').join(''):'<div class="space-placeholder">'+(mapDbCache.availabilityState==='empty'?'No active accommodation spaces are configured.':'Accommodation space data is unavailable. Use Refresh to try again.')+'</div>';
   }
 
   function selectLiveEvacueeSpace(id){
@@ -1176,6 +1287,29 @@
     box.innerHTML='<div class="room-banner"><div><h2>'+esc(row.space_name||row.space_code)+'</h2>'+statusPill(normalizeDbSpaceStatus(row))+'</div></div><div class="detail-list">'+[
       ['Space Type',row.space_type||'Accommodation'],['Capacity',cap],['Occupied',occ],['Available',Math.max(0,cap-occ)]
     ].map(([label,value])=>'<div class="detail-line"><b>'+label+'</b><span>'+esc(value)+'</span></div>').join('')+'</div>';
+  }
+
+  function selectLiveEvacueeViewerSpace(id,center=false){
+    const row=evacueeLiveCache.loaded?mapDbCache.spaces.get(id):null;
+    document.getElementById('userMapViewerCanvas')?.querySelectorAll('[data-space]').forEach(spot=>{
+      spot.classList.toggle('viewer-selected-space',spot.dataset.space===id);
+    });
+    const mine=evacueeLiveCache.assignment && String(evacueeLiveCache.space?.space_code)===String(id);
+    const status=row?normalizeDbSpaceStatus(row):'unavailable';
+    const title=document.getElementById('viewerSpaceTitle');
+    const meta=document.getElementById('viewerSpaceMeta');
+    const badge=document.getElementById('viewerSpaceStatus');
+    const eyebrow=document.getElementById('viewerSpaceEyebrow');
+    if(eyebrow) eyebrow.textContent=mine?'Your Assigned Space':'Designated Accommodation Space';
+    if(title) title.textContent=row?.space_name||row?.space_code||id;
+    if(meta) meta.textContent=row?
+      Number(row.current_occupancy)+' / '+Number(row.capacity)+' occupied / '+Math.max(0,Number(row.capacity)-Number(row.current_occupancy))+' available':
+      (evacueeLiveCache.loaded?'Live availability is unavailable for this space. Use Refresh to try again.':'Loading accommodation details...');
+    if(badge){
+      badge.className='viewer-space-status '+status;
+      badge.textContent=status==='available'?'Available':status==='near'?'Near Full':status==='full'?'Full':'Unavailable';
+    }
+    if(center && typeof window.centerUserMapOnSpace==='function') window.centerUserMapOnSpace(id);
   }
 
   function renderLiveEvacueeAccount(){
@@ -1360,7 +1494,7 @@
       };
       state.requests=[];state.activity=[];state.demoGroups=[];state.demoAssignments={};
       window.saveScanSafeState(state);
-      if(snapshot.space?.space_code){mapDbCache.spaces.set(snapshot.space.space_code,snapshot.space);syncSpaceIntoExistingMap(snapshot.space);mapDbCache.ready=true;}
+      if(snapshot.space?.space_code){mapDbCache.spaces.set(snapshot.space.space_code,snapshot.space);syncSpaceIntoExistingMap(snapshot.space);mapDbCache.ready=true;mapDbCache.ownerId=ownerId;}
       renderLiveEvacueeAccount();
       setupEvacueeLiveChannel(sb,ev);
       if(typeof window.CustomEvent==='function') document.dispatchEvent(new CustomEvent('scansafe:evacuee-updated'));
@@ -1381,11 +1515,15 @@
       evacueeRefreshPromise=(async()=>{
         const result=await performEvacueeLiveRefresh();
         if(result && mapPage()==='user-room.html'){
+          const ownerId=evacueeLiveCache.ownerId;
           try{
             if(!(await loadAccommodationState())) throw new Error('Map refresh failed');
           }catch(error){
-            evacueeLiveCache.warnings.push('Map availability could not be refreshed.');
-            renderLiveEvacueeAccount();
+            if(ownerId && evacueeLiveCache.ownerId===ownerId && window.ScanSafeDB.session?.user?.id===ownerId){
+              const warning=mapDbCache.error||'Map availability could not be refreshed. Showing the last confirmed space data.';
+              if(!evacueeLiveCache.warnings.includes(warning)) evacueeLiveCache.warnings.push(warning);
+              renderLiveEvacueeAccount();
+            }
           }
         }
         return result;
@@ -1405,12 +1543,37 @@
     evacueeLiveChannel.subscribe();
   }
 
+
+  async function reviewRegistrationWithMedia(requestId){
+    const original=window.__scanSafePrototypeReview;
+    if(typeof original==='function') original(requestId);
+
+    const state=typeof window.currentState==='function'?window.currentState():null;
+    const req=state?.requests?.find(row=>String(row.id)===String(requestId));
+    const target=document.getElementById('reviewDetails');
+    if(!req?.dbId || !target) return;
+
+    if(!window.ScanSafeMedia?.showRegistrationReview){
+      const note=document.createElement('div');
+      note.className='space-placeholder';
+      note.textContent='Registration image review is not loaded. Refresh this page and try again.';
+      target.appendChild(note);
+      return;
+    }
+
+    await window.ScanSafeMedia.showRegistrationReview({
+      evacueeId:req.dbId,
+      container:target
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', async function(){
     // Capture the current prototype functions first, then override only behavior.
     window.__scanSafePrototypeLogin = window.loginDemo;
     window.__scanSafePrototypeRegister = window.registerPublicEvacuee;
     window.__scanSafePrototypeApprove = window.approveRegistration;
     window.__scanSafePrototypeReject = window.rejectRegistration;
+    window.__scanSafePrototypeReview = window.reviewRegistration;
     window.__scanSafePrototypeAssignSpace = window.assignSpace;
     window.__scanSafePrototypeConfirmSpaceAssignment = window.confirmSpaceAssignment;
 
@@ -1419,11 +1582,18 @@
     window.logout = supabaseLogout;
     window.approveRegistration = approveByRequestId;
     window.rejectRegistration = rejectByRequestId;
+    window.reviewRegistration = reviewRegistrationWithMedia;
     window.assignSpace = assignSpaceFromDatabase;
     window.confirmSpaceAssignment = confirmSpaceAssignmentDatabase;
 
     await bootstrapSession();
     if(!(await phase9AccessGuard())) return;
+
+    if(mapPage()==='profile.html'){
+      try{history.scrollRestoration='manual';}catch(_){}
+      requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+    }
+
     const operationsOwner=window.ScanSafeDB.session?.user?.id;
     document.querySelectorAll('[data-operations-link]').forEach(link=>{
       link.hidden=!(operationsOwner && window.ScanSafeDB.profile?.id===operationsOwner && window.ScanSafeDB.profile.role==='admin');
@@ -1440,6 +1610,23 @@
         getClient:readyClient,
         getContext:()=>({userId:window.ScanSafeDB.session?.user?.id,role:window.ScanSafeDB.profile?.role,profile:window.ScanSafeDB.profile})
       })).catch(error=>console.warn('ScanSafe needs requests:',error.message));
+    }
+    const liveModuleContext=()=>({
+      userId:window.ScanSafeDB.session?.user?.id||null,
+      role:window.ScanSafeDB.profile?.role||null,
+      profile:window.ScanSafeDB.profile||null
+    });
+    if(window.ScanSafeMedia){
+      Promise.resolve(window.ScanSafeMedia.init({
+        getClient:readyClient,
+        getContext:liveModuleContext
+      })).catch(error=>console.warn('ScanSafe account media:',error.message));
+    }
+    if(window.ScanSafeNotifications){
+      Promise.resolve(window.ScanSafeNotifications.init({
+        getClient:readyClient,
+        getContext:liveModuleContext
+      })).catch(error=>console.warn('ScanSafe notifications:',error.message));
     }
     await loadPendingIntoPrototype();
     await loadCurrentEvacueeIntoPrototype();
@@ -2891,6 +3078,7 @@
     window.scrollToUserQR=openLiveEvacueeBarcode;
     window.renderUserPrototype=renderLiveEvacueeAccount;
     window.selectSpace=selectLiveEvacueeSpace;
+    window.showUserMapViewerSpace=selectLiveEvacueeViewerSpace;
     window.renderUserAssignmentSummary=renderLiveEvacueeAssignment;
     window.renderUserSpaceList=renderLiveEvacueeSpaces;
     window.sendMessage=p78SendMessage;

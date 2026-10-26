@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v22-evacuation-operations';
+const CACHE_NAME='scansafe-pwa-v23-media-notifications';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',
@@ -22,6 +22,10 @@ const APP_SHELL=[
   './assets/vendor/html5-qrcode.min.js',
   './assets/vendor/quagga2.min.js',
   './assets/vendor/JsBarcode.all.min.js',
+  './assets/account-media.js',
+  './assets/account-media.css',
+  './assets/notification-center.js',
+  './assets/notification-center.css',
   './assets/supabase-bridge.js',
   './assets/logo.svg',
   './assets/icons.svg',

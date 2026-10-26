@@ -5228,3 +5228,17 @@ body.barcode-viewer-open {
   .field select, .msg-input input, .needs-page input,
   .needs-page select, .needs-page textarea { transition: none; }
 }
+
+
+/* ScanSafe live integration v23 */
+@media (min-width:721px) {
+  .profile-page .user-main { padding-top: 18px; }
+}
+.notification-page-list {
+  display: grid;
+  max-height: 520px;
+  overflow: auto;
+}
+.notify-grid .tab[role="button"] { cursor: pointer; user-select: none; }
+.notify-grid .tab[role="button"]:focus-visible { outline: 2px solid #d00000; outline-offset: 2px; }
+#profilePhotoUpload:empty { display: none; }
