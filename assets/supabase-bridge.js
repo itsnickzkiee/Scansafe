@@ -1223,6 +1223,7 @@
   window.ScanSafeMapDebug={
     inspect:()=>({
       page:mapPage(),
+      displayMode:'occupant_list',
       spaces:[...mapDbCache.spaces.values()],
       activeAssignments:mapDbCache.activeAssignments||[],
       hotspotCodes:[...document.querySelectorAll('.map-hotspot[data-space]')].map(node=>normalizeMapSpaceCode(node.dataset.space)),
@@ -1236,6 +1237,7 @@
       unmatchedSpaceCodes:[...new Set((mapDbCache.activeAssignments||[]).map(row=>normalizeMapSpaceCode(row.space_code)))]
         .filter(code=>!code || ![...document.querySelectorAll('.map-hotspot[data-space]')].some(node=>normalizeMapSpaceCode(node.dataset.space)===code)),
       occupantDebug:{...mapDbCache.occupantDebug,
+        listedCount:document.querySelectorAll('#spaceDetail .map-occupant-row').length,
         renderedCount:document.querySelectorAll('.map-occupant-overlay .map-occupant-avatar').length},
       adminAssignments:(adminLiveCache.evacuees||[])
         .filter(row=>row.assigned_space_code)
@@ -1408,13 +1410,13 @@
     }
     const render=()=>{
       if(!current()) return;
-      renderAdminMapOccupants();
+      clearAdminMapOccupantMarkers();
       const selected=document.querySelector('[data-space].selected')?.dataset.space;
       if(selected) renderAdminMapSpaceDetail(selected);
     };
     render();
-    // Optional enrichment runs AFTER initials render. A missing RPC, missing
-    // member, or stalled image request cannot suppress assignment markers.
+    // Current Occupants uses active assignments immediately; optional details
+    // and profile photos enrich the list without delaying it.
     void (async()=>{
       try{
         const {data,error}=await sb.rpc('get_scansafe_active_map_occupants');
@@ -1451,55 +1453,12 @@
     return rows;
   }
 
-  function renderAdminMapOccupants(){
+  function clearAdminMapOccupantMarkers(){
     if(mapPage()!=='shelter-room.html') return;
-    const stage=document.querySelector('.floor-image-stage');
-    if(!stage) return;
-
-    stage.querySelectorAll('.map-occupant-overlay').forEach(node=>node.remove());
-    const stageRect=stage.getBoundingClientRect();
-
-    for(const [spaceCode,rows] of mapDbCache.occupants.entries()){
-      if(!rows?.length) continue;
-
-      const hotspot=[...stage.querySelectorAll('.map-hotspot[data-space]')]
-        .find(node=>normalizeMapSpaceCode(node.dataset.space)===spaceCode);
-      if(!hotspot) continue;
-
-      const rect=hotspot.getBoundingClientRect();
-      const left=(rect.left-stageRect.left)+(rect.width/2);
-      const top=(rect.top-stageRect.top)+(rect.height/2);
-
-      const overlay=document.createElement('div');
-      overlay.className='map-occupant-overlay';
-      overlay.dataset.space=spaceCode;
-      // Match the existing percentage hotspots, even before image dimensions
-      // arrive. Percent anchors also stay correct when the sidebar resizes.
-      const percent=['left','top','width','height'].every(key=>/^\d+(\.\d+)?%$/.test(hotspot.style[key]));
-      if(!percent && (!stageRect.width || !stageRect.height)) continue;
-      overlay.style.left=percent?(parseFloat(hotspot.style.left)+parseFloat(hotspot.style.width)/2).toFixed(3)+'%':left+'px';
-      overlay.style.top=percent?(parseFloat(hotspot.style.top)+parseFloat(hotspot.style.height)/2).toFixed(3)+'%':top+'px';
-      overlay.style.zIndex='80';
-
-      const visible=rows.slice(0,3);
-      overlay.innerHTML=
-        visible.map(row=>
-          `<span class="map-occupant-avatar${row.profile_url?' has-photo':''}" title="${gbeaaEscape(row.full_name||'Evacuee')}">`+
-            (row.profile_url
-              ? `<img src="${gbeaaEscape(row.profile_url)}" alt="">`
-              : gbeaaEscape(mapOccupantInitials(row.full_name)))+
-          `</span>`
-        ).join('')+
-        (rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'')+
-        `<span class="map-occupant-overlay-label">${rows.length===1?gbeaaEscape(rows[0].full_name||'Evacuee'):rows.length+' groups'}${rows.some(mapOccupantCheckedIn)?' · Checked In':''}</span>`;
-
-      overlay.title=rows
-        .map(row=>`${row.full_name} • ${mapOccupantCheckedIn(row)?'Checked In':'Assigned'} • Group ${Number(row.group_size||1)}`)
-        .join('\n');
-
-      stage.appendChild(overlay);
-      installMapPhotoFallback(overlay);
-    }
+    // Remove overlays left by an older map view; retain the selected-space
+    // hotspot and the profile avatars in the Current Occupants panel.
+    document.querySelectorAll('.floor-image-stage .map-occupant-overlay, .floor-image-stage .map-occupant-stack')
+      .forEach(node=>node.remove());
   }
 
   function installMapPhotoFallback(root){
@@ -1534,14 +1493,7 @@
   function installAdminMapMonitoring(){
     if(mapPage()!=='shelter-room.html' || window.__scanSafeMapMonitoringInstalled) return;
     window.__scanSafeMapMonitoringInstalled=true;
-    const stage=document.querySelector('.floor-image-stage');
-    stage?.querySelector('.floor-plan-image')?.addEventListener('load',renderAdminMapOccupants);
-    if(stage && typeof window.ResizeObserver==='function'){
-      const observer=new window.ResizeObserver(renderAdminMapOccupants);
-      observer.observe(stage);
-      window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
-    }
-    window.addEventListener('resize',renderAdminMapOccupants);
+    clearAdminMapOccupantMarkers();
     const original=window.selectSpace;
     window.selectSpace=function(spaceCode){
       if(typeof original==='function') original(spaceCode);

@@ -5930,3 +5930,9 @@ body.scanner-readmission-open{overflow:hidden}
   white-space:nowrap;
   line-height:1.2;
 }
+
+/* Occupants are listed in Space Details, including when older map code is cached. */
+.floor-image-stage .map-occupant-overlay,
+.floor-image-stage .map-occupant-stack{
+  display:none!important;
+}

@@ -294,9 +294,15 @@ function harness(options = {}) {
   return {
     context, document, tables, calls, settle,
     inspect: () => context.ScanSafeMapDebug.inspect(),
-    markers: () => document.querySelectorAll('.map-occupant-overlay'),
+    rows: () => document.querySelectorAll('#spaceDetail .map-occupant-row'),
+    selectSpace: (code = 'A1') => context.selectSpace(code),
     async refresh() {
       await within(context.ScanSafeMapDebug.refresh(), 500, 'map refresh must not wait for optional photos/occupant RPC');
+      await settle();
+      return context.ScanSafeMapDebug.inspect();
+    },
+    async adminRefresh() {
+      await within(context.ScanSafeAdminLive.refresh(), 500, 'admin refresh must not wait for optional photos/occupant RPC');
       await settle();
       return context.ScanSafeMapDebug.inspect();
     },
@@ -328,107 +334,128 @@ function enrichedRow(overrides = {}) {
   return { assignment_id: 10, group_id: 20, space_id: 1, space_code: 'A1', evacuee_id: 30, full_name: 'Nick Reyes', group_size: 1, current_status: 'accommodated', map_status: 'assigned', arrival_time: null, ...overrides };
 }
 
+function assertNoMapBubbles(h) {
+  assert.equal(h.document.querySelectorAll('.map-occupant-overlay,.map-occupant-stack').length, 0, 'map must not contain current or legacy occupant bubbles');
+  assert.equal(h.inspect().renderedMarkers.length, 0, 'debug reports no rendered map markers');
+}
+
 for (const kind of ['missing', 'empty']) {
-  test(`A1 active assignment renders exactly one pre-check-in bubble when occupant RPC is ${kind}`, async () => {
+  test(`A1 active assignment appears in Current Occupants before check-in when occupant RPC is ${kind}`, async () => {
     const tables = fixtures();
     tables.accommodation_assignments.push({ assignment_id: 99, group_id: 99, space_id: 1, occupant_count: 1, assignment_status: 'released' });
     const h = harness({ tables, occupantRpc: () => Promise.resolve(kind === 'missing' ? { data: null, error: missingRpc } : { data: [], error: null }) });
     const debug = await h.refresh();
-    assert.equal(h.markers().length, 1, 'one real active A1 assignment must create one map marker');
-    assert.equal(h.markers()[0].querySelectorAll('.map-occupant-avatar').length, 1);
-    assert.match(h.markers()[0].textContent, /NR/);
-    assert.doesNotMatch(h.markers()[0].textContent, /Checked In|GBEAA/);
+    h.selectSpace('A1');
+    assert.equal(h.rows().length, 1, 'one real active A1 assignment must create one Current Occupants row');
+    assert.equal(h.rows()[0].querySelectorAll('.map-occupant-avatar').length, 1);
+    assert.match(h.rows()[0].textContent, /Nick Reyes/);
+    assert.match(h.rows()[0].querySelector('.map-occupant-avatar').textContent, /NR/);
+    assert.match(h.rows()[0].textContent, /Assigned/);
+    assert.doesNotMatch(h.rows()[0].textContent, /Checked In|GBEAA/);
     assert.equal(debug.activeAssignments.length, 1, 'debug counts only authoritative active assignments');
     assert.ok(debug.hotspotCodes.includes('A1'));
-    assert.equal(debug.renderedMarkers.length, 1);
-    assert.equal(debug.occupantDebug.renderedCount, 1, 'debug rendered count reflects actual avatar elements');
+    assertNoMapBubbles(h);
     assert.equal(debug.unmatchedSpaceCodes.length, 0);
     assert.ok(h.calls.table.some(call => call.table === 'accommodation_assignments' && call.filters.some(([column, value, op]) => column === 'assignment_status' && value === 'active' && op === 'eq')), 'table query must filter active assignments');
   });
 }
 
-test('a hanging profile request does not block initials or map refresh', async () => {
+test('a hanging profile request does not block occupant-list initials or map refresh', async () => {
   const h = harness({
     occupantRpc: async () => ({ data: [enrichedRow()], error: null }),
     photoRpc: () => new Promise(() => {})
   });
   await h.refresh();
-  assert.equal(h.markers().length, 1);
-  assert.match(h.markers()[0].querySelector('.map-occupant-avatar').textContent, /NR/);
+  h.selectSpace();
+  assert.equal(h.rows().length, 1);
+  assert.match(h.rows()[0].querySelector('.map-occupant-avatar').textContent, /NR/);
   assert.ok(h.calls.rpc.some(call => call.name === 'get_scansafe_registration_details'), 'photo enrichment was attempted');
+  assertNoMapBubbles(h);
 });
 
-test('profile photo replaces initials when available and broken photo restores initials', async () => {
+test('occupant-list profile photo renders when available and broken photo restores initials', async () => {
   const h = harness({
     occupantRpc: async () => ({ data: [enrichedRow()], error: null }),
     photoRpc: async () => ({ data: { profile_photo: { path: 'nick/avatar.jpg' } }, error: null })
   });
   await h.refresh();
-  const img = h.markers()[0]?.querySelector('.map-occupant-avatar img');
+  h.selectSpace();
+  const img = h.rows()[0]?.querySelector('.map-occupant-avatar img');
   assert.ok(img, 'signed profile image must be rendered');
   assert.equal(img.getAttribute('src'), 'https://media.example.test/nick/avatar.jpg');
   img.dispatchEvent({ type: 'error' });
-  assert.match(h.markers()[0].querySelector('.map-occupant-avatar').textContent, /NR/, 'failed profile photo must retain a readable initials fallback');
+  assert.match(h.rows()[0].querySelector('.map-occupant-avatar').textContent, /NR/, 'failed profile photo must retain a readable initials fallback');
+  assertNoMapBubbles(h);
 });
 
-test('space codes normalize trim and uppercase before matching existing hotspots', async () => {
+test('space codes normalize trim and uppercase for selected space and occupant list', async () => {
   const tables = fixtures(); tables.accommodation_spaces[0].space_code = '  a1  ';
   const h = harness({ tables });
   const debug = await h.refresh();
-  assert.equal(h.markers().length, 1);
-  assert.equal(normalize(h.markers()[0].dataset.space), 'A1');
+  h.selectSpace('  a1  ');
+  assert.equal(h.rows().length, 1);
+  assert.match(h.rows()[0].textContent, /Nick Reyes/);
   assert.equal(debug.unmatchedSpaceCodes.length, 0);
+  assertNoMapBubbles(h);
 });
 
-test('checked-in enrichment adds Checked In to the same assignment bubble', async () => {
+test('checked-in enrichment updates the existing Current Occupants row', async () => {
   let checkedIn = false;
   const h = harness({ occupantRpc: async () => ({ data: [enrichedRow(checkedIn ? { current_status: 'checked_in', map_status: 'checked_in', arrival_time: '2026-10-27T03:00:00Z' } : {})], error: null }) });
   await h.refresh();
-  assert.equal(h.markers().length, 1);
-  assert.doesNotMatch(h.markers()[0].textContent, /Checked In/);
+  h.selectSpace();
+  assert.equal(h.rows().length, 1);
+  assert.doesNotMatch(h.rows()[0].textContent, /Checked In/);
   checkedIn = true; await h.refresh();
-  assert.equal(h.markers().length, 1, 'checking in must not duplicate the assignment bubble');
-  assert.equal(h.markers()[0].querySelectorAll('.map-occupant-avatar').length, 1);
-  assert.match(h.markers()[0].textContent, /Checked In/, 'checked-in status must be visible on the bubble');
+  assert.equal(h.rows().length, 1, 'checking in must not duplicate the assignment row');
+  assert.equal(h.rows()[0].querySelectorAll('.map-occupant-avatar').length, 1);
+  assert.match(h.rows()[0].querySelector('em').textContent, /Checked In/, 'checked-in status must be visible in the occupant list');
+  assertNoMapBubbles(h);
 });
 
 test('checked-in status remains visible when optional occupant RPC is missing', async () => {
   const tables = fixtures(); tables.evacuees[0].current_status = 'checked_in';
   const h = harness({ tables });
   await h.refresh();
-  assert.equal(h.markers().length, 1);
-  assert.match(h.markers()[0].textContent, /Checked In/);
+  h.selectSpace();
+  assert.equal(h.rows().length, 1);
+  assert.match(h.rows()[0].querySelector('em').textContent, /Checked In/);
+  assertNoMapBubbles(h);
 });
 
 test('missing member metadata cannot hide an active assignment', async () => {
   const tables = fixtures(); tables.evacuees = []; tables.evacuee_groups = [];
   const h = harness({ tables });
   const debug = await h.refresh();
+  h.selectSpace();
   assert.equal(debug.activeAssignments.length, 1);
-  assert.equal(h.markers().length, 1);
-  assert.match(h.markers()[0].querySelector('.map-occupant-avatar').textContent, /E/);
+  assert.equal(h.rows().length, 1);
+  assert.match(h.rows()[0].querySelector('.map-occupant-avatar').textContent, /E/);
+  assertNoMapBubbles(h);
 });
 
-test('the existing admin refresh updates map assignments without a debug call', async () => {
+test('the existing admin refresh updates selected Current Occupants without a debug call', async () => {
   const h = harness();
-  await h.context.ScanSafeAdminLive.refresh();
-  assert.equal(h.markers().length, 1);
+  await h.adminRefresh();
+  h.selectSpace();
+  assert.equal(h.rows().length, 1);
   h.tables.accommodation_assignments[0].assignment_status = 'released';
-  await h.context.ScanSafeAdminLive.refresh();
-  assert.equal(h.markers().length, 0, 'normal admin refresh must remove a released assignment');
+  await h.adminRefresh();
+  assert.equal(h.rows().length, 0, 'normal admin refresh must remove the released assignment from selected space list');
+  assertNoMapBubbles(h);
 });
 
 test('released assignment disappears even with stale RPC occupant and nonzero stored occupancy', async () => {
   const h = harness({ occupantRpc: async () => ({ data: [enrichedRow()], error: null }) });
-  await h.refresh(); assert.equal(h.markers().length, 1);
+  await h.refresh(); h.selectSpace(); assert.equal(h.rows().length, 1);
   h.tables.accommodation_assignments[0].assignment_status = 'released';
   h.tables.evacuees[0].current_status = 'released';
   const debug = await h.refresh();
   assert.equal(h.tables.accommodation_spaces[0].current_occupancy, 1, 'fixture intentionally retains stale counter');
-  assert.equal(h.markers().length, 0, 'inactive assignment must not be reintroduced by occupant RPC or occupancy counter');
+  assert.equal(h.rows().length, 0, 'inactive assignment must not be reintroduced by occupant RPC or occupancy counter');
   assert.equal(debug.activeAssignments.length, 0);
   assert.equal(debug.renderedMarkers.length, 0);
-  assert.equal(debug.occupantDebug.renderedCount, 0);
+  assertNoMapBubbles(h);
 });
 
 test('an earlier unresolved occupant response cannot resurrect a released assignment', async () => {
@@ -438,70 +465,65 @@ test('an earlier unresolved occupant response cannot resurrect a released assign
     ? new Promise(resolve => { resolveOld = resolve; })
     : Promise.resolve({ data: [enrichedRow()], error: null }) });
   await h.refresh();
-  assert.equal(h.markers().length, 1, 'authoritative assignment renders while optional RPC remains pending');
+  h.selectSpace();
+  assert.equal(h.rows().length, 1, 'authoritative assignment appears in list while optional RPC remains pending');
   assert.equal(typeof resolveOld, 'function');
   h.tables.accommodation_assignments[0].assignment_status = 'released';
   await h.refresh();
-  assert.equal(h.markers().length, 0);
+  assert.equal(h.rows().length, 0);
   resolveOld({ data: [enrichedRow({ arrival_time: '2026-10-27T03:00:00Z', map_status: 'checked_in' })], error: null });
   await h.settle();
-  assert.equal(h.markers().length, 0, 'late response from prior refresh cannot append the old bubble');
+  assert.equal(h.rows().length, 0, 'late response from prior refresh cannot restore the old list row');
   assert.equal(h.inspect().activeAssignments.length, 0);
-  assert.equal(h.inspect().occupantDebug.renderedCount, 0);
+  assertNoMapBubbles(h);
 });
 
-test('occupancy without an active assignment never fabricates an occupant bubble', async () => {
+test('occupancy without an active assignment never fabricates a Current Occupants row', async () => {
   const tables = fixtures(); tables.accommodation_assignments = [];
   const h = harness({ tables });
   await h.refresh();
-  assert.equal(h.markers().length, 0);
+  h.selectSpace();
+  assert.equal(h.rows().length, 0);
   assert.equal(h.inspect().activeAssignments.length, 0);
+  assertNoMapBubbles(h);
 });
 
-test('five active groups on A1 render one overlapping stack with three avatars and +2', async () => {
+test('all five active groups on A1 appear in Current Occupants without map bubbles or +N truncation', async () => {
   const h = harness({ tables: fixtures(5) });
   const debug = await h.refresh();
-  assert.equal(h.markers().length, 1);
-  assert.equal(h.markers()[0].querySelectorAll('.map-occupant-avatar').length, 3);
-  assert.equal(h.markers()[0].querySelector('.map-occupant-more').textContent, '+2');
+  h.selectSpace();
+  assert.equal(h.rows().length, 5, 'list must show every active assigned group');
+  assert.equal(h.document.querySelectorAll('#spaceDetail .map-occupant-avatar').length, 5);
+  assert.equal(h.document.querySelectorAll('#spaceDetail .map-occupant-more').length, 0);
+  assert.match(h.rows()[0].textContent, /Nick Reyes/);
+  assert.match(h.rows()[4].textContent, /Evacuee 5/);
   assert.equal(debug.activeAssignments.length, 5);
-  assert.equal(debug.occupantDebug.renderedCount, 3, 'only three actual avatar nodes render; +2 is a count badge');
+  assertNoMapBubbles(h);
 });
 
 test('active assignments without matching map hotspots are reported in debug output', async () => {
   const tables = fixtures(); tables.accommodation_spaces[0].space_code = '  b9  ';
   const h = harness({ tables });
   const debug = await h.refresh();
-  assert.equal(h.markers().length, 0);
   assert.ok(debug.unmatchedSpaceCodes.includes('B9'));
   assert.equal(debug.activeAssignments.length, 1);
   assert.ok(Array.isArray(debug.occupants), 'debug must expose occupants as well as assignments and markers');
+  assertNoMapBubbles(h);
 });
 
-test('a late-loading floor-plan image leaves exactly one correctly anchored A1 bubble', async () => {
+test('image load and resize preserve the selected occupant list and never add map bubbles', async () => {
   const h = harness({ imagePending: true });
   await h.refresh();
-  assert.equal(h.markers().length, 1, 'percentage hotspot anchors allow initials before the map image has height');
-  const anchorBeforeImage = { left: h.markers()[0].style.left, top: h.markers()[0].style.top };
-  assert.match(anchorBeforeImage.left, /%$/);
-  assert.match(anchorBeforeImage.top, /%$/);
+  h.selectSpace();
+  assert.equal(h.rows().length, 1, 'list must work before floor-plan image has height');
+  assertNoMapBubbles(h);
+  const hotspot = h.document.querySelector('.map-hotspot[data-space="A1"]');
+  const geometry = { left: hotspot.style.left, top: hotspot.style.top, width: hotspot.style.width, height: hotspot.style.height };
   await h.finishImageLoad();
-  assert.equal(h.markers().length, 1, 'image load/layout completion must render the already fetched active assignment');
-  assert.equal(h.markers()[0].querySelectorAll('.map-occupant-avatar').length, 1);
-  assert.equal(normalize(h.markers()[0].dataset.space), 'A1');
-  assert.equal(h.inspect().renderedMarkers.length, 1);
-  assert.equal(h.inspect().occupantDebug.renderedCount, 1);
-  assert.equal(h.markers()[0].style.left, anchorBeforeImage.left);
-  assert.equal(h.markers()[0].style.top, anchorBeforeImage.top);
+  assert.equal(h.rows().length, 1);
+  assertNoMapBubbles(h);
   await h.resize(960, 1440);
-  assert.equal(h.markers().length, 1, 'resizing must replace rather than duplicate the overlay');
-  assert.equal(h.markers()[0].style.left, anchorBeforeImage.left, 'map-relative x anchor stays fixed on resize');
-  assert.equal(h.markers()[0].style.top, anchorBeforeImage.top, 'map-relative y anchor stays fixed on resize');
-  const stage = h.document.querySelector('.floor-image-stage');
-  const hotspot = stage.querySelector('.map-hotspot[data-space="A1"]');
-  const spotRect = hotspot.getBoundingClientRect(), stageRect = stage.getBoundingClientRect();
-  const markerRect = h.markers()[0].getBoundingClientRect();
-  assert.ok(Math.abs(markerRect.left - (spotRect.left + spotRect.width / 2)) < 0.1, 'marker x coordinate matches center of actual HTML A1 hotspot');
-  assert.ok(Math.abs(markerRect.top - (spotRect.top + spotRect.height / 2)) < 0.1, 'marker y coordinate matches center of actual HTML A1 hotspot');
-  assert.ok(markerRect.left > stageRect.left && markerRect.left < stageRect.right);
+  assert.equal(h.rows().length, 1);
+  assertNoMapBubbles(h);
+  assert.deepEqual({ left: hotspot.style.left, top: hotspot.style.top, width: hotspot.style.width, height: hotspot.style.height }, geometry, 'existing map hotspot geometry is preserved');
 });
