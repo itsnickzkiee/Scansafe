@@ -39,5 +39,5 @@ test('admin registration review still retains registration ID preview support', 
 });
 
 test('service worker cache is bumped for UI cleanup', () => {
-  assert.match(read('service-worker.js'), /scansafe-pwa-v26-checkin-release-lifecycle/);
+  assert.match(read('service-worker.js'), /scansafe-pwa-v27-readmission-map-polish/);
 });

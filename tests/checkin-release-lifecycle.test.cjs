@@ -38,7 +38,7 @@ test('admin detail exposes controlled release flow', () => {
 test('evacuee UI uses simplified four-step lifecycle', () => {
   const js = read('assets/supabase-bridge.js');
   assert.match(js, /\['Submitted',loaded/);
-  assert.match(js, /\['Approved',approved\|\|released/);
+  assert.match(js, /\['Approved',approved/);
   assert.match(js, /\['Accommodated',accommodated\|\|released/);
   assert.match(js, /\['Released',released/);
   assert.match(js, /renderShelterStayLifecycle/);
@@ -57,7 +57,7 @@ test('Request Needs remains assignment-gated', () => {
 });
 
 test('service worker cache is bumped', () => {
-  assert.match(read('service-worker.js'), /scansafe-pwa-v26-checkin-release-lifecycle/);
+  assert.match(read('service-worker.js'), /scansafe-pwa-v27-readmission-map-polish/);
 });
 
 

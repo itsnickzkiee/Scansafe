@@ -58,7 +58,7 @@ function selectSpace(id){
   const spot=q(`[data-space="${id}"]`); if(spot)spot.classList.add('selected');
   const av=d.cap-d.occ,p=Math.round(d.occ/d.cap*100),box=q('#spaceDetail');
   const isUser=document.body.classList.contains('user-shell');
-  const action=isUser?'':(d.status==='full'?'<button class="btn soft full" disabled>Hallway Space is Full</button>':`<button class="btn red full" onclick="assignSpace('${id}')">${ico('users','sm')} Assign Evacuee / Group</button>`);
+  const action=isUser?'':'<div class="map-monitor-note"><b>Automatic Assignment</b><span>Normal accommodation assignment happens during barcode check-in. Use this map to monitor capacity and current occupants.</span></div>';
   if(box) box.innerHTML=`<div class="room-banner"><svg class="icon xl bigicon"><use href="assets/icons.svg#home"></use></svg><div><h2>${d.name}</h2><div style="margin-top:5px">${statusPill(d.status)}</div></div></div><div class="detail-list"><div class="detail-line"><b>Space Type</b><span>${d.type}</span></div><div class="detail-line"><b>Location</b><span>${d.side}</span></div><div class="detail-line"><b>Capacity</b><span>${d.cap}</span></div><div class="detail-line"><b>Occupied</b><span>${d.occ}</span></div><div class="detail-line"><b>Available</b><span>${av}</span></div><div class="detail-line"><b>Occupancy</b><span><div class="occupancy-line"><i style="width:${p}%"></i></div><b style="float:right;margin-top:-12px">${p}%</b></span></div><div class="detail-line"><b>Notes</b><span style="background:#f8fafc;border:1px solid #e3e8ee;border-radius:5px;padding:8px">${d.notes}</span></div></div>${action}`;
 }
 function renderSpaces(){
@@ -331,7 +331,7 @@ function showEvac(id){
 function selectSpace(id){
   const d=getSpaceBase(id);if(!d)return;qa('[data-space]').forEach(x=>x.classList.remove('selected'));q(`[data-space="${id}"]`)?.classList.add('selected');
   const occ=getDynamicOccupancy(id),av=Math.max(0,d.cap-occ),p=Math.round(occ/d.cap*100),status=getSpaceStatus(id),box=q('#spaceDetail'),isUser=document.body.classList.contains('user-shell');
-  const action=isUser?'':(status==='full'?'<button class="btn soft full" disabled>Accommodation Space is Full</button>':`<button class="btn red full" onclick="assignSpace('${id}')">${ico('users','sm')} Assign Approved Group</button>`);
+  const action=isUser?'':'<div class="map-monitor-note"><b>Automatic Assignment</b><span>Normal accommodation assignment happens during barcode check-in. Use this map to monitor capacity and current occupants.</span></div>';
   if(box)box.innerHTML=`<div class="room-banner"><svg class="icon xl bigicon"><use href="assets/icons.svg#home"></use></svg><div><h2>${esc(d.name)}</h2><div style="margin-top:5px">${statusPill(status)}</div></div></div><div class="detail-list"><div class="detail-line"><b>Space Type</b><span>${esc(d.type)}</span></div><div class="detail-line"><b>Location</b><span>${esc(d.side)}</span></div><div class="detail-line"><b>Capacity</b><span>${d.cap}</span></div><div class="detail-line"><b>Occupied</b><span>${occ}</span></div><div class="detail-line"><b>Available</b><span>${av}</span></div><div class="detail-line"><b>Occupancy</b><span><div class="occupancy-line"><i style="width:${p}%;background:${status==='near'?'#f0a11f':status==='full'?'#e20707':'#35aa55'}"></i></div><b style="float:right;margin-top:-12px">${p}%</b></span></div><div class="detail-line"><b>Notes</b><span style="background:#f8fafc;border:1px solid #e3e8ee;border-radius:5px;padding:8px">${esc(d.notes)}</span></div></div>${action}`;
 }
 function renderSpaces(){
@@ -387,10 +387,14 @@ function initUserBottomNav(){
   if(!document.body.classList.contains('user-shell'))return;
   q('#mobileMenuButton')?.remove();q('.mobile-nav-overlay')?.remove();document.body.classList.remove('mobile-nav-open');
   if(q('.mobile-bottom-nav'))return;
-  const path=location.pathname.split('/').pop(),nav=document.createElement('nav');
+  const path=location.pathname.split('/').pop(),hash=location.hash,nav=document.createElement('nav');
   nav.className='mobile-bottom-nav';
   const items=[['user-portal.html','home','Home'],['user-portal.html#qr','barcode','My Barcode'],['user-room.html','bed','My Space'],['user-needs.html','edit','Needs'],['user-notifications.html','bell','Alerts'],['profile.html','settings','Profile']];
-  nav.innerHTML=items.map(([href,icon,label])=>`<a href="${href}" class="${href===path?'active':''}">${ico(icon)}<span>${label}</span>${label==='Needs'?'<b class="needs-mobile-badge" data-needs-count hidden>0</b>':''}</a>`).join('');
+  nav.innerHTML=items.map(([href,icon,label])=>{
+    const base=href.split('#')[0];
+    const active=href.endsWith('#qr')?path==='user-portal.html'&&hash==='#qr':base==='user-portal.html'?path==='user-portal.html'&&hash!=='#qr':base===path;
+    return `<a href="${href}" class="${active?'active':''}">${ico(icon)}<span>${label}</span>${label==='Needs'?'<b class="needs-mobile-badge" data-needs-count hidden>0</b>':''}</a>`;
+  }).join('');
   document.body.appendChild(nav);
 }
 function enhanceAdminNavigation(){

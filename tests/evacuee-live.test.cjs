@@ -228,7 +228,7 @@ test('authenticated account RPC supplies Nick without direct-table queries', asy
   await h.refresh();
   assert.equal(h.context.currentState().user.qrCode, 'NICK-ACTUAL-50');
   assert.equal(h.calls.table.length, 0);
-  assert.match(h.nodes.get('userStatusHero').innerHTML, /Registration Approved/);
+  assert.match(h.nodes.get('userStatusHero').innerHTML, /Approved \/ Ready/);
 });
 
 test('released stays show an ended stay while preserving the issued account barcode', async () => {
@@ -239,14 +239,14 @@ test('released stays show an ended stay while preserving the issued account barc
   const h = harness({ accountSnapshot: async () => ({ data: snapshot, error: null }) });
   h.nodes.set('userAssignmentSummary', new Element('userAssignmentSummary'));
   await h.refresh();
-  assert.equal(h.kpi('data-user-status'), 'Released');
+  assert.equal(h.kpi('data-user-status'), 'Released / Cooldown');
   assert.equal(h.context.currentState().user.checkedIn, false);
   assert.equal(h.context.currentState().user.assignment, null);
   assert.equal(h.context.currentState().user.qrCode, 'NICK-ACTUAL-50');
   assert.match(h.nodes.get('userStatusHero').innerHTML, /Shelter Stay Released/);
   assert.match(h.nodes.get('userAccommodationCard').innerHTML, /Accommodation released/);
-  assert.match(h.nodes.get('userLatestCard').innerHTML, /Shelter stay ended/);
-  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /previous accommodation has been released/);
+  assert.match(h.nodes.get('userLatestCard').innerHTML, /Shelter stay released/);
+  assert.match(h.nodes.get('userAssignmentSummary').innerHTML, /Shelter stay released/);
   assert.match(h.nodes.get('userProgressSteps').innerHTML, /Released/);
   assert.doesNotMatch(h.nodes.get('userProgressSteps').innerHTML, /Pending|Checked-In/);
   assert.match(h.nodes.get('userQrCard').innerHTML, /Show Barcode/);

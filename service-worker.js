@@ -1,4 +1,4 @@
-const CACHE_NAME='scansafe-pwa-v26-checkin-release-lifecycle';
+const CACHE_NAME='scansafe-pwa-v27-readmission-map-polish';
 const APP_SHELL=[
   './user-portal.html',
   './my-information.html',

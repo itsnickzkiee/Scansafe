@@ -1,7 +1,7 @@
 /* Staff barcode verification and automatic accommodation assignment. */
 (function(){
   'use strict';
-  let options={},initialized=false,revision=0,pending=null,busy=false,hasResult=false,cameraState='idle',authenticatedOwner=null,detectionState='searching',decodedValue='';
+  let options={},initialized=false,revision=0,pending=null,busy=false,hasResult=false,cameraState='idle',authenticatedOwner=null,detectionState='searching',decodedValue='',readmissionRequest=null;
   const el=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const context=()=>options.getContext?options.getContext():{userId:window.ScanSafeDB?.session?.user?.id,role:window.ScanSafeDB?.profile?.role};
@@ -75,6 +75,73 @@
     if(hours) return hours+'h';
     return minutes+'m';
   }
+  function cooldownText(seconds){
+    const total=Math.max(0,Math.ceil(Number(seconds)||0));
+    const hours=Math.floor(total/3600);
+    const minutes=Math.ceil((total%3600)/60);
+    if(hours && minutes) return hours+'h '+minutes+'m';
+    if(hours) return hours+'h';
+    return Math.max(1,minutes)+'m';
+  }
+  function ensureReadmissionModal(){
+    let modal=el('scannerReadmissionModal');
+    if(modal) return modal;
+    modal=document.createElement('div');
+    modal.id='scannerReadmissionModal';
+    modal.className='scanner-readmission-modal';
+    modal.hidden=true;
+    modal.innerHTML='<div class="scanner-readmission-backdrop" data-readmit-close></div><section class="scanner-readmission-dialog" role="dialog" aria-modal="true" aria-labelledby="scannerReadmissionTitle"><div class="scanner-readmission-icon">↻</div><h2 id="scannerReadmissionTitle">Confirm Readmission</h2><p id="scannerReadmissionCopy"></p><div id="scannerReadmissionPrevious" class="scanner-readmission-previous"></div><div class="scanner-readmission-note">A new shelter stay will start. Accommodation will be selected automatically using the current shelter capacity.</div><div class="scanner-readmission-actions"><button type="button" class="btn out" data-readmit-close>Cancel</button><button type="button" class="btn red" id="scannerReadmissionConfirm">Confirm Readmission</button></div><p id="scannerReadmissionFeedback" class="scanner-readmission-feedback" role="status" aria-live="polite"></p></section>';
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-readmit-close]').forEach(button=>button.addEventListener('click',()=>closeReadmissionModal()));
+    modal.querySelector('#scannerReadmissionConfirm')?.addEventListener('click',confirmReadmission);
+    return modal;
+  }
+  function closeReadmissionModal(){
+    if(busy) return;
+    const modal=el('scannerReadmissionModal');
+    if(modal) modal.hidden=true;
+    document.body.classList.remove('scanner-readmission-open');
+    readmissionRequest=null;
+  }
+  function openReadmissionModal(value,data){
+    const modal=ensureReadmissionModal();
+    readmissionRequest={value:String(value||data?.qr_value||''),data};
+    const copy=modal.querySelector('#scannerReadmissionCopy');
+    const previous=modal.querySelector('#scannerReadmissionPrevious');
+    const feedback=modal.querySelector('#scannerReadmissionFeedback');
+    if(copy) copy.textContent='Start a new shelter stay for '+(data?.full_name||'this evacuee')+'?';
+    if(previous) previous.innerHTML=row('Previous Departure',scanDate(data?.departure_time))+row('Previous Stay Duration',scanDuration(data?.stay_duration_seconds))+row('Previous Space',data?.previous_space||'Not recorded');
+    if(feedback) feedback.textContent='';
+    modal.hidden=false;
+    document.body.classList.add('scanner-readmission-open');
+  }
+  async function confirmReadmission(){
+    const request=readmissionRequest;
+    if(!request || busy) return;
+    const sb=client();
+    const modal=ensureReadmissionModal();
+    const button=modal.querySelector('#scannerReadmissionConfirm');
+    const feedback=modal.querySelector('#scannerReadmissionFeedback');
+    if(!sb){if(feedback) feedback.textContent='Database connection unavailable.';return;}
+    busy=true;controls();
+    if(button){button.disabled=true;button.textContent='Starting New Stay...';}
+    if(feedback) feedback.textContent='Confirming readmission and checking current accommodation availability...';
+    try{
+      const {data,error}=await sb.rpc('confirm_scansafe_readmission',{p_barcode_value:request.value});
+      if(error) throw error;
+      if(!data || data.valid!==true) throw new Error('The server did not confirm the new shelter stay.');
+      modal.hidden=true;document.body.classList.remove('scanner-readmission-open');readmissionRequest=null;
+      render(data,request.value);
+      status('Readmission confirmed. A new shelter stay is active.','success');
+      if(options.refresh) Promise.resolve().then(()=>options.refresh()).catch(()=>{});
+    }catch(error){
+      if(feedback) feedback.textContent=error?.message||'Readmission could not be confirmed.';
+    }finally{
+      busy=false;
+      if(button){button.disabled=false;button.textContent='Confirm Readmission';}
+      controls();
+    }
+  }
   function render(data,value){
     const box=el('scanResult');if(!box) return;
     box.classList.remove('hidden');hasResult=true;
@@ -91,7 +158,7 @@
     const shelter=data.shelter_name||assignment.shelter_name||'Not provided';
     const arrival=scanDate(data.arrival_time||assignment.assigned_at||data.scanned_at);
 
-    if(data.scan_state==='already_checked_in' || data.duplicate_scan===true && data.scan_state!=='released'){
+    if(data.scan_state==='already_checked_in'){
       box.innerHTML=
         '<div class="scanner-result-badge scanner-result-duplicate">ALREADY CHECKED IN</div>'+
         '<h2 class="scanner-result-title">Duplicate scan blocked</h2>'+
@@ -108,6 +175,45 @@
       if(last) last.innerHTML='<h3 class="section-h">Last Scanned Evacuee</h3><h2 class="scanner-evacuee-name">'+esc(data.full_name||'Evacuee')+'</h2><span class="pill amber">Already Checked In</span><div class="detail-list">'+row('Arrival Time',arrival)+row('Accommodation',space||'Current assignment retained')+row('Group size',data.group_size||'Not provided')+'</div>';
 
       status('Duplicate scan blocked. '+(data.full_name||'Evacuee')+' is already checked in.','warning');
+      return;
+    }
+
+    if(data.scan_state==='recently_released'){
+      const remaining=cooldownText(data.cooldown_remaining_seconds);
+      box.innerHTML=
+        '<div class="scanner-result-badge scanner-result-released">RECENTLY RELEASED</div>'+ 
+        '<h2 class="scanner-result-title">Readmission cooldown active</h2>'+ 
+        '<p>The previous shelter stay is complete. A new stay can be started after the 12-hour cooldown.</p>'+ 
+        '<div class="detail-list">'+
+          row('Evacuee',data.full_name||'Evacuee')+
+          row('Previous Arrival',scanDate(data.arrival_time))+
+          row('Previous Departure',scanDate(data.departure_time))+
+          (data.stay_duration_seconds!=null?row('Previous Stay Duration',scanDuration(data.stay_duration_seconds)):'')+
+          row('Readmission Available In',remaining)+
+          row('Status','Released / Cooldown')+
+        '</div>';
+      clearLast((data.full_name||'Evacuee')+' is in the 12-hour readmission cooldown.');
+      status('Previous stay released. Readmission available in '+remaining+'.','warning');
+      return;
+    }
+
+    if(data.scan_state==='ready_for_readmission'){
+      box.innerHTML=
+        '<div class="scanner-result-badge scanner-result-ready">READY FOR READMISSION</div>'+ 
+        '<h2 class="scanner-result-title">Eligible for a new shelter stay</h2>'+ 
+        '<p>The previous stay is complete and the 12-hour cooldown has ended. Staff confirmation is required before starting a new stay.</p>'+ 
+        '<div class="detail-list">'+
+          row('Evacuee',data.full_name||'Evacuee')+
+          row('Previous Departure',scanDate(data.departure_time))+
+          (data.stay_duration_seconds!=null?row('Previous Stay Duration',scanDuration(data.stay_duration_seconds)):'')+
+          row('Previous Space',data.previous_space||'Not recorded')+
+          row('Status','Ready for Readmission')+
+        '</div>'+ 
+        '<button type="button" class="btn red full scanner-readmit-button" id="scannerReadmitButton">Confirm Readmission</button>';
+      el('scannerReadmitButton')?.addEventListener('click',()=>openReadmissionModal(value,data));
+      const last=el('lastScannedEvacuee');
+      if(last) last.innerHTML='<h3 class="section-h">Last Scanned Evacuee</h3><h2 class="scanner-evacuee-name">'+esc(data.full_name||'Evacuee')+'</h2><span class="pill green">Ready for Readmission</span><div class="detail-list">'+row('Previous Departure',scanDate(data.departure_time))+row('Previous Space',data.previous_space||'Not recorded')+'</div>';
+      status('Ready for readmission. Confirm before starting a new shelter stay.','success');
       return;
     }
 
@@ -132,7 +238,7 @@
     const checkedIn=data.scan_state==='checked_in' || assigned;
     const assignmentText=assigned?space:'Waiting for assignment';
     const allocationMessage=checkedIn
-      ? 'Check-in completed. GBEAA accommodation is confirmed and occupancy was recorded once.'
+      ? 'Check-in completed. Accommodation was assigned automatically and occupancy was recorded once.'
       : data.assignment_message||'Barcode verified, but accommodation was not completed.';
 
     box.innerHTML=
@@ -145,7 +251,7 @@
         row('Arrival Time',checkedIn?arrival:'Not recorded')+
         row('Accommodation',assignmentText)+
         row('Shelter',shelter)+
-        row('Assignment',assigned?'Assigned via GBEAA':'Waiting for assignment')+
+        row('Assignment',assigned?'Automatic Assignment':'Waiting for assignment')+
         row('Scanned by',window.ScanSafeDB?.profile?.full_name||'Authorized staff')+
       '</div>';
 
@@ -182,7 +288,7 @@
     const token=++revision;
     const current=()=>token===revision&&context()?.userId===ctx.userId&&context()?.role===ctx.role;
     busy=true;controls();clearLast('Verifying barcode and checking current shelter-stay status...');
-    const box=el('scanResult');if(box){box.classList.remove('hidden');box.innerHTML='<p>Verifying barcode, checking duplicate check-in, and running GBEAA when needed...</p>';}
+    const box=el('scanResult');if(box){box.classList.remove('hidden');box.innerHTML='<p>Verifying barcode, checking shelter-stay status, and preparing automatic accommodation...</p>';}
     status('Barcode detected. Checking eligibility and one-time check-in status...','busy');
     const promise=(async()=>{
       try{
@@ -192,7 +298,7 @@
         if(!current()){if(token===revision) reset();return null;}
         if(error){
           const missing=error.code==='PGRST202'||error.code==='42883'||/could not find.*scan_and_assign_evacuee|scan_and_assign_evacuee.*does not exist/i.test(error.message||'');
-          unavailable(missing?'Scanner setup is incomplete. Run SUPABASE_SCANNER_GBEAA_FIX.sql in Supabase SQL Editor, then retry.':error.message||'The server could not verify this barcode. Try again.',value);
+          unavailable(missing?'Scanner setup is incomplete. Run the latest ScanSafe scanner and lifecycle SQL patches, then retry.':error.message||'The server could not verify this barcode. Try again.',value);
           return null;
         }
         if(!data||typeof data.valid!=='boolean'){unavailable('The server returned an incomplete verification result. Try again.',value);return null;}
