@@ -1,0 +1,75 @@
+/* ScanSafe Reports live-functional layer */
+.report-live-kpis{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.report-live-kpi{
+  padding:14px;
+  min-height:96px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:5px;
+}
+.report-live-kpi span{
+  color:#65758b;
+  font-size:9px;
+  font-weight:700;
+}
+.report-live-kpi strong{
+  color:#10243e;
+  font-size:24px;
+  line-height:1;
+}
+.report-live-kpi small{
+  color:#8b96a5;
+  font-size:8px;
+}
+.report-table-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:10px;
+}
+.report-table-head p{margin:3px 0 0;font-size:9px}
+.report-table-head>span{
+  background:#fff0f0;
+  color:#b40000;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:8px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.report-table-wrap{
+  overflow:auto;
+  max-height:440px;
+  border:1px solid #edf0f4;
+  border-radius:10px;
+}
+.report-table-wrap .table{
+  min-width:920px;
+  margin:0;
+}
+.report-table-wrap thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#f8fafc;
+}
+@media(max-width:1100px){
+  .report-live-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .report-live-kpis{grid-template-columns:1fr 1fr}
+  .report-table-head{flex-direction:column}
+}
+@media print{
+  .admin-top,.admin-side,.report-filter button,.notif,.top-btn{display:none!important}
+  .admin-main{margin:0!important}
+  .page{padding:0!important}
+  .report-table-wrap{max-height:none!important;overflow:visible!important}
+}

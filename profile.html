@@ -41,10 +41,6 @@
 <div id="evacueeDataStatus" class="card card-pad" role="status" aria-live="polite" style="margin-bottom:12px">Loading your registration from the database...</div>
 <section class="user-hero"><h1>Profile</h1><p>View your account and accommodation details.</p><div class="date-card"><svg class="icon"><use href="assets/icons.svg#calendar"></use></svg><div><b data-now>Loading date...</b></div></div></section>
 <div class="profile-layout"><section class="card card-pad"><div style="display:flex;gap:18px;align-items:center"><div class="profile-photo-control"><div class="person-round profile-avatar"><svg class="icon"><use href="assets/icons.svg#user"></use></svg></div><button type="button" class="profile-photo-plus" data-profile-photo-picker aria-label="Upload profile photo" title="Upload profile photo">+</button><div id="profilePhotoUpload"></div></div><div><h2 style="margin:0" data-user-name>Loading...</h2><div class="muted" style="font-size:10px" data-user-status>Loading status...</div><div class="muted profile-photo-hint">Tap + to update profile photo</div></div></div><div class="info-lines"><div class="info-line"><b>Email Address</b><span data-user-email>Loading...</span></div><div class="info-line"><b>Contact Number</b><span data-user-contact>Loading...</span></div><div class="info-line"><b>Address</b><span data-user-address>Loading...</span></div><div class="info-line"><b>Registration Code</b><span data-user-registration-code>Loading...</span></div><div class="info-line"><b>Assigned Shelter</b><span data-user-shelter>Loading...</span></div><div class="info-line"><b>Assigned Space</b><span data-user-space>Loading...</span></div></div><button class="btn out" onclick="go('my-information.html')">View My Information</button></section><aside class="card card-pad"><h3 class="section-h">Account</h3><button class="btn red full" style="margin-top:8px" onclick="logout()">Logout</button></aside></div>
-
-<section class="card card-pad stay-lifecycle-card is-waiting" data-user-stay-card>
-  <div class="space-placeholder">Loading shelter-stay history...</div>
-</section>
 </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-config.js"></script>
@@ -52,7 +48,7 @@
 <script src="assets/app.js?v=needs-v19"></script>
 <script src="assets/barcode-viewer.js?v=needs-v19"></script>
 <script src="assets/needs-requests.js?v=operations-v22"></script>
-<script src="assets/account-media.js?v=ui-v24"></script>
+<script src="assets/account-media.js?v=live-profile-v1"></script>
 <script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
 </body>

@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScanSafe Reports &amp; Analytics</title><link rel="stylesheet" href="assets/style.css?v=operations-v22"><link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
 <link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
+<link rel="stylesheet" href="assets/reports-live.css?v=reports-v1">
 </head><body><div class="admin-app"><header class="admin-top"><img class="logo-img" src="assets/logo.svg"><div class="top-actions"><div class="avatar">A</div><div class="identity"><strong>Admin</strong>Administrator</div><div class="notif"><svg class="icon "><use href="assets/icons.svg#bell"></use></svg></div><button class="top-btn" onclick="logout()"><svg class="icon sm"><use href="assets/icons.svg#logout"></use></svg> Logout</button></div></header><aside class="admin-side"><a class="nav-item " href="admin-dashboard.html"><svg class="icon "><use href="assets/icons.svg#home"></use></svg><span>Dashboard</span></a><a class="nav-item " href="evacuees.html"><svg class="icon "><use href="assets/icons.svg#users"></use></svg><span>Evacuees</span></a><a class="nav-item " href="shelter-room.html"><svg class="icon "><use href="assets/icons.svg#building"></use></svg><span>Accommodation Map</span></a><a class="nav-item " href="barcode-scanner.html"><svg class="icon "><use href="assets/icons.svg#barcode"></use></svg><span>Barcode Scanner</span></a><a class="nav-item active" href="reports.html"><svg class="icon "><use href="assets/icons.svg#chart"></use></svg><span>Reports & Analytics</span></a><a class="nav-item" href="needs-requests.html"><svg class="icon"><use href="assets/icons.svg#edit"></use></svg><span>Needs Requests</span><b class="nav-badge" data-needs-count hidden>0</b></a><a class="nav-item " href="messages.html"><svg class="icon "><use href="assets/icons.svg#message"></use></svg><span>Messages</span></a><a class="nav-item " href="settings.html"><svg class="icon "><use href="assets/icons.svg#settings"></use></svg><span>Settings</span></a></aside>
 <main class="admin-main">
 <section class="page">
@@ -8,12 +9,12 @@
 <section class="card card-pad">
 <h3 class="section-h"><svg class="icon"><use href="assets/icons.svg#filter"></use></svg> Report Filters</h3>
 <div class="report-filter">
-<div><label style="font-size:9px;font-weight:700">Date Range</label><select class="select" style="width:100%"><option>Loading date range...</option></select></div>
-<div><label style="font-size:9px;font-weight:700">Shelter</label><select class="select" style="width:100%"><option>All Shelters</option></select></div>
-<div><label style="font-size:9px;font-weight:700">Report Type</label><select class="select" style="width:100%"><option>All Report Types</option></select></div>
-<button class="btn out" onclick="generatePDF()"><svg class="icon sm"><use href="assets/icons.svg#download"></use></svg> Export PDF</button>
-<button class="btn out" onclick="exportCSV()"><svg class="icon sm"><use href="assets/icons.svg#download"></use></svg> Export CSV</button>
-<button class="btn red" onclick="ScanSafeAdminLive.refresh()"><svg class="icon sm"><use href="assets/icons.svg#chart"></use></svg> Generate Report</button>
+<div><label style="font-size:9px;font-weight:700">Date Range</label><select class="select" data-report-range style="width:100%"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="all">All time</option></select></div>
+<div><label style="font-size:9px;font-weight:700">Shelter</label><select class="select" data-report-shelter style="width:100%"><option value="all">All Shelters</option></select></div>
+<div><label style="font-size:9px;font-weight:700">Report Type</label><select class="select" data-report-type style="width:100%"><option value="overview">Overview</option><option value="evacuees">Evacuees</option><option value="occupancy">Occupancy</option><option value="operations">Operations</option><option value="needs">Needs Requests</option></select></div>
+<button type="button" class="btn out" data-report-pdf><svg class="icon sm"><use href="assets/icons.svg#download"></use></svg> Export PDF</button>
+<button type="button" class="btn out" data-report-csv><svg class="icon sm"><use href="assets/icons.svg#download"></use></svg> Export CSV</button>
+<button type="button" class="btn red" data-report-refresh><svg class="icon sm"><use href="assets/icons.svg#chart"></use></svg> Generate Report</button>
 </div>
 </section>
 <div class="report-kpis">
@@ -28,6 +29,28 @@
 <section class="card chart-card"><h3 class="section-h">Accommodation Space Utilization</h3><div class="bar-chart"><div class="muted" style="padding:45px 10px">Loading shelter capacity...</div></div></section>
 <section class="card chart-card"><h3 class="section-h">Approval Trend</h3><div class="line-chart"><svg viewBox="0 0 600 165" role="img" aria-label="Approval trend loading"></svg></div><div class="xlabels"></div></section>
 </div>
+
+<section class="report-operations" data-report-operations>
+  <div class="report-live-kpis">
+    <article class="card report-live-kpi"><span>Currently Accommodated</span><strong data-live-kpi="accommodated">--</strong><small>Active assignments</small></article>
+    <article class="card report-live-kpi"><span>Released Stays</span><strong data-live-kpi="released">--</strong><small>Completed shelter stays</small></article>
+    <article class="card report-live-kpi"><span>Average Stay</span><strong data-live-kpi="avgStay">--</strong><small>Completed stays</small></article>
+    <article class="card report-live-kpi"><span>Active Needs</span><strong data-live-kpi="needs">--</strong><small>Pending / preparing / delivery</small></article>
+    <article class="card report-live-kpi"><span>Verified Scans</span><strong data-live-kpi="scans">--</strong><small>Selected date range</small></article>
+  </div>
+  <section class="card card-pad mt12">
+    <div class="report-table-head">
+      <div><h3 class="section-h">Filtered Evacuee Report</h3><p class="muted">Live Supabase records matching the filters above.</p></div>
+      <span data-report-result-count>0 records</span>
+    </div>
+    <div class="report-table-wrap">
+      <table class="table" data-report-live-table>
+        <thead><tr><th>ID</th><th>Name</th><th>Approval</th><th>Status</th><th>Group</th><th>Space</th><th>Shelter</th><th>Registered</th></tr></thead>
+        <tbody><tr><td colspan="8" style="text-align:center">Loading live records...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</section>
 <div class="reports-bottom">
 <section class="card card-pad"><h3 class="section-h">Evacuee Demographics</h3><div class="mini-bars"><div class="muted">Loading demographics...</div></div><div class="xlabels" style="grid-template-columns:repeat(6,1fr)"><span>0-12</span><span>13-18</span><span>19-30</span><span>31-50</span><span>51-65</span><span>66+</span></div></section>
 <section class="card card-pad"><h3 class="section-h">Evacuee Group Type</h3><div class="donut-wrap" style="gap:20px"><div class="donut" style="background:#dce3ea"><strong>--</strong></div><div class="legend"><div class="legend-row"><i class="dot" style="background:#e20707"></i><span>Family / Group Members</span><b>--</b></div><div class="legend-row"><i class="dot" style="background:#ff8e8e"></i><span>Individuals</span><b>--</b></div><div class="legend-row"><i class="dot" style="background:#30a5e0"></i><span>Senior Citizens</span><b>--</b></div></div></div></section>
@@ -42,8 +65,9 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="assets/app.js?v=needs-v19"></script>
 <script src="assets/needs-requests.js?v=operations-v22"></script>
-<script src="assets/account-media.js?v=integration-v23"></script>
+<script src="assets/account-media.js?v=live-profile-v1"></script>
 <script src="assets/notification-center.js?v=integration-v23"></script>
 <script src="assets/supabase-bridge.js?v=operations-v22"></script>
+<script src="assets/reports-live.js?v=reports-v1"></script>
 </body>
 </html>

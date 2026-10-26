@@ -31,7 +31,12 @@
     initialized:false,
     refreshTimer:null,
     lastThreadIds:new Set(),
-    selectionSeq:0
+    selectionSeq:0,
+    mediaChannel:null,
+    livePollTimer:null,
+    realtimeStatus:'idle',
+    selfProfileUrl:'',
+    contactPhotoCache:new Map()
   };
 
   const templates={
@@ -115,7 +120,9 @@
 
   function typingMarkup(name){
     return `<div class="ss-typing-row" data-typing-indicator>
-      <span class="ss-typing-avatar">${esc(initials(name))}</span>
+      ${isStaff && state.currentId
+        ? avatarMarkup(name,state.contacts.find(c=>String(c.user_id)===String(state.currentId))?.profile_url||'','ss-typing-avatar')
+        : `<span class="ss-typing-avatar">${esc(initials(name))}</span>`}
       <div class="ss-typing-bubble" aria-label="${esc(name)} is typing">
         <i></i><i></i><i></i>
       </div>
@@ -153,6 +160,43 @@
     if(active){
       state.remoteTypingTimer=setTimeout(()=>showRemoteTyping(false,name),2600);
     }
+  }
+
+  function avatarMarkup(name,url,extra=''){
+    if(url){
+      return `<span class="avatar ss-photo-avatar ${extra}"><img src="${esc(url)}" alt="${esc(name||'Profile photo')}"></span>`;
+    }
+    return `<span class="avatar ${extra}">${esc(initials(name))}</span>`;
+  }
+
+  async function signedProfileUrl(path){
+    if(!path || !state.sb?.storage?.from) return '';
+    const cached=state.contactPhotoCache.get(path);
+    if(cached && cached.expires>Date.now()) return cached.url;
+    try{
+      const {data,error}=await state.sb.storage.from('scansafe-account-media').createSignedUrl(path,300);
+      if(error) throw error;
+      const url=data?.signedUrl||'';
+      if(url) state.contactPhotoCache.set(path,{url,expires:Date.now()+240000});
+      return url;
+    }catch(_){ return ''; }
+  }
+
+  async function hydrateContactPhotos(rows){
+    await Promise.all((rows||[]).map(async row=>{
+      row.profile_url=row.profile_path?await signedProfileUrl(row.profile_path):'';
+    }));
+    return rows;
+  }
+
+  async function loadSelfPhoto(){
+    if(isStaff || !state.sb) return '';
+    try{
+      const {data,error}=await state.sb.rpc('get_my_scansafe_media');
+      if(error) throw error;
+      state.selfProfileUrl=data?.profile_photo?.path?await signedProfileUrl(data.profile_photo.path):'';
+    }catch(_){ state.selfProfileUrl=''; }
+    return state.selfProfileUrl;
   }
 
   function pairTopic(otherId){
@@ -217,14 +261,19 @@
       : mine
         ? `<span class="ss-send-state">${m.read_at?'Read':'Sent'}</span>`
         : '';
+    const currentContact=isStaff
+      ? state.contacts.find(c=>String(c.user_id)===String(state.currentId))
+      : null;
+    const otherUrl=isStaff?(currentContact?.profile_url||''):'';
+    const mineUrl=!isStaff?state.selfProfileUrl:'';
     return `<div class="bubble-row ${mine?'mine':''}" data-message-id="${esc(m.message_id||'')}">
-      ${mine?'':`<span class="avatar">${esc(initials(name))}</span>`}
+      ${mine?'':avatarMarkup(name,otherUrl)}
       <div class="bubble">
         ${mine?'':`<b class="ss-bubble-name">${esc(name)}</b>`}
         <div class="ss-message-text">${esc(m.message_text||'')}</div>
         <div class="ss-message-meta"><span>${esc(formatTime(m.sent_at||new Date()))}</span>${status}</div>
       </div>
-      ${mine?`<span class="avatar">${esc(initials(name))}</span>`:''}
+      ${mine?avatarMarkup(name,mineUrl):''}
     </div>`;
   }
 
@@ -332,6 +381,7 @@
 
   async function loadUserThread(){
     if(!state.sb) return;
+    await loadSelfPhoto();
     const {data,error}=await state.sb.rpc('get_my_admin_thread');
     if(error){console.warn('User messages:',error.message);return;}
     renderThread(data||[],'Shelter Staff');
@@ -342,9 +392,15 @@
 
   async function loadContacts(selectFirst=false){
     if(!state.sb||!isStaff) return;
-    const {data,error}=await state.sb.rpc('get_staff_message_contacts');
+    let data=null,error=null;
+    let result=await state.sb.rpc('get_staff_message_contacts_v2');
+    if(result.error && /PGRST202|does not exist|could not find/i.test((result.error.code||'')+' '+(result.error.message||''))){
+      result=await state.sb.rpc('get_staff_message_contacts');
+    }
+    data=result.data; error=result.error;
     if(error){console.warn('Message contacts:',error.message);return;}
     state.contacts=Array.isArray(data)?data:[];
+    await hydrateContactPhotos(state.contacts);
     renderContacts();
 
     if(selectFirst){
@@ -372,7 +428,7 @@
     }else{
       host.innerHTML=list.map(c=>`
         <button type="button" class="ss-contact ${String(c.user_id)===String(state.currentId)?'active':''}" data-contact-id="${esc(c.user_id)}">
-          <span class="avatar">${esc(initials(c.full_name))}</span>
+          ${avatarMarkup(c.full_name,c.profile_url)}
           <span class="ss-contact-copy">
             <b>${esc(c.full_name||'Evacuee')}</b>
             <span data-contact-preview>${esc(c.last_message||'No messages yet')}</span>
@@ -410,7 +466,7 @@
     const head=document.querySelector('[data-enhanced-conv-head]');
     if(head){
       head.innerHTML=`<div class="ss-conv-person">
-        <span class="avatar">${esc(initials(state.currentName))}</span>
+        ${avatarMarkup(state.currentName,c?.profile_url||'')}
         <div><b>${esc(state.currentName)}</b><span>Evacuee • ScanSafe Account</span></div>
       </div>
       <span class="ss-conv-last">${esc(c?.last_at?relative(c.last_at):'')}</span>`;
@@ -528,7 +584,7 @@
     const rows=state.contacts.filter(c=>!q||String(c.full_name||'').toLowerCase().includes(q));
     host.innerHTML=rows.length?rows.map(c=>`
       <button type="button" class="${String(c.user_id)===String(composeSelected)?'active':''}" data-compose-contact="${esc(c.user_id)}">
-        <span class="avatar">${esc(initials(c.full_name))}</span>
+        ${avatarMarkup(c.full_name,c.profile_url)}
         <span><b>${esc(c.full_name)}</b><small>${esc(c.last_message||'No previous messages')}</small></span>
       </button>`).join(''):'<div class="ss-empty-list">No evacuee found.</div>';
     host.querySelectorAll('[data-compose-contact]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -695,11 +751,56 @@
     if(!state.sb||state.messageChannel) return;
     const me=state.session?.user?.id;
     if(!me) return;
+
     state.messageChannel=state.sb.channel('scansafe-message-ui-'+me+'-'+Math.random().toString(36).slice(2))
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'receiver_id=eq.'+me},refreshCurrent)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'sender_id=eq.'+me},refreshCurrent)
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:'sender_id=eq.'+me},refreshCurrent)
+      .on('postgres_changes',{event:'*',schema:'public',table:'messages'},payload=>{
+        const row=payload?.new&&Object.keys(payload.new).length?payload.new:payload?.old||{};
+        if(String(row.sender_id)===String(me)||String(row.receiver_id)===String(me)){
+          refreshCurrent();
+        }
+      })
+      .subscribe(status=>{
+        state.realtimeStatus=String(status||'').toLowerCase();
+        document.body.dataset.messageRealtime=state.realtimeStatus;
+      });
+
+    // Media/profile changes update contact photos/names without browser refresh.
+    state.mediaChannel=state.sb.channel('scansafe-message-media-'+me+'-'+Math.random().toString(36).slice(2))
+      .on('postgres_changes',{event:'*',schema:'public',table:'scansafe_account_media'},payload=>{
+        state.contactPhotoCache.clear();
+        if(isStaff){
+          loadContacts(false).then(()=>{ if(state.currentId) selectContact(state.currentId); });
+        }else{
+          loadSelfPhoto().then(()=>loadUserThread());
+        }
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles'},payload=>{
+        const row=payload?.new||{};
+        if(isStaff){
+          loadContacts(false).then(()=>{ if(state.currentId) selectContact(state.currentId); });
+        }else if(String(row.id)===String(me)){
+          state.profile={...(state.profile||{}),...row};
+          loadUserThread();
+        }
+      })
       .subscribe();
+
+    // Short visible-page fallback: no manual browser refresh is needed even if
+    // a realtime websocket is temporarily reconnecting.
+    clearInterval(state.livePollTimer);
+    state.livePollTimer=setInterval(()=>{
+      if(document.visibilityState!=='visible') return;
+      if(isStaff){
+        loadContacts(false);
+        if(state.currentId) selectContact(state.currentId);
+      }else{
+        loadUserThread();
+      }
+    },4000);
+
+    document.addEventListener('visibilitychange',()=>{
+      if(document.visibilityState==='visible') refreshCurrent();
+    });
   }
 
   async function init(){
@@ -717,6 +818,7 @@
       await loadContacts(true);
     }else{
       await loadUserContact();
+      await loadSelfPhoto();
       await loadUserThread();
     }
 
@@ -729,6 +831,13 @@
     setTimeout(()=>init().catch(err=>console.error('ScanSafe Messages:',err)),650);
   });
 
+  window.addEventListener('beforeunload',()=>{
+    clearInterval(state.livePollTimer);
+    if(state.sb&&state.messageChannel) try{state.sb.removeChannel(state.messageChannel);}catch(_){}
+    if(state.sb&&state.mediaChannel) try{state.sb.removeChannel(state.mediaChannel);}catch(_){}
+    if(state.sb&&state.typingChannel) try{state.sb.removeChannel(state.typingChannel);}catch(_){}
+  });
+
   window.ScanSafeMessagesDebug={
     inspect:()=>({
       page,
@@ -738,6 +847,9 @@
       contacts:state.contacts.length,
       typingChannel:!!state.typingChannel,
       realtime:!!state.messageChannel,
+      realtimeStatus:state.realtimeStatus,
+      profileMediaRealtime:!!state.mediaChannel,
+      livePoll:!!state.livePollTimer,
       sending:state.sending
     }),
     refresh:async()=>{

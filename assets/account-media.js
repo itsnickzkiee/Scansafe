@@ -6,6 +6,7 @@
   let options = {}, generation = 0, currentOwner = null, refreshing = null, mounted = null;
   let avatarUrl = '', avatarPath = '', avatarExpires = 0, reviewSequence = 0;
   const uploads = new Set();
+  let realtimeChannel = null, realtimeClient = null;
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function context() { try { return options.getContext ? options.getContext() || {} : {}; } catch (_) { return {}; } }
   function owner() { const c = context(); return c.userId || c.ownerId || c.user?.id || null; }
@@ -201,12 +202,45 @@
       return current() ? data : null;
     } catch (error) { if (current()) target.textContent = message(error); return null; }
   }
+  function stopRealtime() {
+    const sb = realtimeClient;
+    const channel = realtimeChannel;
+    realtimeChannel = null; realtimeClient = null;
+    if (sb && channel) { try { sb.removeChannel(channel); } catch (_) {} }
+  }
+  async function startRealtime() {
+    stopRealtime();
+    const uid = owner(), c = context();
+    if (!uid || c.role !== 'evacuee') return;
+    let sb;
+    try { sb = client(); } catch (_) { return; }
+    realtimeClient = sb;
+    realtimeChannel = sb.channel('scansafe-profile-media-' + uid + '-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes',{
+        event:'*',schema:'public',table:'scansafe_account_media',filter:'owner_id=eq.' + uid
+      },() => {
+        avatarExpires = 0; avatarPath = ''; avatarUrl = '';
+        refresh();
+        document.dispatchEvent(new CustomEvent('scansafe:profile-media-updated',{detail:{owner_id:uid}}));
+      })
+      .on('postgres_changes',{
+        event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.' + uid
+      },() => {
+        refresh();
+        document.dispatchEvent(new CustomEvent('scansafe:profile-updated',{detail:{owner_id:uid}}));
+      })
+      .subscribe();
+  }
   function reset() {
+    stopRealtime();
     generation++; reviewSequence++; refreshing = null; clearAvatars(); currentOwner = null;
     if (mounted) { mounted.textContent = ''; mounted = null; }
     document.querySelectorAll('.account-media-review-images').forEach(el => el.remove());
   }
-  function init(config) { reset(); options = config || {}; return refresh(); }
+  function init(config) {
+    reset(); options = config || {};
+    return refresh().finally(() => { startRealtime(); });
+  }
   window.ScanSafeMedia = {
     init, reset, refresh, validateFile, showRegistrationReview,
     uploadRegistrationId: ({ file, ownerId } = {}) => upload('valid-id', file, ownerId),

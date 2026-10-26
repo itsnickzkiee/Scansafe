@@ -215,3 +215,73 @@ body.ss-messages-page .ss-conv-head{
 }
 .ss-recipient-lock b{color:#b00000;font-size:9px}
 .ss-recipient-lock b::before{content:'●';margin-right:5px;font-size:7px}
+
+
+/* v3 — remove exposed admin-shell background / black-maroon gaps */
+body.ss-messages-page,
+body.ss-messages-page .admin-app,
+body.ss-messages-page .admin-main,
+body.ss-messages-page .page{
+  background:#f8fafc!important;
+}
+body.ss-messages-page .page{
+  min-height:calc(100vh - 88px)!important;
+  padding-bottom:18px!important;
+}
+body.ss-messages-page .messages-grid{
+  height:auto!important;
+  min-height:calc(100vh - 300px)!important;
+  align-items:stretch!important;
+  background:#f8fafc!important;
+}
+body.ss-messages-page .msg-col,
+body.ss-messages-page .conversation,
+body.ss-messages-page .side-panel{
+  height:auto!important;
+  min-height:calc(100vh - 300px)!important;
+  background:#fff!important;
+  overflow:hidden!important;
+}
+body.ss-messages-page .msg-col{
+  padding-bottom:12px!important;
+}
+body.ss-messages-page .conversation{
+  display:grid!important;
+  grid-template-rows:auto minmax(280px,1fr) auto auto!important;
+}
+body.ss-messages-page .side-panel{
+  overflow:auto!important;
+}
+body.ss-messages-page .thread{
+  min-height:0!important;
+  overflow-y:auto!important;
+}
+.ss-photo-avatar{
+  overflow:hidden!important;
+  padding:0!important;
+  background:#fff1f1!important;
+}
+.ss-photo-avatar img{
+  width:100%!important;
+  height:100%!important;
+  display:block!important;
+  object-fit:cover!important;
+  border-radius:inherit!important;
+}
+body.ss-messages-page[data-message-realtime="subscribed"] .ss-conv-head::after{
+  content:'Live';
+  font-size:7px;
+  font-weight:800;
+  color:#168647;
+  background:#e9f8ef;
+  border-radius:999px;
+  padding:4px 7px;
+}
+@media(max-width:900px){
+  body.ss-messages-page .msg-col,
+  body.ss-messages-page .conversation,
+  body.ss-messages-page .side-panel{
+    min-height:auto!important;
+  }
+  body.ss-messages-page .conversation{min-height:560px!important}
+}
