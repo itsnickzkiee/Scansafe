@@ -1413,27 +1413,18 @@
     const sb=readyClient();
     if(!sb || !['admin','staff'].includes(window.ScanSafeDB.profile?.role)) return [];
 
-    const fallback=adminMapFallbackOccupants();
-    const directRows=await adminMapDirectAssignmentOccupants(sb);
-    let rpcRows=[];
+    let rows=[];
     let rpcError=null;
-
     try{
-      const {data,error}=await sb.rpc('get_scansafe_space_occupants');
+      const {data,error}=await sb.rpc('get_scansafe_active_map_occupants');
       if(error) throw error;
-      rpcRows=Array.isArray(data)?data:[];
+      rows=Array.isArray(data)?data:[];
     }catch(error){
       rpcError=error;
-      console.warn('ScanSafe map occupants RPC:',error?.message||error);
+      console.error('ScanSafe active map occupants:',error?.message||error);
     }
 
-    // The map must still show assigned occupants even if the optional
-    // occupant-detail RPC is unavailable or returns no row for older data.
-    const rows=mergeAdminMapOccupants(
-      rpcRows,
-      mergeAdminMapOccupants(directRows,fallback)
-    );
-
+    // Profile photo is optional; initials remain the guaranteed visual fallback.
     await Promise.all(rows.map(async row=>{
       if(!row?.evacuee_id || !sb.storage?.from) return;
       try{
@@ -1442,29 +1433,33 @@
         });
         const path=detail?.data?.profile_photo?.path;
         if(!path) return;
-        const signed=await sb.storage.from('scansafe-account-media').createSignedUrl(path,300);
+        const signed=await sb.storage
+          .from('scansafe-account-media')
+          .createSignedUrl(path,300);
         const url=signed?.data?.signedUrl;
         if(/^https?:\/\//i.test(String(url||''))) row.profile_url=url;
-      }catch(_){ /* Initials remain the safe fallback. */ }
+      }catch(_){}
     }));
 
     mapDbCache.occupants.clear();
     for(const row of rows){
-      const key=String(row.space_code||'').trim();
+      const key=String(row.space_code||'').trim().toUpperCase();
       if(!key) continue;
       if(!mapDbCache.occupants.has(key)) mapDbCache.occupants.set(key,[]);
       mapDbCache.occupants.get(key).push(row);
     }
 
     mapDbCache.occupantDebug={
-      rpcCount:rpcRows.length,
-      fallbackCount:fallback.length,
-      directAssignmentCount:directRows.length,
+      source:'get_scansafe_active_map_occupants',
       renderedCount:rows.length,
       rpcError:rpcError?.message||null
     };
 
     renderAdminMapOccupants();
+
+    // Map/image sizing can settle after the async RPC. Re-render a few times;
+    // this only repositions overlays and does not query the database again.
+    [60,220,700].forEach(delay=>setTimeout(renderAdminMapOccupants,delay));
     return rows;
   }
 
@@ -1473,30 +1468,30 @@
     const stage=document.querySelector('.floor-image-stage');
     if(!stage) return;
 
-    stage.querySelectorAll('.map-occupant-stack').forEach(node=>node.remove());
+    stage.querySelectorAll('.map-occupant-overlay').forEach(node=>node.remove());
+    const stageRect=stage.getBoundingClientRect();
+    if(!stageRect.width || !stageRect.height) return;
 
     for(const [spaceCode,rows] of mapDbCache.occupants.entries()){
       if(!rows?.length) continue;
 
-      const hotspot=stage.querySelector(`.map-hotspot[data-space="${CSS.escape(spaceCode)}"]`);
+      const hotspot=[...stage.querySelectorAll('.map-hotspot[data-space]')]
+        .find(node=>String(node.dataset.space||'').trim().toUpperCase()===String(spaceCode).trim().toUpperCase());
       if(!hotspot) continue;
 
-      // Anchor the bubble INSIDE the actual accommodation hotspot instead of
-      // calculating coordinates against the whole floor image. This remains
-      // correct during resize, horizontal scrolling and responsive scaling.
-      const stack=document.createElement('span');
-      stack.className='map-occupant-stack map-occupant-stack-anchored';
-      stack.dataset.space=spaceCode;
-      stack.setAttribute(
-        'aria-label',
-        (rows.length===1?rows[0].full_name:rows.length+' accommodated groups')+' in '+spaceCode
-      );
-      stack.title=rows
-        .map(row=>`${row.full_name} • Group ${Number(row.group_size||1)} • ${row.arrival_time?'Checked In':'Assigned'}`)
-        .join('\n');
+      const rect=hotspot.getBoundingClientRect();
+      const left=(rect.left-stageRect.left)+(rect.width/2);
+      const top=(rect.top-stageRect.top)+(rect.height/2);
+
+      const overlay=document.createElement('div');
+      overlay.className='map-occupant-overlay';
+      overlay.dataset.space=spaceCode;
+      overlay.style.left=left+'px';
+      overlay.style.top=top+'px';
+      overlay.style.zIndex='80';
 
       const visible=rows.slice(0,3);
-      stack.innerHTML=
+      overlay.innerHTML=
         visible.map(row=>
           `<span class="map-occupant-avatar${row.profile_url?' has-photo':''}" title="${gbeaaEscape(row.full_name||'Evacuee')}">`+
             (row.profile_url
@@ -1504,17 +1499,15 @@
               : gbeaaEscape(mapOccupantInitials(row.full_name)))+
           `</span>`
         ).join('')+
-        (rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'');
+        (rows.length>3?`<span class="map-occupant-more">+${rows.length-3}</span>`:'')+
+        `<span class="map-occupant-overlay-label">${rows.length===1?gbeaaEscape(rows[0].full_name||'Evacuee'):rows.length+' groups'}</span>`;
 
-      hotspot.appendChild(stack);
-      hotspot.classList.add('has-map-occupants');
+      overlay.title=rows
+        .map(row=>`${row.full_name} • ${row.arrival_time?'Checked In':'Assigned'} • Group ${Number(row.group_size||1)}`)
+        .join('\n');
+
+      stage.appendChild(overlay);
     }
-
-    stage.querySelectorAll('.map-hotspot').forEach(hotspot=>{
-      if(!hotspot.querySelector('.map-occupant-stack')){
-        hotspot.classList.remove('has-map-occupants');
-      }
-    });
   }
 
   function renderAdminMapSpaceDetail(spaceCode){
