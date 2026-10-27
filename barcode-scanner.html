@@ -9,6 +9,24 @@
 <link rel="stylesheet" href="assets/account-media.css?v=integration-v23">
 <link rel="stylesheet" href="assets/notification-center.css?v=integration-v23">
 <link rel="stylesheet" href="assets/scanner-polish.css?v=scanner-polish-v1">
+
+<style id="camera-preview-safety-fix">
+.scanner-page .scan-frame{
+  position:relative;
+  overflow:hidden!important;
+  background:#101828;
+}
+.scanner-page #scanSafeQrReader{
+  transform-origin:top left;
+  background:#101828;
+  overflow:hidden;
+}
+.scanner-page #scanSafeQrReader video{
+  display:block!important;
+  margin:0!important;
+  border:0!important;
+}
+</style>
 </head>
 
 <body class="scanner-page">
@@ -146,7 +164,7 @@
 <script src="assets/supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="assets/app.js?v=needs-v19"></script>
-<script src="assets/scanner-camera.js?v=needs-v19"></script>
+<script src="assets/scanner-camera.js?v=camera-preview-fix-v1"></script>
 <script src="assets/scanner.js?v=needs-v19"></script>
 <script src="assets/needs-requests.js?v=operations-v22"></script>
 <script src="assets/account-media.js?v=integration-v23"></script>

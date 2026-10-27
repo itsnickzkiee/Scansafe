@@ -179,9 +179,58 @@
     const frame = previewLayout.frame;
     const width = frame.clientWidth;
     if (!width) return;
+
     const video = reader.querySelector('video');
-    const ratio = video && video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9;
-    reader.style.transform = 'scale(' + (width / 1280) + ')';
+    const ratio = video && video.videoWidth && video.videoHeight
+      ? video.videoWidth / video.videoHeight
+      : 16 / 9;
+
+    // Keep a large logical preview for long CODE128 values, but make the
+    // logical height match the REAL camera aspect ratio. This prevents
+    // html5-qrcode from rendering only a thin strip of live video above a
+    // large empty/dark reader area.
+    const logicalWidth = 1280;
+    const logicalHeight = Math.max(1, Math.round(logicalWidth / ratio));
+
+    reader.style.width = logicalWidth + 'px';
+    reader.style.height = logicalHeight + 'px';
+    reader.style.transform = 'scale(' + (width / logicalWidth) + ')';
+
+    const scanRegion = reader.querySelector('[id$="__scan_region"]');
+    if (scanRegion) {
+      scanRegion.style.position = 'relative';
+      scanRegion.style.width = logicalWidth + 'px';
+      scanRegion.style.height = logicalHeight + 'px';
+      scanRegion.style.minHeight = logicalHeight + 'px';
+      scanRegion.style.overflow = 'hidden';
+      scanRegion.style.background = '#101828';
+      scanRegion.style.border = '0';
+      scanRegion.style.padding = '0';
+      scanRegion.style.margin = '0';
+    }
+
+    if (video) {
+      video.style.position = 'absolute';
+      video.style.inset = '0';
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.maxWidth = 'none';
+      video.style.maxHeight = 'none';
+      // Container and stream use the same aspect ratio, so fill does not crop
+      // the barcode and keeps locator/detection coordinates aligned.
+      video.style.objectFit = 'fill';
+      video.style.margin = '0';
+      video.style.transform = 'none';
+    }
+
+    // html5-qrcode's built-in dashboard is not used because ScanSafe already
+    // provides its own Start/Stop button and camera selector.
+    const dashboard = reader.querySelector('[id$="__dashboard"]');
+    if (dashboard) dashboard.style.display = 'none';
+
+    const headerMessage = reader.querySelector('[id$="__header_message"]');
+    if (headerMessage) headerMessage.style.display = 'none';
+
     frame.style.height = Math.ceil(width / ratio) + 'px';
   }
 
@@ -200,7 +249,7 @@
     // The library sizes its decode canvas from video.clientWidth. Keep 1280
     // layout pixels for long CODE128 values; transforms resize only the preview.
     reader.style.width = '1280px';
-    reader.style.height = 'auto';
+    reader.style.height = '720px'; // temporary until camera metadata supplies the exact ratio
     reader.style.position = 'absolute';
     reader.style.left = '0';
     reader.style.top = '0';
